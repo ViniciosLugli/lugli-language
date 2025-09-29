@@ -1,0 +1,20 @@
+[package]
+name = "lugli-parser"
+version.workspace = true
+description = "Parser for the Lugli programming language"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+lugli-common.workspace = true
+lugli-lexer.workspace = true
+lugli-ast.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+pretty_assertions.workspace = true
+insta.workspace = true

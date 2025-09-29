@@ -1,0 +1,29 @@
+[package]
+name = "lugli"
+version.workspace = true
+description = "Command-line interface and REPL for the Lugli programming language"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "lugli"
+path = "src/main.rs"
+
+[dependencies]
+lugli-common.workspace = true
+lugli-lexer.workspace = true
+lugli-ast.workspace = true
+lugli-parser.workspace = true
+lugli-vm.workspace = true
+lugli-stdlib.workspace = true
+clap.workspace = true
+colored.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+pretty_assertions.workspace = true
+tempfile = "3.23.0"

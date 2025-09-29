@@ -1,0 +1,18 @@
+[package]
+name = "lugli-lexer"
+version.workspace = true
+description = "Lexical analyzer for the Lugli programming language"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+lugli-common.workspace = true
+logos.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+pretty_assertions.workspace = true

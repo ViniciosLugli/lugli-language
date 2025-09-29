@@ -1,18 +1,50 @@
-[package]
-name = "Lugli-language-interpreter"
-version = "0.2.0"
-description = "My 'lugli' language interpreter for learning purposes"
-authors = ["Vinicios Lugli <vinicioslugli@gmail.com>"]
-edition = "2018"
+[workspace]
+members = [
+	"crates/lugli-common",
+	"crates/lugli-lexer",
+	"crates/lugli-ast",
+	"crates/lugli-parser",
+	"crates/lugli-vm",
+	"crates/lugli-stdlib",
+	"crates/lugli",
+]
+resolver = "2"
 
-[dependencies]
-logos = "0.12"
-thiserror = "1.0"
-hashbrown = "0.12.0"
-regex = "1.5.4"
-clap = "3.0.0-beta.4"
-colored = "2"
-chrono = "0.4.12"
+[workspace.package]
+version = "0.3.0"
+description = "Lugli: High-level programming language with Rust-friendly syntax and Python simplicity"
+authors = ["Vinicios Lugli <vinicioslugli@gmail.com>"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/ViniciosLugli/Lugli-language"
+
+[workspace.dependencies]
+# Core language dependencies
+logos = "0.15.1"
+thiserror = "2.0.17"
+hashbrown = "0.16.0"
+
+# CLI and utilities
+clap = { version = "4.5.48", features = ["derive"] }
+colored = "3.0.0"
+
+# Standard library
+chrono = { version = "0.4.42", features = ["serde"] }
+regex = "1.11.3"
+
+# Internal crates
+lugli-common = { path = "crates/lugli-common" }
+lugli-lexer = { path = "crates/lugli-lexer" }
+lugli-ast = { path = "crates/lugli-ast" }
+lugli-parser = { path = "crates/lugli-parser" }
+lugli-vm = { path = "crates/lugli-vm" }
+lugli-stdlib = { path = "crates/lugli-stdlib" }
+
+# Development dependencies
+criterion = { version = "0.7.0", features = ["html_reports"] }
+proptest = "1.8.0"
+insta = "1.43.2"
+pretty_assertions = "1.4.1"
 
 [profile.release]
 opt-level = 3

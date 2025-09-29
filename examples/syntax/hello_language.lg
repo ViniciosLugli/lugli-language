@@ -1,5 +1,17 @@
-fn hello_language(lang) {
-    println!("Hello, " + lang + " Language!")
+# Hello Language - Simple Introduction
+# Demonstrates basic function and modern syntax
+
+fn hello_language(lang: str) {
+    print(f"Hello, {lang} Language!")
 }
 
+# Main execution
 hello_language("Lugli")
+
+# Alternative approaches
+fn greet_language(name: str, version: str = "1.0") {
+    print(f"Welcome to {name} v{version}! 🚀")
+}
+
+greet_language("Lugli", "2.0")
+greet_language("Lugli")  # Uses default version

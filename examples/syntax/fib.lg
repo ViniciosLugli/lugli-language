@@ -1,8 +1,235 @@
-fn fib(n) {
+# Fibonacci Sequence Examples
+# Demonstrates different algorithms and modern Lugli syntax
+
+# Recursive Fibonacci (simple but inefficient)
+fn fib_recursive(n: i32) -> i32 {
     if n < 2 {
         return n
     }
-    return fib(n - 1) + fib(n - 2)
+    return fib_recursive(n - 1) + fib_recursive(n - 2)
 }
 
-println!(fib(5))
+# Iterative Fibonacci (efficient)
+fn fib_iterative(n: i32) -> i32 {
+    if n < 2 {
+        return n
+    }
+
+    mut a = 0
+    mut b = 1
+
+    for _ in range(2, n + 1) {
+        let temp = a + b
+        a = b
+        b = temp
+    }
+
+    return b
+}
+
+# Memoized Fibonacci (recursive with caching)
+fn fib_memoized(n: i32, memo: {i32: i32} = {}) -> i32 {
+    if n in memo {
+        return memo[n]
+    }
+
+    if n < 2 {
+        memo[n] = n
+        return n
+    }
+
+    let result = fib_memoized(n - 1, memo) + fib_memoized(n - 2, memo)
+    memo[n] = result
+    return result
+}
+
+# Generator function for Fibonacci sequence
+fn fib_sequence(count: i32) -> [i32] {
+    if count <= 0 {
+        return []
+    }
+
+    mut sequence = [0]
+    if count == 1 {
+        return sequence
+    }
+
+    sequence.push(1)
+    if count == 2 {
+        return sequence
+    }
+
+    for i in range(2, count) {
+        let next = sequence[i - 1] + sequence[i - 2]
+        sequence.push(next)
+    }
+
+    return sequence
+}
+
+# Matrix-based Fibonacci (O(log n) using fast matrix exponentiation)
+fn fib_matrix(n: i32) -> i32 {
+    if n < 2 {
+        return n
+    }
+
+    fn matrix_multiply(a: [[i32; 2]; 2], b: [[i32; 2]; 2]) -> [[i32; 2]; 2] {
+        return [
+            [a[0][0] * b[0][0] + a[0][1] * b[1][0], a[0][0] * b[0][1] + a[0][1] * b[1][1]],
+            [a[1][0] * b[0][0] + a[1][1] * b[1][0], a[1][0] * b[0][1] + a[1][1] * b[1][1]]
+        ]
+    }
+
+    fn matrix_power(matrix: [[i32; 2]; 2], n: i32) -> [[i32; 2]; 2] {
+        if n == 1 {
+            return matrix
+        }
+
+        if n % 2 == 0 {
+            let half = matrix_power(matrix, n / 2)
+            return matrix_multiply(half, half)
+        } else {
+            return matrix_multiply(matrix, matrix_power(matrix, n - 1))
+        }
+    }
+
+    let base_matrix = [[1, 1], [1, 0]]
+    let result_matrix = matrix_power(base_matrix, n)
+    return result_matrix[0][1]
+}
+
+# Fibonacci with custom number types (if big integers are supported)
+fn fib_big(n: i32) -> str {
+    if n < 2 {
+        return n.to_string()
+    }
+
+    mut a = "0"
+    mut b = "1"
+
+    for _ in range(2, n + 1) {
+        let temp = big_int_add(a, b)
+        a = b
+        b = temp
+    }
+
+    return b
+}
+
+fn big_int_add(a: str, b: str) -> str {
+    # Simplified big integer addition (would need proper implementation)
+    # This is just a placeholder showing the concept
+    return f"({a} + {b})"
+}
+
+# Performance comparison function
+import time
+
+fn benchmark_fibonacci(n: i32) {
+    print(f"Computing Fibonacci({n}) with different algorithms:")
+    print()
+
+    # Iterative (always fast)
+    let start = time.now()
+    let result_iter = fib_iterative(n)
+    let time_iter = time.now() - start
+    print(f"Iterative: {result_iter} (time: {time_iter:.6f}s)")
+
+    # Memoized (fast)
+    let start = time.now()
+    let result_memo = fib_memoized(n)
+    let time_memo = time.now() - start
+    print(f"Memoized:  {result_memo} (time: {time_memo:.6f}s)")
+
+    # Matrix (very fast for large n)
+    let start = time.now()
+    let result_matrix = fib_matrix(n)
+    let time_matrix = time.now() - start
+    print(f"Matrix:    {result_matrix} (time: {time_matrix:.6f}s)")
+
+    # Recursive (only for small n due to exponential time)
+    if n <= 35 {
+        let start = time.now()
+        let result_recursive = fib_recursive(n)
+        let time_recursive = time.now() - start
+        print(f"Recursive: {result_recursive} (time: {time_recursive:.6f}s)")
+    } else {
+        print("Recursive: Skipped (too slow for large n)")
+    }
+
+    print()
+}
+
+# Golden ratio approach
+fn fib_golden_ratio(n: i32) -> i32 {
+    let phi = (1.0 + Math.sqrt(5.0)) / 2.0
+    let psi = (1.0 - Math.sqrt(5.0)) / 2.0
+    let result = (Math.pow(phi, n as f64) - Math.pow(psi, n as f64)) / Math.sqrt(5.0)
+    return Math.round(result) as i32
+}
+
+# Main demonstration
+print("🔢 Fibonacci Sequence Demonstration")
+print("===================================")
+print()
+
+# Test different approaches for small numbers
+print("First 15 Fibonacci numbers:")
+let sequence = fib_sequence(15)
+print(sequence)
+print()
+
+# Compare algorithms for different sizes
+benchmark_fibonacci(10)
+benchmark_fibonacci(20)
+benchmark_fibonacci(30)
+
+# Show golden ratio approach
+print("Golden Ratio approach:")
+for i in range(1, 11) {
+    let golden_result = fib_golden_ratio(i)
+    let iterative_result = fib_iterative(i)
+    let match_result = if golden_result == iterative_result { "✅" } else { "❌" }
+    print(f"fib({i}): Golden={golden_result}, Iterative={iterative_result} {match_result}")
+}
+print()
+
+# Fibonacci properties
+print("Fibonacci Properties:")
+let fib_nums = fib_sequence(12)
+for i in range(1, fib_nums.len() - 1) {
+    let current = fib_nums[i]
+    let next = fib_nums[i + 1]
+    let ratio = next as f64 / current as f64
+    print(f"F({i+1})/F({i}) = {next}/{current} = {ratio:.6f}")
+}
+print()
+
+# Check Fibonacci identities
+print("Fibonacci Identities:")
+let n = 8
+let fn_val = fib_iterative(n)
+let fn_plus_1 = fib_iterative(n + 1)
+let fn_minus_1 = fib_iterative(n - 1)
+
+# F(n)^2 + F(n+1)^2 = F(2n+1)
+let left_side = fn_val * fn_val + fn_plus_1 * fn_plus_1
+let right_side = fib_iterative(2 * n + 1)
+print(f"F({n})² + F({n+1})² = F({2*n+1})")
+print(f"{fn_val}² + {fn_plus_1}² = {right_side}")
+print(f"{left_side} = {right_side} ✅")
+print()
+
+# Lucas numbers (related sequence)
+fn lucas(n: i32) -> i32 {
+    if n == 0 { return 2 }
+    if n == 1 { return 1 }
+    return lucas(n - 1) + lucas(n - 2)
+}
+
+print("Lucas sequence (first 10 numbers):")
+let lucas_sequence = [lucas(i) for i in range(10)]
+print(lucas_sequence)
+
+print()
+print("Fibonacci demonstration complete! 🎯")

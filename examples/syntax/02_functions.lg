@@ -1,0 +1,93 @@
+# Modern Function Examples
+# Demonstrates Python+Rust hybrid function syntax
+
+# Basic function with type hints
+fn greet(name: str) -> str {
+    return f"Hello, {name}!"
+}
+
+# Function with default parameters
+fn calculate_area(width: f64, height: f64 = 1.0) -> f64 {
+    return width * height
+}
+
+# Multiple return values (tuple)
+fn get_user_info() -> (str, i32, bool) {
+    return "Alice", 25, true
+}
+
+# Function with optional parameters
+fn send_email(to: str, subject: str = "No Subject", urgent: bool = false) -> bool {
+    if urgent {
+        print(f"URGENT: Sending '{subject}' to {to}")
+    } else {
+        print(f"Sending '{subject}' to {to}")
+    }
+    return true
+}
+
+# Higher-order functions
+fn apply_operation(x: f64, y: f64, op: fn(f64, f64) -> f64) -> f64 {
+    return op(x, y)
+}
+
+fn add(a: f64, b: f64) -> f64 {
+    return a + b
+}
+
+fn multiply(a: f64, b: f64) -> f64 {
+    return a * b
+}
+
+# Lambda functions (Python-style)
+let square = |x: f64| -> f64 { x * x }
+let is_even = |n: i32| -> bool { n % 2 == 0 }
+
+# Generic function
+fn find_max<T>(items: [T]) -> T where T: PartialOrd {
+    mut max_item = items[0]
+    for item in items {
+        if item > max_item {
+            max_item = item
+        }
+    }
+    return max_item
+}
+
+# Function with error handling
+fn divide(a: f64, b: f64) -> Result<f64, str> {
+    if b == 0.0 {
+        return Err("Division by zero")
+    }
+    return Ok(a / b)
+}
+
+# Usage examples
+let message = greet("World")
+print(message)
+
+let area1 = calculate_area(10.0)        # Uses default height = 1.0
+let area2 = calculate_area(10.0, 5.0)   # Explicit height
+
+let (name, age, active) = get_user_info()
+print(f"User: {name}, Age: {age}, Active: {active}")
+
+send_email("alice@example.com")
+send_email("bob@example.com", "Meeting Tomorrow", true)
+
+let result1 = apply_operation(5.0, 3.0, add)
+let result2 = apply_operation(5.0, 3.0, multiply)
+print(f"5 + 3 = {result1}, 5 * 3 = {result2}")
+
+let squared = square(4.0)
+let check = is_even(7)
+print(f"4 squared = {squared}, 7 is even: {check}")
+
+let numbers = [3, 7, 1, 9, 5]
+let max_num = find_max(numbers)
+print(f"Max number: {max_num}")
+
+match divide(10.0, 2.0) {
+    Ok(result) => print(f"Result: {result}"),
+    Err(error) => print(f"Error: {error}")
+}
