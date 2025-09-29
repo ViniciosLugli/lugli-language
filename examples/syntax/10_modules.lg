@@ -1,0 +1,330 @@
+# Module System Examples
+# Demonstrates import/export and module organization in Python+Rust hybrid syntax
+
+# Basic imports
+import math
+import string
+import datetime
+
+# Specific imports
+from math import sqrt, pow, pi
+from string import capitalize, format
+from collections import List, Dict, Set
+
+# Aliased imports
+import datetime as dt
+import math as m
+from collections import List as ArrayList
+
+# Using imported functions
+let result = sqrt(16.0)
+print(f"Square root of 16: {result}")
+
+let power = pow(2.0, 8.0)
+print(f"2^8 = {power}")
+
+print(f"Pi value: {pi}")
+
+# Using aliased imports
+let now = dt.now()
+print(f"Current time: {now}")
+
+let circle_area = m.pi * pow(5.0, 2.0)
+print(f"Circle area: {circle_area}")
+
+# Importing from relative paths
+import "./utils/helpers"
+import "../shared/common"
+from "./utils/math_helpers" import factorial, fibonacci
+
+# Importing with wildcard (use sparingly)
+from "./constants" import *
+
+# Conditional imports
+if DEBUG_MODE {
+    import debug_tools
+    from debug_tools import trace, log_performance
+}
+
+# Module definition examples (what would be in other files)
+
+# File: math_utils.lg
+export fn add(a: f64, b: f64) -> f64 {
+    return a + b
+}
+
+export fn multiply(a: f64, b: f64) -> f64 {
+    return a * b
+}
+
+# Private function (not exported)
+fn internal_helper(x: f64) -> f64 {
+    return x * 2.0
+}
+
+# Export constant
+export const EULER_NUMBER = 2.71828
+
+# Export struct
+export struct Point {
+    x: f64,
+    y: f64
+}
+
+export impl Point {
+    fn new(x: f64, y: f64) -> Point {
+        return Point { x: x, y: y }
+    }
+
+    fn distance_from_origin(self) -> f64 {
+        return sqrt(self.x * self.x + self.y * self.y)
+    }
+}
+
+# File: string_utils.lg
+export fn reverse_string(s: str) -> str {
+    mut result = ""
+    for char in s.chars().reversed() {
+        result += char
+    }
+    return result
+}
+
+export fn word_count(text: str) -> i32 {
+    return text.split(" ").filter(|word| !word.is_empty()).len()
+}
+
+# Re-export from another module
+from "./internal/advanced_string" import advanced_split
+export { advanced_split }
+
+# File: collections_utils.lg
+export trait Printable {
+    fn to_string(self) -> str
+}
+
+export enum Status {
+    Active,
+    Inactive,
+    Pending
+}
+
+export fn process_list<T>(items: [T]) -> [T] where T: Printable {
+    for item in items {
+        print(item.to_string())
+    }
+    return items
+}
+
+# Using exported items
+import math_utils
+import string_utils
+import collections_utils
+
+# Using qualified names
+let sum = math_utils.add(5.0, 3.0)
+let product = math_utils.multiply(4.0, 6.0)
+print(f"Sum: {sum}, Product: {product}")
+
+# Using exported constants
+print(f"Euler's number: {math_utils.EULER_NUMBER}")
+
+# Using exported structs
+let point = math_utils.Point::new(3.0, 4.0)
+let distance = point.distance_from_origin()
+print(f"Distance from origin: {distance}")
+
+# Using string utilities
+let text = "Hello, World!"
+let reversed = string_utils.reverse_string(text)
+let words = string_utils.word_count(text)
+print(f"Original: {text}")
+print(f"Reversed: {reversed}")
+print(f"Word count: {words}")
+
+# Module visibility and access control
+
+# File: user_management.lg
+pub struct User {
+    pub name: str,
+    pub email: str,
+    password_hash: str  # Private field
+}
+
+pub impl User {
+    pub fn new(name: str, email: str, password: str) -> User {
+        return User {
+            name: name,
+            email: email,
+            password_hash: hash_password(password)
+        }
+    }
+
+    pub fn verify_password(self, password: str) -> bool {
+        return hash_password(password) == self.password_hash
+    }
+
+    # Private method
+    fn hash_password(password: str) -> str {
+        # Simplified hashing
+        return f"hash_{password}"
+    }
+}
+
+# Nested modules
+pub mod authentication {
+    use super.User
+
+    pub fn login(email: str, password: str) -> Option<User> {
+        # Login logic here
+        return Option::None
+    }
+
+    pub fn logout(user: User) {
+        # Logout logic here
+        print(f"User {user.name} logged out")
+    }
+
+    mod session {
+        # Private nested module
+        fn create_session_token() -> str {
+            return "session_token_123"
+        }
+    }
+}
+
+# Macro exports (if supported)
+export macro debug_print {
+    ($msg:expr) => {
+        if DEBUG_MODE {
+            print(f"DEBUG: {$msg}")
+        }
+    }
+}
+
+# Using the macro
+debug_print!("This is a debug message")
+
+# Module initialization
+# File: database.lg
+let mut connection_pool = []
+
+export fn initialize() {
+    print("Initializing database connection pool...")
+    connection_pool = create_pool(10)
+}
+
+export fn get_connection() -> Option<Connection> {
+    if connection_pool.is_empty() {
+        return Option::None
+    } else {
+        return Option::Some(connection_pool.pop())
+    }
+}
+
+fn create_pool(size: i32) -> [Connection] {
+    mut pool = []
+    for i in range(size) {
+        pool.push(Connection::new(f"conn_{i}"))
+    }
+    return pool
+}
+
+struct Connection {
+    id: str
+}
+
+impl Connection {
+    fn new(id: str) -> Connection {
+        return Connection { id: id }
+    }
+}
+
+# Package structure example
+# myapp/
+#   ├── main.lg
+#   ├── lib.lg
+#   ├── models/
+#   │   ├── mod.lg
+#   │   ├── user.lg
+#   │   └── product.lg
+#   ├── utils/
+#   │   ├── mod.lg
+#   │   ├── string.lg
+#   │   └── math.lg
+#   └── tests/
+#       ├── mod.lg
+#       └── integration.lg
+
+# File: models/mod.lg
+export { User } from "./user"
+export { Product } from "./product"
+
+# File: main.lg
+import models
+from models import User, Product
+import utils.string as str_utils
+import utils.math as math_utils
+
+# Version constraints and dependencies
+# Cargo.toml equivalent for Lugli packages
+# [dependencies]
+# json_parser = "1.0.0"
+# http_client = "^2.1.0"
+# crypto = { version = "0.5", features = ["sha256"] }
+
+import json_parser  # External dependency
+import http_client
+import crypto
+
+# Feature flags
+#[cfg(feature = "web")]
+import web_framework
+
+#[cfg(feature = "cli")]
+import command_line_parser
+
+# Platform-specific imports
+#[cfg(target_os = "linux")]
+import linux_utils
+
+#[cfg(target_os = "windows")]
+import windows_utils
+
+# Dynamic imports (runtime)
+fn load_plugin(name: str) -> Option<Module> {
+    let module_path = f"./plugins/{name}.lg"
+    if file_exists(module_path) {
+        return Some(import_dynamic(module_path))
+    } else {
+        return None
+    }
+}
+
+# Using dynamic imports
+if let Some(plugin) = load_plugin("example_plugin") {
+    plugin.initialize()
+    plugin.execute()
+}
+
+# Module testing
+# File: tests/string_utils_test.lg
+import "../string_utils"
+import testing
+
+test "reverse_string should reverse input" {
+    let input = "hello"
+    let expected = "olleh"
+    let actual = string_utils.reverse_string(input)
+    assert_eq(expected, actual)
+}
+
+test "word_count should count words correctly" {
+    let input = "hello world test"
+    let expected = 3
+    let actual = string_utils.word_count(input)
+    assert_eq(expected, actual)
+}
+
+# Running tests
+# lugli test string_utils_test.lg

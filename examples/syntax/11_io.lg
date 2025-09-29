@@ -1,0 +1,368 @@
+# Input/Output Examples
+# Demonstrates I/O operations in Python+Rust hybrid syntax
+
+import io
+import fs
+import format
+
+# Basic console input
+print("What's your name?")
+let name = input()
+print(f"Hello, {name}!")
+
+# Input with prompt
+let age = input("Enter your age: ")
+print(f"You are {age} years old")
+
+# Input with type conversion
+let age_num = input("Enter your age: ").parse::<i32>().unwrap_or(0)
+if age_num > 0 {
+    print(f"In 10 years, you'll be {age_num + 10}")
+} else {
+    print("Invalid age entered")
+}
+
+# Input validation loop
+loop {
+    let score = input("Enter a score (0-100): ")
+    match score.parse::<f64>() {
+        Ok(num) if num >= 0.0 && num <= 100.0 => {
+            print(f"Valid score: {num}")
+            break
+        },
+        Ok(num) => print(f"Score {num} is out of range. Try again."),
+        Err(_) => print("Please enter a valid number.")
+    }
+}
+
+# Multi-line input
+print("Enter a multi-line message (end with 'END'):")
+mut lines = []
+loop {
+    let line = input()
+    if line == "END" {
+        break
+    }
+    lines.push(line)
+}
+print("Your message:")
+for line in lines {
+    print(f"  {line}")
+}
+
+# File reading
+# Read entire file
+match fs.read_to_string("example.txt") {
+    Ok(content) => {
+        print("File content:")
+        print(content)
+    },
+    Err(error) => print(f"Error reading file: {error}")
+}
+
+# Read file line by line
+match fs.open("example.txt") {
+    Ok(file) => {
+        let lines = file.lines()
+        for (line_num, line) in enumerate(lines) {
+            print(f"Line {line_num + 1}: {line}")
+        }
+    },
+    Err(error) => print(f"Error opening file: {error}")
+}
+
+# Read file with error handling
+fn read_config_file(filename: str) -> Result<{str: str}, str> {
+    match fs.read_to_string(filename) {
+        Ok(content) => {
+            let mut config = {}
+            for line in content.lines() {
+                if line.contains("=") {
+                    let parts = line.split("=", 2)
+                    if parts.len() == 2 {
+                        config[parts[0].trim()] = parts[1].trim()
+                    }
+                }
+            }
+            Ok(config)
+        },
+        Err(error) => Err(f"Failed to read config: {error}")
+    }
+}
+
+# File writing
+let data = "Hello, World!\nThis is a test file.\n"
+match fs.write("output.txt", data) {
+    Ok(_) => print("File written successfully"),
+    Err(error) => print(f"Error writing file: {error}")
+}
+
+# Append to file
+match fs.append("output.txt", "Appended line\n") {
+    Ok(_) => print("Line appended successfully"),
+    Err(error) => print(f"Error appending to file: {error}")
+}
+
+# File operations with buffered writer
+match fs.create("data.txt") {
+    Ok(mut file) => {
+        file.write_line("Name,Age,City")
+        file.write_line("Alice,25,New York")
+        file.write_line("Bob,30,San Francisco")
+        file.write_line("Charlie,35,Chicago")
+        file.flush()  # Ensure data is written
+        print("CSV file created successfully")
+    },
+    Err(error) => print(f"Error creating file: {error}")
+}
+
+# Binary file operations
+let binary_data = [0x48, 0x65, 0x6C, 0x6C, 0x6F]  # "Hello" in ASCII
+match fs.write_bytes("binary.dat", binary_data) {
+    Ok(_) => print("Binary file written"),
+    Err(error) => print(f"Error writing binary file: {error}")
+}
+
+match fs.read_bytes("binary.dat") {
+    Ok(bytes) => {
+        print(f"Read {bytes.len()} bytes")
+        let text = String::from_utf8(bytes).unwrap_or("Invalid UTF-8")
+        print(f"As text: {text}")
+    },
+    Err(error) => print(f"Error reading binary file: {error}")
+}
+
+# File metadata and directory operations
+if fs.exists("example.txt") {
+    match fs.metadata("example.txt") {
+        Ok(meta) => {
+            print(f"File size: {meta.size} bytes")
+            print(f"Modified: {meta.modified}")
+            print(f"Is directory: {meta.is_dir}")
+            print(f"Is file: {meta.is_file}")
+        },
+        Err(error) => print(f"Error getting metadata: {error}")
+    }
+} else {
+    print("File does not exist")
+}
+
+# Directory listing
+match fs.read_dir(".") {
+    Ok(entries) => {
+        print("Directory contents:")
+        for entry in entries {
+            let file_type = if entry.is_dir { "DIR" } else { "FILE" }
+            print(f"  {file_type}: {entry.name}")
+        }
+    },
+    Err(error) => print(f"Error reading directory: {error}")
+}
+
+# Creating directories
+if fs.create_dir("temp_folder").is_ok() {
+    print("Directory created successfully")
+
+    # Create nested directories
+    if fs.create_dir_all("temp_folder/nested/deep").is_ok() {
+        print("Nested directories created")
+    }
+}
+
+# File copying and moving
+if fs.copy("example.txt", "example_copy.txt").is_ok() {
+    print("File copied successfully")
+}
+
+if fs.rename("example_copy.txt", "renamed_example.txt").is_ok() {
+    print("File renamed successfully")
+}
+
+# Temporary files
+match fs.create_temp_file("temp_", ".txt") {
+    Ok(temp_file) => {
+        print(f"Temporary file created: {temp_file.path}")
+        temp_file.write("Temporary content")
+        # File is automatically deleted when temp_file goes out of scope
+    },
+    Err(error) => print(f"Error creating temp file: {error}")
+}
+
+# JSON I/O
+let data = {
+    "name": "Alice",
+    "age": 25,
+    "hobbies": ["reading", "swimming", "coding"]
+}
+
+# Write JSON
+match fs.write_json("user.json", data) {
+    Ok(_) => print("JSON written successfully"),
+    Err(error) => print(f"Error writing JSON: {error}")
+}
+
+# Read JSON
+match fs.read_json("user.json") {
+    Ok(parsed) => {
+        print(f"Loaded user: {parsed.name}, age {parsed.age}")
+        print(f"Hobbies: {parsed.hobbies.join(', ')}")
+    },
+    Err(error) => print(f"Error reading JSON: {error}")
+}
+
+# CSV I/O
+import csv
+
+# Write CSV
+let csv_data = [
+    ["Name", "Age", "City"],
+    ["Alice", "25", "New York"],
+    ["Bob", "30", "San Francisco"],
+    ["Charlie", "35", "Chicago"]
+]
+
+match csv.write_file("users.csv", csv_data) {
+    Ok(_) => print("CSV written successfully"),
+    Err(error) => print(f"Error writing CSV: {error}")
+}
+
+# Read CSV
+match csv.read_file("users.csv") {
+    Ok(rows) => {
+        for (i, row) in enumerate(rows) {
+            if i == 0 {
+                print(f"Headers: {row.join(' | ')}")
+            } else {
+                print(f"Data: {row.join(' | ')}")
+            }
+        }
+    },
+    Err(error) => print(f"Error reading CSV: {error}")
+}
+
+# Network I/O (HTTP)
+import http
+
+# HTTP GET request
+match http.get("https://api.github.com/users/octocat") {
+    Ok(response) => {
+        print(f"Status: {response.status}")
+        print(f"Headers: {response.headers}")
+
+        match response.json() {
+            Ok(data) => print(f"User: {data.name} ({data.login})"),
+            Err(error) => print(f"Error parsing JSON: {error}")
+        }
+    },
+    Err(error) => print(f"HTTP request failed: {error}")
+}
+
+# HTTP POST request
+let post_data = {
+    "title": "Test Post",
+    "body": "This is a test",
+    "userId": 1
+}
+
+match http.post("https://jsonplaceholder.typicode.com/posts", post_data) {
+    Ok(response) => {
+        print(f"POST Status: {response.status}")
+        if let Ok(data) = response.json() {
+            print(f"Created post with ID: {data.id}")
+        }
+    },
+    Err(error) => print(f"POST request failed: {error}")
+}
+
+# Process I/O
+import process
+
+# Run external command
+match process.run(["ls", "-la"]) {
+    Ok(output) => {
+        print("Command output:")
+        print(output.stdout)
+        if !output.stderr.is_empty() {
+            print(f"Errors: {output.stderr}")
+        }
+        print(f"Exit code: {output.exit_code}")
+    },
+    Err(error) => print(f"Command failed: {error}")
+}
+
+# Interactive process
+match process.spawn(["python3", "-i"]) {
+    Ok(mut child) => {
+        child.stdin.write("print('Hello from Python')\n")
+        child.stdin.write("2 + 2\n")
+        child.stdin.write("exit()\n")
+
+        match child.wait() {
+            Ok(exit_status) => print(f"Process exited with: {exit_status}"),
+            Err(error) => print(f"Process error: {error}")
+        }
+    },
+    Err(error) => print(f"Failed to spawn process: {error}")
+}
+
+# Environment variables
+import env
+
+print(f"PATH: {env.get('PATH').unwrap_or('Not set')}")
+print(f"HOME: {env.get('HOME').unwrap_or('Not set')}")
+
+env.set("MY_VAR", "Hello World")
+print(f"MY_VAR: {env.get('MY_VAR').unwrap_or('Not set')}")
+
+# Formatted output
+let users = [
+    {"name": "Alice", "age": 25, "score": 95.5},
+    {"name": "Bob", "age": 30, "score": 87.2},
+    {"name": "Charlie", "age": 35, "score": 92.8}
+]
+
+print("User Report:")
+print("+---------+-----+-------+")
+print("| Name    | Age | Score |")
+print("+---------+-----+-------+")
+for user in users {
+    print(f"| {user.name:7} | {user.age:3} | {user.score:5.1f} |")
+}
+print("+---------+-----+-------+")
+
+# Progress indicators
+import time
+
+print("Processing files...")
+let total_files = 10
+for i in range(total_files) {
+    let progress = (i + 1) as f64 / total_files as f64 * 100.0
+    let bar_length = 20
+    let filled_length = (progress / 100.0 * bar_length as f64) as i32
+    let bar = "█" * filled_length + "░" * (bar_length - filled_length)
+
+    print(f"\r[{bar}] {progress:5.1f}% ({i + 1}/{total_files})", end="")
+    time.sleep(0.1)  # Simulate work
+}
+print("\nProcessing complete!")
+
+# Logging
+import log
+
+log.set_level(log.DEBUG)
+
+log.debug("This is a debug message")
+log.info("Application started")
+log.warn("This is a warning")
+log.error("An error occurred")
+
+# Log to file
+log.to_file("app.log")
+log.info("This will be written to file")
+
+# Structured logging
+log.info("User login", {
+    "user_id": 123,
+    "ip_address": "192.168.1.1",
+    "timestamp": time.now()
+})

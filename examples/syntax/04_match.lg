@@ -1,0 +1,188 @@
+# Pattern Matching Examples
+# Demonstrates Rust-style pattern matching in Python+Rust hybrid
+
+# Basic match expressions
+fn describe_number(n: i32) -> str {
+    match n {
+        0 => "zero",
+        1 => "one",
+        2 => "two",
+        3..=10 => "small number",
+        11..=100 => "medium number",
+        _ => "large number"
+    }
+}
+
+# Match with guards
+fn categorize_grade(score: f64) -> str {
+    match score {
+        s if s >= 90.0 => "A",
+        s if s >= 80.0 => "B",
+        s if s >= 70.0 => "C",
+        s if s >= 60.0 => "D",
+        _ => "F"
+    }
+}
+
+# Enum definition
+enum Color {
+    Red,
+    Green,
+    Blue,
+    RGB(i32, i32, i32),
+    HSL { h: f64, s: f64, l: f64 }
+}
+
+# Match on enums
+fn color_to_hex(color: Color) -> str {
+    match color {
+        Color::Red => "#FF0000",
+        Color::Green => "#00FF00",
+        Color::Blue => "#0000FF",
+        Color::RGB(r, g, b) => f"#{r:02x}{g:02x}{b:02x}",
+        Color::HSL { h, s, l } => f"hsl({h}, {s}%, {l}%)"
+    }
+}
+
+# Option type (Rust-style nullable)
+enum Option<T> {
+    Some(T),
+    None
+}
+
+fn divide_safe(a: f64, b: f64) -> Option<f64> {
+    if b == 0.0 {
+        return Option::None
+    } else {
+        return Option::Some(a / b)
+    }
+}
+
+# Match on Option
+fn handle_result(result: Option<f64>) -> str {
+    match result {
+        Option::Some(value) => f"Result: {value}",
+        Option::None => "Error: Division by zero"
+    }
+}
+
+# Result type for error handling
+enum Result<T, E> {
+    Ok(T),
+    Err(E)
+}
+
+fn parse_number(text: str) -> Result<f64, str> {
+    # Simplified parsing logic
+    if text == "42" {
+        return Result::Ok(42.0)
+    } elif text == "3.14" {
+        return Result::Ok(3.14)
+    } else {
+        return Result::Err(f"Cannot parse '{text}' as number")
+    }
+}
+
+# Complex pattern matching
+struct Point {
+    x: f64,
+    y: f64
+}
+
+fn analyze_point(point: Point) -> str {
+    match point {
+        Point { x: 0.0, y: 0.0 } => "Origin",
+        Point { x: 0.0, y } => f"On Y-axis at {y}",
+        Point { x, y: 0.0 } => f"On X-axis at {x}",
+        Point { x, y } if x == y => f"On diagonal at ({x}, {y})",
+        Point { x, y } if x > 0.0 && y > 0.0 => "First quadrant",
+        Point { x, y } if x < 0.0 && y > 0.0 => "Second quadrant",
+        Point { x, y } if x < 0.0 && y < 0.0 => "Third quadrant",
+        Point { x, y } if x > 0.0 && y < 0.0 => "Fourth quadrant",
+        _ => "Unknown"
+    }
+}
+
+# Match on lists/arrays
+fn analyze_list(items: [i32]) -> str {
+    match items {
+        [] => "Empty list",
+        [x] => f"Single item: {x}",
+        [x, y] => f"Two items: {x}, {y}",
+        [x, y, z] => f"Three items: {x}, {y}, {z}",
+        [first, ...rest] => f"Starts with {first}, has {rest.len()} more items",
+    }
+}
+
+# Match in function parameters (destructuring)
+fn process_tuple(data: (str, i32, bool)) -> str {
+    let (name, age, active) = data
+    match (name, age, active) {
+        (n, a, true) if a >= 18 => f"{n} is an active adult ({a})",
+        (n, a, true) => f"{n} is an active minor ({a})",
+        (n, a, false) => f"{n} is inactive ({a})",
+    }
+}
+
+# Match expressions as values
+fn get_message(status: i32) -> str {
+    let message = match status {
+        200 => "OK",
+        404 => "Not Found",
+        500 => "Internal Server Error",
+        code if code >= 400 => "Client Error",
+        code if code >= 500 => "Server Error",
+        _ => "Unknown Status"
+    }
+    return f"HTTP {status}: {message}"
+}
+
+# Usage examples
+print(describe_number(5))
+print(describe_number(150))
+
+print(categorize_grade(95.0))
+print(categorize_grade(75.0))
+
+let red = Color::Red
+let custom = Color::RGB(255, 128, 0)
+let hsl_color = Color::HSL { h: 240.0, s: 100.0, l: 50.0 }
+
+print(color_to_hex(red))
+print(color_to_hex(custom))
+print(color_to_hex(hsl_color))
+
+let result1 = divide_safe(10.0, 2.0)
+let result2 = divide_safe(10.0, 0.0)
+print(handle_result(result1))
+print(handle_result(result2))
+
+let parse1 = parse_number("42")
+let parse2 = parse_number("invalid")
+match parse1 {
+    Result::Ok(value) => print(f"Parsed: {value}"),
+    Result::Err(error) => print(f"Error: {error}")
+}
+
+let point1 = Point { x: 0.0, y: 0.0 }
+let point2 = Point { x: 3.0, y: 3.0 }
+let point3 = Point { x: -2.0, y: 5.0 }
+
+print(analyze_point(point1))
+print(analyze_point(point2))
+print(analyze_point(point3))
+
+let empty = []
+let single = [42]
+let multiple = [1, 2, 3, 4, 5]
+
+print(analyze_list(empty))
+print(analyze_list(single))
+print(analyze_list(multiple))
+
+let user_data = ("Alice", 25, true)
+print(process_tuple(user_data))
+
+print(get_message(200))
+print(get_message(404))
+print(get_message(418))

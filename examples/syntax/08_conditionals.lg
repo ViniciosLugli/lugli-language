@@ -1,0 +1,223 @@
+# Conditional Logic Examples
+# Demonstrates all conditional constructs in Python+Rust hybrid syntax
+
+# Basic if statements
+let age = 25
+if age >= 18 {
+    print("You are an adult")
+}
+
+# If-else
+let temperature = 75
+if temperature > 80 {
+    print("It's hot outside")
+} else {
+    print("It's comfortable outside")
+}
+
+# If-elif-else chain
+let score = 85
+if score >= 90 {
+    print("Grade: A")
+} elif score >= 80 {
+    print("Grade: B")
+} elif score >= 70 {
+    print("Grade: C")
+} elif score >= 60 {
+    print("Grade: D")
+} else {
+    print("Grade: F")
+}
+
+# Complex conditions with logical operators
+let username = "alice"
+let password = "secret123"
+let is_admin = false
+
+if username == "alice" && password == "secret123" {
+    print("Login successful")
+    if is_admin {
+        print("Admin access granted")
+    } else {
+        print("User access granted")
+    }
+} else {
+    print("Invalid credentials")
+}
+
+# Logical operators
+let x = 10
+let y = 20
+
+if x > 5 && y < 25 {
+    print("Both conditions are true")
+}
+
+if x > 15 || y > 15 {
+    print("At least one condition is true")
+}
+
+if !(x > y) {
+    print("x is not greater than y")
+}
+
+# Ternary operator (conditional expression)
+let status = "adult" if age >= 18 else "minor"
+print(f"Status: {status}")
+
+let max_value = x if x > y else y
+print(f"Maximum: {max_value}")
+
+# Multiple ternary
+let grade = "A" if score >= 90 else "B" if score >= 80 else "C" if score >= 70 else "F"
+print(f"Letter grade: {grade}")
+
+# Conditional assignment
+let discount = 0.1 if age >= 65 else 0.05 if age >= 18 else 0.0
+print(f"Discount: {discount * 100}%")
+
+# Guards in function parameters
+fn process_user(name: str, age: i32) -> str {
+    if name.is_empty() {
+        return "Name cannot be empty"
+    }
+
+    if age < 0 {
+        return "Age cannot be negative"
+    }
+
+    if age >= 150 {
+        return "Age seems unrealistic"
+    }
+
+    return f"Processing user {name}, age {age}"
+}
+
+print(process_user("Alice", 25))
+print(process_user("", 30))
+print(process_user("Bob", -5))
+
+# Pattern matching with conditions (guards)
+fn describe_number(n: i32) -> str {
+    match n {
+        0 => "zero",
+        x if x > 0 && x < 10 => "single digit positive",
+        x if x < 0 && x > -10 => "single digit negative",
+        x if x % 2 == 0 => "even number",
+        x if x % 2 == 1 => "odd number",
+        _ => "some number"
+    }
+}
+
+for num in [-5, 0, 3, 12, 15] {
+    print(f"{num}: {describe_number(num)}")
+}
+
+# Nested conditionals
+fn check_access(user_role: str, resource: str, time_of_day: i32) -> bool {
+    if user_role == "admin" {
+        return true  # Admins have full access
+    } elif user_role == "user" {
+        if resource == "public" {
+            return true
+        } elif resource == "private" {
+            if time_of_day >= 9 && time_of_day <= 17 {
+                return true  # Users can access private during business hours
+            } else {
+                return false
+            }
+        } else {
+            return false
+        }
+    } else {
+        return false  # Unknown role
+    }
+}
+
+print(check_access("admin", "private", 22))    # true
+print(check_access("user", "public", 22))      # true
+print(check_access("user", "private", 14))     # true
+print(check_access("user", "private", 22))     # false
+
+# Short-circuit evaluation
+fn expensive_operation() -> bool {
+    print("Expensive operation called")
+    return true
+}
+
+let should_run = false
+if should_run && expensive_operation() {
+    print("Both conditions met")
+} else {
+    print("Short-circuited - expensive operation not called")
+}
+
+# Truthiness and falsiness
+let values = [0, 1, "", "hello", [], [1], {}, {"key": "value"}, null, true, false]
+
+for value in values {
+    if value {
+        print(f"{value} is truthy")
+    } else {
+        print(f"{value} is falsy")
+    }
+}
+
+# Conditional execution with match
+enum Status {
+    Active,
+    Inactive,
+    Pending
+}
+
+fn handle_status(status: Status) -> str {
+    match status {
+        Status::Active => {
+            print("User is active")
+            return "redirect_to_dashboard"
+        },
+        Status::Inactive => {
+            print("User is inactive")
+            return "show_reactivation_form"
+        },
+        Status::Pending => {
+            print("User is pending approval")
+            return "show_waiting_message"
+        }
+    }
+}
+
+# Multiple conditions in one expression
+let weather = "sunny"
+let temperature_celsius = 25
+
+let activity = match (weather, temperature_celsius) {
+    ("sunny", temp) if temp > 25 => "go to the beach",
+    ("sunny", temp) if temp > 15 => "have a picnic",
+    ("rainy", _) => "stay inside and read",
+    ("cloudy", temp) if temp > 20 => "take a walk",
+    _ => "watch a movie"
+}
+
+print(f"Today's activity: {activity}")
+
+# Conditional loops
+mut attempts = 0
+let max_attempts = 3
+
+while attempts < max_attempts {
+    attempts += 1
+    print(f"Attempt {attempts}")
+
+    # Simulate some condition
+    let success = attempts == 2
+
+    if success {
+        print("Success!")
+        break
+    } elif attempts == max_attempts {
+        print("Max attempts reached")
+    } else {
+        print("Retrying...")
+    }
+}

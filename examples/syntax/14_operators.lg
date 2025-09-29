@@ -1,0 +1,377 @@
+# Operators Examples
+# Demonstrates all operators in Python+Rust hybrid syntax
+
+# Arithmetic operators
+let a = 10
+let b = 3
+
+print("Arithmetic Operators:")
+print(f"{a} + {b} = {a + b}")        # Addition
+print(f"{a} - {b} = {a - b}")        # Subtraction
+print(f"{a} * {b} = {a * b}")        # Multiplication
+print(f"{a} / {b} = {a / b}")        # Division (float)
+print(f"{a} // {b} = {a // b}")      # Integer division
+print(f"{a} % {b} = {a % b}")        # Modulo
+print(f"{a} ** {b} = {a ** b}")      # Exponentiation
+
+# Unary arithmetic operators
+let x = 5
+let y = -3
+print(f"\nUnary Operators:")
+print(f"+{x} = {+x}")               # Unary plus
+print(f"-{x} = {-x}")               # Unary minus
+print(f"-({y}) = {-y}")             # Negation of negative
+
+# Assignment operators
+mut value = 10
+print(f"\nAssignment Operators:")
+print(f"Initial value: {value}")
+
+value += 5
+print(f"After += 5: {value}")
+
+value -= 3
+print(f"After -= 3: {value}")
+
+value *= 2
+print(f"After *= 2: {value}")
+
+value /= 4
+print(f"After /= 4: {value}")
+
+value //= 2
+print(f"After //= 2: {value}")
+
+value %= 3
+print(f"After %= 3: {value}")
+
+value **= 3
+print(f"After **= 3: {value}")
+
+# Increment and decrement operators
+mut counter = 5
+print(f"\nIncrement/Decrement:")
+print(f"Initial counter: {counter}")
+
+counter++  # Post-increment
+print(f"After post-increment: {counter}")
+
+++counter  # Pre-increment
+print(f"After pre-increment: {counter}")
+
+counter--  # Post-decrement
+print(f"After post-decrement: {counter}")
+
+--counter  # Pre-decrement
+print(f"After pre-decrement: {counter}")
+
+# Comparison operators
+let num1 = 10
+let num2 = 20
+let num3 = 10
+
+print(f"\nComparison Operators:")
+print(f"{num1} == {num2}: {num1 == num2}")      # Equal
+print(f"{num1} != {num2}: {num1 != num2}")      # Not equal
+print(f"{num1} < {num2}: {num1 < num2}")        # Less than
+print(f"{num1} <= {num3}: {num1 <= num3}")      # Less than or equal
+print(f"{num2} > {num1}: {num2 > num1}")        # Greater than
+print(f"{num2} >= {num1}: {num2 >= num1}")      # Greater than or equal
+
+# String comparison
+let str1 = "apple"
+let str2 = "banana"
+let str3 = "apple"
+
+print(f"\nString Comparison:")
+print(f"'{str1}' == '{str3}': {str1 == str3}")
+print(f"'{str1}' < '{str2}': {str1 < str2}")
+print(f"'{str1}' > '{str2}': {str1 > str2}")
+
+# Logical operators
+let p = true
+let q = false
+
+print(f"\nLogical Operators:")
+print(f"{p} && {q}: {p && q}")       # Logical AND
+print(f"{p} || {q}: {p || q}")       # Logical OR
+print(f"!{p}: {!p}")                 # Logical NOT
+print(f"!{q}: {!q}")
+
+# Logical operators with expressions
+let age = 25
+let has_license = true
+let is_sober = true
+
+let can_drive = age >= 18 && has_license && is_sober
+print(f"Can drive: {can_drive}")
+
+# Short-circuit evaluation
+fn expensive_check() -> bool {
+    print("Expensive operation called")
+    return true
+}
+
+print("\nShort-circuit evaluation:")
+print("false && expensive_check():")
+let result1 = false && expensive_check()  # expensive_check not called
+print(f"Result: {result1}")
+
+print("true || expensive_check():")
+let result2 = true || expensive_check()   # expensive_check not called
+print(f"Result: {result2}")
+
+# Bitwise operators
+let bits1 = 0b1010  # 10 in decimal
+let bits2 = 0b1100  # 12 in decimal
+
+print(f"\nBitwise Operators:")
+print(f"{bits1:04b} & {bits2:04b} = {(bits1 & bits2):04b}")   # Bitwise AND
+print(f"{bits1:04b} | {bits2:04b} = {(bits1 | bits2):04b}")   # Bitwise OR
+print(f"{bits1:04b} ^ {bits2:04b} = {(bits1 ^ bits2):04b}")   # Bitwise XOR
+print(f"~{bits1:04b} = {(~bits1):04b}")                       # Bitwise NOT
+
+# Bit shift operators
+let value = 8  # 0b1000
+print(f"\nBit Shift Operators:")
+print(f"{value} << 1 = {value << 1}")   # Left shift
+print(f"{value} << 2 = {value << 2}")
+print(f"{value} >> 1 = {value >> 1}")   # Right shift
+print(f"{value} >> 2 = {value >> 2}")
+
+# Bit shift with assignment
+mut shifty = 4
+print(f"Initial: {shifty}")
+shifty <<= 2
+print(f"After <<= 2: {shifty}")
+shifty >>= 1
+print(f"After >>= 1: {shifty}")
+
+# Membership operators
+let numbers = [1, 2, 3, 4, 5]
+let letters = "hello"
+let scores = {"Alice": 95, "Bob": 87}
+
+print(f"\nMembership Operators:")
+print(f"3 in {numbers}: {3 in numbers}")
+print(f"6 in {numbers}: {6 in numbers}")
+print(f"'e' in '{letters}': {'e' in letters}")
+print(f"'x' in '{letters}': {'x' in letters}")
+print(f"'Alice' in scores: {'Alice' in scores}")
+print(f"'Charlie' in scores: {'Charlie' in scores}")
+
+# Not in operator
+print(f"7 not in {numbers}: {7 not in numbers}")
+print(f"'o' not in '{letters}': {'o' not in letters}")
+
+# Identity operators
+let list1 = [1, 2, 3]
+let list2 = [1, 2, 3]
+let list3 = list1
+
+print(f"\nIdentity Operators:")
+print(f"list1 is list2: {list1 is list2}")     # Different objects
+print(f"list1 is list3: {list1 is list3}")     # Same object
+print(f"list1 is not list2: {list1 is not list2}")
+
+# Type checking operators
+let mixed_data = [42, "hello", 3.14, true, null]
+
+print(f"\nType Checking:")
+for item in mixed_data {
+    if item is i32 {
+        print(f"{item} is an integer")
+    } elif item is str {
+        print(f"'{item}' is a string")
+    } elif item is f64 {
+        print(f"{item} is a float")
+    } elif item is bool {
+        print(f"{item} is a boolean")
+    } elif item is null {
+        print("null value")
+    } else {
+        print(f"{item} is of unknown type")
+    }
+}
+
+# Conditional (ternary) operator
+let temperature = 75
+let weather = "hot" if temperature > 80 else "cold" if temperature < 60 else "mild"
+print(f"\nTemperature {temperature}°F is {weather}")
+
+# Chained ternary
+let score = 85
+let grade = "A" if score >= 90 else "B" if score >= 80 else "C" if score >= 70 else "F"
+print(f"Score {score} gets grade {grade}")
+
+# Operator precedence examples
+print(f"\nOperator Precedence:")
+print(f"2 + 3 * 4: {2 + 3 * 4}")           # Multiplication first
+print(f"(2 + 3) * 4: {(2 + 3) * 4}")       # Parentheses override
+print(f"2 ** 3 ** 2: {2 ** 3 ** 2}")       # Right-associative
+print(f"(2 ** 3) ** 2: {(2 ** 3) ** 2}")   # Left-associative with parentheses
+
+# Complex precedence
+let result = 5 + 3 * 2 ** 2 - 1
+print(f"5 + 3 * 2 ** 2 - 1 = {result}")    # 5 + 3 * 4 - 1 = 5 + 12 - 1 = 16
+
+# Boolean operators with precedence
+let complex_condition = true || false && true
+print(f"true || false && true: {complex_condition}")  # && has higher precedence
+
+let explicit_condition = true || (false && true)
+print(f"true || (false && true): {explicit_condition}")
+
+# Combining different operator types
+let items = [1, 2, 3, 4, 5]
+let threshold = 3
+
+let filtered = [x * 2 for x in items if x > threshold]
+print(f"Items > {threshold}, doubled: {filtered}")
+
+# Using operators with custom types
+struct Vector {
+    x: f64,
+    y: f64
+}
+
+impl Vector {
+    fn new(x: f64, y: f64) -> Vector {
+        Vector { x: x, y: y }
+    }
+}
+
+# Operator overloading (conceptual - would need actual implementation)
+impl Add for Vector {
+    fn add(self, other: Vector) -> Vector {
+        Vector::new(self.x + other.x, self.y + other.y)
+    }
+}
+
+impl Mul<f64> for Vector {
+    fn mul(self, scalar: f64) -> Vector {
+        Vector::new(self.x * scalar, self.y * scalar)
+    }
+}
+
+let v1 = Vector::new(1.0, 2.0)
+let v2 = Vector::new(3.0, 4.0)
+let v3 = v1 + v2  # Would use overloaded + operator
+let v4 = v1 * 2.0  # Would use overloaded * operator
+
+print(f"Vector addition: ({v3.x}, {v3.y})")
+print(f"Vector scaling: ({v4.x}, {v4.y})")
+
+# Operator functions (treating operators as functions)
+let add_fn = |a, b| a + b
+let multiply_fn = |a, b| a * b
+let compare_fn = |a, b| a > b
+
+print(f"\nOperators as functions:")
+print(f"add_fn(5, 3): {add_fn(5, 3)}")
+print(f"multiply_fn(4, 7): {multiply_fn(4, 7)}")
+print(f"compare_fn(10, 8): {compare_fn(10, 8)}")
+
+# Chaining comparisons
+let value = 15
+let in_range = 10 <= value <= 20
+print(f"{value} is in range [10, 20]: {in_range}")
+
+let out_of_range = 5 < value < 10
+print(f"{value} is in range (5, 10): {out_of_range}")
+
+# Safe navigation operator (if supported)
+struct User {
+    profile: Option<Profile>
+}
+
+struct Profile {
+    name: str,
+    email: Option<str>
+}
+
+let user = User {
+    profile: Some(Profile {
+        name: "Alice",
+        email: Some("alice@example.com")
+    })
+}
+
+# Safe navigation with ?
+let email = user.profile?.email?.unwrap_or("No email")
+print(f"User email: {email}")
+
+# Null coalescing operator
+let maybe_null = null
+let default_value = "default"
+let result = maybe_null ?? default_value
+print(f"Null coalescing result: {result}")
+
+# Range operators
+print(f"\nRange Operators:")
+for i in 1..5 {          # Exclusive range
+    print(f"Exclusive: {i}")
+}
+
+for i in 1..=5 {         # Inclusive range
+    print(f"Inclusive: {i}")
+}
+
+# Spread operator (if supported)
+let arr1 = [1, 2, 3]
+let arr2 = [4, 5, 6]
+let combined = [...arr1, ...arr2]
+print(f"Spread arrays: {combined}")
+
+# Destructuring with operators
+let (first, ...rest) = [1, 2, 3, 4, 5]
+print(f"First: {first}, Rest: {rest}")
+
+# Pipe operator (if supported)
+let result = 5
+    |> |x| x * 2
+    |> |x| x + 1
+    |> |x| x.to_string()
+print(f"Pipe result: {result}")
+
+# Mathematical operator combinations
+let complex_math = (3 + 4) * 2 ** 3 / (2 + 1) % 7
+print(f"Complex math result: {complex_math}")
+
+# Practical operator usage examples
+fn calculate_discount(price: f64, customer_type: str, loyalty_years: i32) -> f64 {
+    let base_discount = match customer_type {
+        "premium" => 0.2,
+        "regular" => 0.1,
+        _ => 0.0
+    }
+
+    let loyalty_bonus = if loyalty_years >= 5 { 0.05 } else { 0.0 }
+    let total_discount = base_discount + loyalty_bonus
+
+    price * (1.0 - total_discount)
+}
+
+let original_price = 100.0
+let final_price = calculate_discount(original_price, "premium", 6)
+print(f"Original: ${original_price}, Final: ${final_price}")
+
+# Operator performance considerations
+let large_number = 1_000_000
+let start_time = time.now()
+
+mut sum = 0
+for i in 1..=large_number {
+    sum += i
+}
+
+let loop_time = time.now() - start_time
+
+# Mathematical formula (faster)
+let start_time = time.now()
+let formula_sum = large_number * (large_number + 1) / 2
+let formula_time = time.now() - start_time
+
+print(f"Loop sum: {sum} (time: {loop_time:.6f}s)")
+print(f"Formula sum: {formula_sum} (time: {formula_time:.6f}s)")
+print(f"Formula is {loop_time / formula_time:.0f}x faster")

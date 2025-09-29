@@ -1,0 +1,290 @@
+# Error Handling Examples
+# Demonstrates error handling patterns in Python+Rust hybrid syntax
+
+# Option type for nullable values
+enum Option<T> {
+    Some(T),
+    None
+}
+
+# Result type for operations that can fail
+enum Result<T, E> {
+    Ok(T),
+    Err(E)
+}
+
+# Basic Option usage
+fn find_user(id: i32) -> Option<str> {
+    if id == 1 {
+        return Option::Some("Alice")
+    } elif id == 2 {
+        return Option::Some("Bob")
+    } else {
+        return Option::None
+    }
+}
+
+# Handling Option with match
+let user_id = 1
+match find_user(user_id) {
+    Option::Some(name) => print(f"Found user: {name}"),
+    Option::None => print(f"User {user_id} not found")
+}
+
+# Option with if-let syntax
+if let Option::Some(name) = find_user(2) {
+    print(f"Welcome, {name}!")
+} else {
+    print("User not found")
+}
+
+# Option chaining and methods
+fn get_user_email(id: i32) -> Option<str> {
+    match find_user(id) {
+        Option::Some(name) => {
+            if name == "Alice" {
+                Option::Some("alice@example.com")
+            } else {
+                Option::Some(f"{name.lower()}@example.com")
+            }
+        },
+        Option::None => Option::None
+    }
+}
+
+# Unwrapping with default values
+let email = get_user_email(3).unwrap_or("default@example.com")
+print(f"Email: {email}")
+
+# Result type for operations that can fail
+fn divide(a: f64, b: f64) -> Result<f64, str> {
+    if b == 0.0 {
+        return Result::Err("Division by zero")
+    } else {
+        return Result::Ok(a / b)
+    }
+}
+
+# Handling Result with match
+match divide(10.0, 2.0) {
+    Result::Ok(result) => print(f"10 / 2 = {result}"),
+    Result::Err(error) => print(f"Error: {error}")
+}
+
+match divide(10.0, 0.0) {
+    Result::Ok(result) => print(f"Result: {result}"),
+    Result::Err(error) => print(f"Error: {error}")
+}
+
+# Result with if-let
+if let Result::Ok(result) = divide(20.0, 4.0) {
+    print(f"Division successful: {result}")
+}
+
+if let Result::Err(error) = divide(5.0, 0.0) {
+    print(f"Division failed: {error}")
+}
+
+# Try-catch style error handling
+fn risky_operation() -> Result<str, str> {
+    let random_fail = true  # Simulate random failure
+    if random_fail {
+        return Result::Err("Operation failed randomly")
+    } else {
+        return Result::Ok("Operation succeeded")
+    }
+}
+
+# Propagating errors with ?
+fn complex_operation() -> Result<str, str> {
+    let step1 = divide(10.0, 2.0)?  # Propagate error if division fails
+    let step2 = risky_operation()?   # Propagate error if operation fails
+    return Result::Ok(f"All steps completed: {step1}, {step2}")
+}
+
+match complex_operation() {
+    Result::Ok(message) => print(message),
+    Result::Err(error) => print(f"Complex operation failed: {error}")
+}
+
+# Custom error types
+enum FileError {
+    NotFound(str),
+    PermissionDenied(str),
+    InvalidFormat(str),
+    NetworkError(str)
+}
+
+fn read_config_file(filename: str) -> Result<{str: any}, FileError> {
+    if filename.is_empty() {
+        return Result::Err(FileError::InvalidFormat("Filename cannot be empty"))
+    }
+
+    if filename == "missing.cfg" {
+        return Result::Err(FileError::NotFound(filename))
+    }
+
+    if filename == "protected.cfg" {
+        return Result::Err(FileError::PermissionDenied(filename))
+    }
+
+    if filename == "network.cfg" {
+        return Result::Err(FileError::NetworkError("Connection timeout"))
+    }
+
+    # Success case
+    return Result::Ok({
+        "version": "1.0",
+        "debug": true,
+        "port": 8080
+    })
+}
+
+# Handling custom errors
+fn handle_config_result(result: Result<{str: any}, FileError>) {
+    match result {
+        Result::Ok(config) => {
+            print(f"Config loaded successfully: {config}")
+        },
+        Result::Err(FileError::NotFound(filename)) => {
+            print(f"Config file not found: {filename}")
+            print("Using default configuration...")
+        },
+        Result::Err(FileError::PermissionDenied(filename)) => {
+            print(f"Permission denied for file: {filename}")
+            print("Please check file permissions")
+        },
+        Result::Err(FileError::InvalidFormat(message)) => {
+            print(f"Invalid file format: {message}")
+        },
+        Result::Err(FileError::NetworkError(message)) => {
+            print(f"Network error: {message}")
+            print("Retrying with cached config...")
+        }
+    }
+}
+
+# Test different error scenarios
+let filenames = ["config.cfg", "missing.cfg", "protected.cfg", "", "network.cfg"]
+for filename in filenames {
+    print(f"\nTrying to read: '{filename}'")
+    let result = read_config_file(filename)
+    handle_config_result(result)
+}
+
+# Panic for unrecoverable errors
+fn validate_age(age: i32) {
+    if age < 0 {
+        panic(f"Age cannot be negative: {age}")
+    }
+    if age > 150 {
+        panic(f"Age seems unrealistic: {age}")
+    }
+    print(f"Valid age: {age}")
+}
+
+# Safe validation with Result instead of panic
+fn safe_validate_age(age: i32) -> Result<i32, str> {
+    if age < 0 {
+        return Result::Err(f"Age cannot be negative: {age}")
+    }
+    if age > 150 {
+        return Result::Err(f"Age seems unrealistic: {age}")
+    }
+    return Result::Ok(age)
+}
+
+let ages = [25, -5, 200, 65]
+for age in ages {
+    match safe_validate_age(age) {
+        Result::Ok(valid_age) => print(f"Valid age: {valid_age}"),
+        Result::Err(error) => print(f"Invalid age: {error}")
+    }
+}
+
+# Combining multiple fallible operations
+fn calculate_user_score(user_id: i32, bonus_points: f64) -> Result<f64, str> {
+    let user_name = find_user(user_id).ok_or("User not found")?
+    let base_score = divide(100.0, user_id as f64)?
+    let total_score = base_score + bonus_points
+
+    if total_score < 0.0 {
+        return Result::Err("Score cannot be negative")
+    }
+
+    return Result::Ok(total_score)
+}
+
+# Test combined operations
+for user_id in [1, 2, 0, 3] {
+    match calculate_user_score(user_id, 10.0) {
+        Result::Ok(score) => print(f"User {user_id} score: {score:.2f}"),
+        Result::Err(error) => print(f"Error calculating score for user {user_id}: {error}")
+    }
+}
+
+# Error recovery patterns
+fn with_retry<T, E>(operation: fn() -> Result<T, E>, max_attempts: i32) -> Result<T, E> {
+    mut attempts = 0
+    loop {
+        attempts += 1
+        match operation() {
+            Result::Ok(value) => return Result::Ok(value),
+            Result::Err(error) => {
+                if attempts >= max_attempts {
+                    return Result::Err(error)
+                }
+                print(f"Attempt {attempts} failed, retrying...")
+            }
+        }
+    }
+}
+
+# Fallback chains
+fn get_config_value(key: str) -> Option<str> {
+    # Try environment variable first
+    let env_value = get_env_var(key)
+    if env_value.is_some() {
+        return env_value
+    }
+
+    # Try config file
+    let config_value = get_from_config_file(key)
+    if config_value.is_some() {
+        return config_value
+    }
+
+    # Use default
+    match key {
+        "port" => Option::Some("8080"),
+        "host" => Option::Some("localhost"),
+        _ => Option::None
+    }
+}
+
+fn get_env_var(key: str) -> Option<str> {
+    # Simulate environment variable lookup
+    if key == "PORT" {
+        Option::Some("3000")
+    } else {
+        Option::None
+    }
+}
+
+fn get_from_config_file(key: str) -> Option<str> {
+    # Simulate config file lookup
+    if key == "host" {
+        Option::Some("0.0.0.0")
+    } else {
+        Option::None
+    }
+}
+
+# Test fallback chain
+let config_keys = ["PORT", "host", "database_url"]
+for key in config_keys {
+    match get_config_value(key) {
+        Option::Some(value) => print(f"{key}: {value}"),
+        Option::None => print(f"{key}: not configured")
+    }
+}

@@ -1,0 +1,19 @@
+[package]
+name = "lugli-ast"
+version.workspace = true
+description = "Abstract Syntax Tree definitions for the Lugli programming language"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+lugli-common.workspace = true
+lugli-lexer.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+pretty_assertions.workspace = true
+insta.workspace = true

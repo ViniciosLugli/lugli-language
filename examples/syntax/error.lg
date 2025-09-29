@@ -1,24 +1,414 @@
--- All this file has errors... nothing to see here.
+# Error Handling Examples and Patterns
+# Demonstrates comprehensive error handling in Python+Rust hybrid syntax
 
-create test = "cool"
+# ==========================================
+# COMPILE-TIME ERRORS (These should be caught by the compiler)
+# ==========================================
 
-test.example = fn () {}
+# Uncomment these lines to see compile-time errors:
 
-struct Person {
-    name
+# 1. Type mismatch errors
+# let number: i32 = "not a number"  # Error: Type mismatch
+
+# 2. Undefined variable
+# print(undefined_variable)  # Error: Variable not found
+
+# 3. Invalid struct field access
+# struct Person { name: str }
+# let person = Person { name: "Alice" }
+# print(person.email)  # Error: Field 'email' not found in Person
+
+# 4. Missing struct fields
+# let incomplete = Person {}  # Error: Missing required field 'name'
+
+# 5. Invalid method calls
+# let text = "hello"
+# text.nonexistent_method()  # Error: Method not found
+
+# 6. Variable redeclaration in same scope
+# let x = 5
+# let x = 10  # Error: Variable 'x' already declared
+
+# ==========================================
+# RUNTIME ERRORS AND ERROR HANDLING
+# ==========================================
+
+import errors
+
+# 1. RESULT TYPE ERROR HANDLING (Rust-style)
+enum FileError {
+    NotFound(str),
+    PermissionDenied(str),
+    InvalidFormat(str),
+    IoError(str)
 }
 
-create string = "testing"
-string[] = "c"
+fn read_config_file(filename: str) -> Result<{str: any}, FileError> {
+    if filename.is_empty() {
+        return Err(FileError::InvalidFormat("Filename cannot be empty"))
+    }
 
-Person { email: "testing" }
+    if filename == "missing.txt" {
+        return Err(FileError::NotFound(filename))
+    }
 
-create string = "testing"
+    if filename == "protected.txt" {
+        return Err(FileError::PermissionDenied(filename))
+    }
 
-for c in string {
+    if filename == "corrupt.txt" {
+        return Err(FileError::IoError("File corrupted"))
+    }
 
+    # Success case
+    return Ok({"version": "1.0", "debug": true})
 }
 
-create person = Person { name: "Ryan" }
+# Handling Result types with match
+print("=== Result Type Error Handling ===")
+let filenames = ["config.txt", "missing.txt", "protected.txt", "corrupt.txt", ""]
 
-println!(person.email)
+for filename in filenames {
+    print(f"\nTrying to read: '{filename}'")
+
+    match read_config_file(filename) {
+        Ok(config) => {
+            print(f"✅ Success: {config}")
+        },
+        Err(FileError::NotFound(file)) => {
+            print(f"❌ File not found: {file}")
+            print("💡 Creating default config...")
+        },
+        Err(FileError::PermissionDenied(file)) => {
+            print(f"❌ Permission denied: {file}")
+            print("💡 Try running as administrator")
+        },
+        Err(FileError::InvalidFormat(msg)) => {
+            print(f"❌ Invalid format: {msg}")
+            print("💡 Please provide a valid filename")
+        },
+        Err(FileError::IoError(msg)) => {
+            print(f"❌ I/O Error: {msg}")
+            print("💡 Try again later or check disk space")
+        }
+    }
+}
+
+# 2. ERROR PROPAGATION WITH ? OPERATOR
+fn process_config_chain(filename: str) -> Result<str, FileError> {
+    let config = read_config_file(filename)?  # Propagate error if any
+    let version = config.get("version").ok_or(
+        FileError::InvalidFormat("Missing version field")
+    )?
+    return Ok(f"Processed config version: {version}")
+}
+
+print(f"\n=== Error Propagation ===")
+match process_config_chain("config.txt") {
+    Ok(result) => print(f"✅ {result}"),
+    Err(error) => print(f"❌ Chain failed: {error}")
+}
+
+# 3. OPTION TYPE FOR NULLABLE VALUES
+fn find_user_by_id(id: i32) -> Option<str> {
+    let users = {1: "Alice", 2: "Bob", 3: "Charlie"}
+    return users.get(id)
+}
+
+print(f"\n=== Option Type Handling ===")
+for id in [1, 2, 5] {
+    match find_user_by_id(id) {
+        Some(name) => print(f"✅ Found user {id}: {name}"),
+        None => print(f"❌ User {id} not found")
+    }
+}
+
+# Option chaining and unwrap variants
+let user_name = find_user_by_id(1).unwrap_or("Unknown")
+print(f"User name with default: {user_name}")
+
+let risky_access = find_user_by_id(999).expect("User must exist!")  # Panics if None
+
+# 4. TRY-CATCH BLOCKS (Python-style for dynamic errors)
+print(f"\n=== Try-Catch Error Handling ===")
+
+fn risky_division(a: f64, b: f64) -> f64 {
+    if b == 0.0 {
+        throw DivisionByZeroError(f"Cannot divide {a} by zero")
+    }
+    return a / b
+}
+
+fn risky_array_access(arr: [i32], index: i32) -> i32 {
+    if index < 0 || index >= arr.len() {
+        throw IndexError(f"Index {index} out of bounds for array of length {arr.len()}")
+    }
+    return arr[index]
+}
+
+# Try-catch with specific error types
+try {
+    let result = risky_division(10.0, 0.0)
+    print(f"Division result: {result}")
+} catch DivisionByZeroError as e {
+    print(f"❌ Division error: {e.message}")
+    print("💡 Using default value 0")
+    let result = 0.0
+} catch ArithmeticError as e {
+    print(f"❌ Arithmetic error: {e.message}")
+} catch Exception as e {
+    print(f"❌ Unexpected error: {e.message}")
+}
+
+# Try-catch with multiple operations
+try {
+    let numbers = [1, 2, 3, 4, 5]
+    let index = 10
+    let value = risky_array_access(numbers, index)
+    let calculated = risky_division(value, 0.0)
+    print(f"Final result: {calculated}")
+} catch IndexError as e {
+    print(f"❌ Array access error: {e.message}")
+} catch DivisionByZeroError as e {
+    print(f"❌ Division error: {e.message}")
+} catch Exception as e {
+    print(f"❌ General error: {e.message}")
+} finally {
+    print("🧹 Cleanup operations completed")
+}
+
+# 5. CUSTOM ERROR TYPES AND HIERARCHIES
+abstract class LugliError : Exception {
+    message: str
+
+    fn new(message: str) -> Self {
+        Self { message: message }
+    }
+}
+
+class ValidationError : LugliError {}
+class NetworkError : LugliError {}
+class DatabaseError : LugliError {}
+
+class UserValidationError : ValidationError {}
+class EmailValidationError : ValidationError {}
+
+fn validate_email(email: str) -> Result<str, EmailValidationError> {
+    if email.is_empty() {
+        return Err(EmailValidationError::new("Email cannot be empty"))
+    }
+
+    if !email.contains("@") {
+        return Err(EmailValidationError::new("Email must contain @"))
+    }
+
+    if !email.contains(".") {
+        return Err(EmailValidationError::new("Email must contain domain"))
+    }
+
+    return Ok(email)
+}
+
+# 6. ERROR RECOVERY PATTERNS
+print(f"\n=== Error Recovery Patterns ===")
+
+# Retry pattern
+fn with_retry<T, E>(operation: fn() -> Result<T, E>, max_attempts: i32) -> Result<T, E> {
+    mut attempts = 0
+    loop {
+        attempts += 1
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(error) => {
+                if attempts >= max_attempts {
+                    return Err(error)
+                }
+                print(f"Attempt {attempts} failed, retrying...")
+            }
+        }
+    }
+}
+
+# Fallback pattern
+fn with_fallback<T>(
+    primary: fn() -> Result<T, any>,
+    fallback: fn() -> T
+) -> T {
+    match primary() {
+        Ok(value) => value,
+        Err(_) => fallback()
+    }
+}
+
+# Circuit breaker pattern
+struct CircuitBreaker {
+    failure_count: i32,
+    threshold: i32,
+    is_open: bool
+}
+
+impl CircuitBreaker {
+    fn new(threshold: i32) -> CircuitBreaker {
+        CircuitBreaker {
+            failure_count: 0,
+            threshold: threshold,
+            is_open: false
+        }
+    }
+
+    fn call<T, E>(mut self, operation: fn() -> Result<T, E>) -> Result<T, str> {
+        if self.is_open {
+            return Err("Circuit breaker is open")
+        }
+
+        match operation() {
+            Ok(value) => {
+                self.failure_count = 0
+                return Ok(value)
+            },
+            Err(_) => {
+                self.failure_count += 1
+                if self.failure_count >= self.threshold {
+                    self.is_open = true
+                    print("🔌 Circuit breaker opened due to failures")
+                }
+                return Err("Operation failed")
+            }
+        }
+    }
+}
+
+# 7. PANIC AND UNRECOVERABLE ERRORS
+print(f"\n=== Panic Handling ===")
+
+fn careful_operation(should_panic: bool) {
+    if should_panic {
+        panic("This is an unrecoverable error!")
+    }
+    print("Operation completed successfully")
+}
+
+# Catching panics (if supported)
+try {
+    careful_operation(false)
+    careful_operation(true)  # This will panic
+} catch PanicError as e {
+    print(f"❌ Caught panic: {e.message}")
+    print("💡 Application can continue after panic recovery")
+}
+
+# 8. ASSERTION ERRORS
+fn validate_preconditions(value: i32) {
+    assert!(value > 0, "Value must be positive")
+    assert!(value < 100, f"Value {value} must be less than 100")
+
+    debug_assert!(value % 2 == 0, "Value should be even in debug mode")
+
+    print(f"✅ Value {value} passed all validations")
+}
+
+try {
+    validate_preconditions(50)
+    validate_preconditions(-5)  # Will fail assertion
+} catch AssertionError as e {
+    print(f"❌ Assertion failed: {e.message}")
+}
+
+# 9. ERROR CONTEXT AND STACK TRACES
+fn operation_with_context() -> Result<str, str> {
+    let step1 = step_one().map_err(|e| f"Step 1 failed: {e}")?
+    let step2 = step_two(step1).map_err(|e| f"Step 2 failed: {e}")?
+    let step3 = step_three(step2).map_err(|e| f"Step 3 failed: {e}")?
+    return Ok(step3)
+}
+
+fn step_one() -> Result<str, str> {
+    Err("Database connection failed")
+}
+
+fn step_two(input: str) -> Result<str, str> {
+    Ok(f"Processed: {input}")
+}
+
+fn step_three(input: str) -> Result<str, str> {
+    Ok(f"Finalized: {input}")
+}
+
+match operation_with_context() {
+    Ok(result) => print(f"✅ Success: {result}"),
+    Err(error) => {
+        print(f"❌ Operation failed: {error}")
+        print(f"📍 Stack trace: {error.stack_trace()}")
+    }
+}
+
+# 10. LOGGING AND ERROR MONITORING
+import logging
+
+logging.configure({
+    "level": "DEBUG",
+    "format": "{timestamp} [{level}] {message}",
+    "outputs": ["console", "file:errors.log"]
+})
+
+fn monitored_operation(will_fail: bool) -> Result<str, str> {
+    logging.info("Starting monitored operation")
+
+    if will_fail {
+        logging.error("Operation failed with critical error")
+        return Err("Critical failure occurred")
+    }
+
+    logging.info("Operation completed successfully")
+    return Ok("Success")
+}
+
+# Error aggregation
+struct ErrorCollector {
+    errors: [str]
+}
+
+impl ErrorCollector {
+    fn new() -> ErrorCollector {
+        ErrorCollector { errors: [] }
+    }
+
+    fn add_error!(mut self, error: str) {
+        self.errors.push(error)
+        logging.warn(f"Error collected: {error}")
+    }
+
+    fn has_errors(self) -> bool {
+        return !self.errors.is_empty()
+    }
+
+    fn get_summary(self) -> str {
+        if self.errors.is_empty() {
+            return "No errors"
+        }
+        return f"{self.errors.len()} errors: {self.errors.join('; ')}"
+    }
+}
+
+print(f"\n=== Error Collection and Monitoring ===")
+let mut collector = ErrorCollector::new()
+
+# Simulate batch operations
+let operations = ["op1", "op2", "op3"]
+for op in operations {
+    match monitored_operation(op == "op2") {
+        Ok(_) => logging.info(f"✅ {op} succeeded"),
+        Err(error) => collector.add_error!(f"{op}: {error}")
+    }
+}
+
+print(f"Operation summary: {collector.get_summary()}")
+
+print(f"\n=== Error Handling Examples Complete ===")
+print("💡 Key principles:")
+print("  - Use Result<T, E> for recoverable errors")
+print("  - Use Option<T> for nullable values")
+print("  - Use try-catch for dynamic error handling")
+print("  - Use panic! for unrecoverable errors")
+print("  - Always provide meaningful error messages")
+print("  - Implement proper error recovery strategies")

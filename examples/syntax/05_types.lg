@@ -1,0 +1,248 @@
+# Type System Examples
+# Demonstrates Python+Rust hybrid type system
+
+# Basic type annotations
+let name: str = "Alice"
+let age: i32 = 25
+let height: f64 = 5.6
+let is_active: bool = true
+let data: [i32] = [1, 2, 3, 4, 5]
+let user_info: {str: any} = {"name": "Bob", "age": 30}
+
+# Optional types (Rust-style Option)
+let maybe_name: Option<str> = Some("Charlie")
+let maybe_age: Option<i32> = None
+
+fn get_user_name(id: i32) -> Option<str> {
+    if id == 1 {
+        return Some("Alice")
+    } else {
+        return None
+    }
+}
+
+# Union types (Python-style)
+type NumberOrString = i32 | f64 | str
+
+fn process_value(value: NumberOrString) -> str {
+    match value {
+        i32(n) => f"Integer: {n}",
+        f64(n) => f"Float: {n}",
+        str(s) => f"String: {s}"
+    }
+}
+
+# Type aliases
+type UserId = i32
+type UserName = str
+type UserData = {str: any}
+
+fn create_user(id: UserId, name: UserName) -> UserData {
+    return {"id": id, "name": name, "created_at": now()}
+}
+
+# Generic types
+struct Container<T> {
+    value: T,
+    metadata: {str: any}
+}
+
+impl<T> Container<T> {
+    fn new(value: T) -> Container<T> {
+        return Container {
+            value: value,
+            metadata: {}
+        }
+    }
+
+    fn get_value(self) -> T {
+        return self.value
+    }
+
+    fn set_metadata!(mut self, key: str, value: any) {
+        self.metadata[key] = value
+    }
+}
+
+# Bounded generics (with traits/interfaces)
+trait Printable {
+    fn to_string(self) -> str
+}
+
+impl Printable for i32 {
+    fn to_string(self) -> str {
+        return f"{self}"
+    }
+}
+
+impl Printable for f64 {
+    fn to_string(self) -> str {
+        return f"{self:.2f}"
+    }
+}
+
+fn print_value<T>(value: T) where T: Printable {
+    print(value.to_string())
+}
+
+# Function types
+type BinaryOp = fn(f64, f64) -> f64
+type Predicate<T> = fn(T) -> bool
+type Transformer<T, U> = fn(T) -> U
+
+fn apply_operation(x: f64, y: f64, op: BinaryOp) -> f64 {
+    return op(x, y)
+}
+
+let add: BinaryOp = |a, b| a + b
+let multiply: BinaryOp = |a, b| a * b
+
+# Higher-kinded types
+type Collection<T> = [T] | Set<T> | Dict<str, T>
+
+fn process_collection<T>(items: Collection<T>) -> i32 {
+    match items {
+        [T](list) => list.len(),
+        Set<T>(set) => set.size(),
+        Dict<str, T>(dict) => dict.len()
+    }
+}
+
+# Recursive types
+enum JsonValue {
+    Null,
+    Bool(bool),
+    Number(f64),
+    String(str),
+    Array([JsonValue]),
+    Object({str: JsonValue})
+}
+
+fn json_to_string(value: JsonValue) -> str {
+    match value {
+        JsonValue::Null => "null",
+        JsonValue::Bool(b) => f"{b}",
+        JsonValue::Number(n) => f"{n}",
+        JsonValue::String(s) => f'"{s}"',
+        JsonValue::Array(arr) => {
+            let items = arr.map(json_to_string).join(", ")
+            return f"[{items}]"
+        },
+        JsonValue::Object(obj) => {
+            let pairs = obj.items().map(|(k, v)| f'"{k}": {json_to_string(v)}').join(", ")
+            return f"{{{pairs}}}"
+        }
+    }
+}
+
+# Type guards and type checking
+fn is_string(value: any) -> bool {
+    return typeof(value) == "str"
+}
+
+fn safe_string_length(value: any) -> Option<i32> {
+    if is_string(value) {
+        return Some(value.len())  # Type narrowing
+    } else {
+        return None
+    }
+}
+
+# Interface/trait definitions
+trait Drawable {
+    fn draw(self) -> str
+    fn area(self) -> f64
+}
+
+trait Comparable<T> {
+    fn compare(self, other: T) -> i32  # -1, 0, 1
+}
+
+struct Rectangle {
+    width: f64,
+    height: f64
+}
+
+impl Drawable for Rectangle {
+    fn draw(self) -> str {
+        return f"Rectangle({self.width}x{self.height})"
+    }
+
+    fn area(self) -> f64 {
+        return self.width * self.height
+    }
+}
+
+impl Comparable<Rectangle> for Rectangle {
+    fn compare(self, other: Rectangle) -> i32 {
+        let self_area = self.area()
+        let other_area = other.area()
+        if self_area < other_area {
+            return -1
+        } elif self_area > other_area {
+            return 1
+        } else {
+            return 0
+        }
+    }
+}
+
+# Type assertions and casting
+fn process_any_value(value: any) -> str {
+    if value is str {
+        return f"String: {value}"
+    } elif value is i32 {
+        return f"Integer: {value}"
+    } elif value is f64 {
+        return f"Float: {value}"
+    } elif value is bool {
+        return f"Boolean: {value}"
+    } else {
+        return f"Unknown type: {typeof(value)}"
+    }
+}
+
+# Usage examples
+let container = Container::new(42)
+print(f"Container value: {container.get_value()}")
+
+print_value(123)
+print_value(3.14159)
+
+let result1 = apply_operation(5.0, 3.0, add)
+let result2 = apply_operation(5.0, 3.0, multiply)
+print(f"5 + 3 = {result1}")
+print(f"5 * 3 = {result2}")
+
+let json_data = JsonValue::Object({
+    "name": JsonValue::String("Alice"),
+    "age": JsonValue::Number(25),
+    "active": JsonValue::Bool(true),
+    "scores": JsonValue::Array([
+        JsonValue::Number(95),
+        JsonValue::Number(87),
+        JsonValue::Number(92)
+    ])
+})
+
+print(json_to_string(json_data))
+
+let rect1 = Rectangle { width: 10.0, height: 5.0 }
+let rect2 = Rectangle { width: 8.0, height: 6.0 }
+
+print(rect1.draw())
+print(f"Area: {rect1.area()}")
+
+let comparison = rect1.compare(rect2)
+match comparison {
+    -1 => print("Rectangle 1 is smaller"),
+    0 => print("Rectangles are equal"),
+    1 => print("Rectangle 1 is larger"),
+    _ => print("Invalid comparison")
+}
+
+# Type checking examples
+let values = [42, "hello", 3.14, true, null]
+for value in values {
+    print(process_any_value(value))
+}
