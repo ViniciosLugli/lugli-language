@@ -125,12 +125,19 @@ fn bench_real_programs(c: &mut Criterion) {
     group.warm_up_time(Duration::from_millis(500));
     group.measurement_time(Duration::from_secs(5));
 
-    // Hangman game
-    let hangman_source = load_example("examples/samples/hangman.lg");
-
-    group.bench_function("hangman_game_129_lines", |b| {
+    // Pattern matching (110 lines)
+    let pattern_source = load_example("examples/basics/07_pattern_matching.lg");
+    group.bench_function("pattern_matching_110_lines", |b| {
         b.iter(|| {
-            run_lugli_source(black_box(&hangman_source)).unwrap();
+            run_lugli_source(black_box(&pattern_source)).unwrap();
+        });
+    });
+
+    // List comprehensions (179 lines)
+    let list_comp_source = load_example("examples/basics/08_list_comprehensions.lg");
+    group.bench_function("list_comprehensions_179_lines", |b| {
+        b.iter(|| {
+            run_lugli_source(black_box(&list_comp_source)).unwrap();
         });
     });
 
@@ -386,16 +393,16 @@ fn bench_compilation(c: &mut Criterion) {
         });
     });
 
-    // Medium program - hangman
-    let medium = load_example("examples/samples/hangman.lg");
+    // Medium program - pattern matching
+    let medium = load_example("examples/basics/07_pattern_matching.lg");
     group.throughput(Throughput::Bytes(medium.len() as u64));
-    group.bench_function("parse_hangman_129_lines", |b| {
+    group.bench_function("parse_pattern_matching_110_lines", |b| {
         b.iter(|| {
             parse_lugli_source(black_box(&medium)).unwrap();
         });
     });
 
-    group.bench_function("compile_hangman_129_lines", |b| {
+    group.bench_function("compile_pattern_matching_110_lines", |b| {
         b.iter(|| {
             compile_lugli_source(black_box(&medium)).unwrap();
         });
