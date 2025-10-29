@@ -1,15 +1,24 @@
-use lugli_ast::{AstNode, Expr, LiteralValue, Program, Stmt, Visitor, VisitorMut};
+use lugli_ast::{
+    AstNode, CallData, Expr, IfData, LiteralValue, NodeId, Program, Stmt, Visitor, VisitorMut,
+};
 use lugli_common::Span;
-use lugli_lexer::{Token, TokenKind};
+use lugli_lexer::TokenKind;
+
+fn make_id(n: usize) -> NodeId {
+    NodeId::new(n)
+}
 
 mod ast_construction_tests {
     use super::*;
 
     #[test]
     fn test_complex_nested_program() {
-        let span = Span {
-            start: 0,
-            end: 100,
+        let span = Span { start: 0, end: 100 };
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
         };
 
         // Build a complex program with nested structures
@@ -17,94 +26,102 @@ mod ast_construction_tests {
             vec![
                 // fn fibonacci(n) { ... }
                 Stmt::FnDecl {
+                    id: next_id(),
                     name: "fibonacci".to_string(),
                     params: vec!["n".to_string()],
                     body: vec![Stmt::If {
-                        condition: Expr::Binary {
-                            left: Box::new(Expr::Identifier {
-                                name: "n".to_string(),
-                                span: span.clone(),
-                            }),
-                            operator: Token::new(TokenKind::LessEqual, span.clone()),
-                            right: Box::new(Expr::Literal {
-                                value: LiteralValue::Number(1.0),
-                                span: span.clone(),
-                            }),
-                            span: span.clone(),
-                        },
-                        then_branch: vec![Stmt::Return {
-                            value: Some(Expr::Identifier {
-                                name: "n".to_string(),
-                                span: span.clone(),
-                            }),
-                            span: span.clone(),
-                        }],
-                        elif_branches: vec![],
-                        else_branch: Some(vec![Stmt::Return {
-                            value: Some(Expr::Binary {
-                                left: Box::new(Expr::Call {
-                                    callee: Box::new(Expr::Identifier {
-                                        name: "fibonacci".to_string(),
-                                        span: span.clone(),
-                                    }),
-                                    arguments: vec![Expr::Binary {
-                                        left: Box::new(Expr::Identifier {
-                                            name: "n".to_string(),
-                                            span: span.clone(),
-                                        }),
-                                        operator: Token::new(TokenKind::Minus, span.clone()),
-                                        right: Box::new(Expr::Literal {
-                                            value: LiteralValue::Number(1.0),
-                                            span: span.clone(),
-                                        }),
-                                        span: span.clone(),
-                                    }],
-                                    span: span.clone(),
+                        id: next_id(),
+                        data: Box::new(IfData {
+                            condition: Expr::Binary {
+                                id: next_id(),
+                                left: Box::new(Expr::Identifier {
+                                    id: next_id(),
+                                    name: "n".to_string(),
                                 }),
-                                operator: Token::new(TokenKind::Plus, span.clone()),
-                                right: Box::new(Expr::Call {
-                                    callee: Box::new(Expr::Identifier {
-                                        name: "fibonacci".to_string(),
-                                        span: span.clone(),
-                                    }),
-                                    arguments: vec![Expr::Binary {
-                                        left: Box::new(Expr::Identifier {
-                                            name: "n".to_string(),
-                                            span: span.clone(),
-                                        }),
-                                        operator: Token::new(TokenKind::Minus, span.clone()),
-                                        right: Box::new(Expr::Literal {
-                                            value: LiteralValue::Number(2.0),
-                                            span: span.clone(),
-                                        }),
-                                        span: span.clone(),
-                                    }],
-                                    span: span.clone(),
+                                operator: TokenKind::LessEqual,
+                                right: Box::new(Expr::Literal {
+                                    id: next_id(),
+                                    value: LiteralValue::Number(1.0),
                                 }),
-                                span: span.clone(),
-                            }),
-                            span: span.clone(),
-                        }]),
-                        span: span.clone(),
+                            },
+                            then_branch: vec![Stmt::Return {
+                                id: next_id(),
+                                value: Some(Expr::Identifier {
+                                    id: next_id(),
+                                    name: "n".to_string(),
+                                }),
+                            }],
+                            elif_branches: vec![],
+                            else_branch: Some(vec![Stmt::Return {
+                                id: next_id(),
+                                value: Some(Expr::Binary {
+                                    id: next_id(),
+                                    left: Box::new(Expr::Call {
+                                        id: next_id(),
+                                        data: Box::new(CallData {
+                                            callee: Expr::Identifier {
+                                                id: next_id(),
+                                                name: "fibonacci".to_string(),
+                                            },
+                                            arguments: vec![Expr::Binary {
+                                                id: next_id(),
+                                                left: Box::new(Expr::Identifier {
+                                                    id: next_id(),
+                                                    name: "n".to_string(),
+                                                }),
+                                                operator: TokenKind::Minus,
+                                                right: Box::new(Expr::Literal {
+                                                    id: next_id(),
+                                                    value: LiteralValue::Number(1.0),
+                                                }),
+                                            }],
+                                        }),
+                                    }),
+                                    operator: TokenKind::Plus,
+                                    right: Box::new(Expr::Call {
+                                        id: next_id(),
+                                        data: Box::new(CallData {
+                                            callee: Expr::Identifier {
+                                                id: next_id(),
+                                                name: "fibonacci".to_string(),
+                                            },
+                                            arguments: vec![Expr::Binary {
+                                                id: next_id(),
+                                                left: Box::new(Expr::Identifier {
+                                                    id: next_id(),
+                                                    name: "n".to_string(),
+                                                }),
+                                                operator: TokenKind::Minus,
+                                                right: Box::new(Expr::Literal {
+                                                    id: next_id(),
+                                                    value: LiteralValue::Number(2.0),
+                                                }),
+                                            }],
+                                        }),
+                                    }),
+                                }),
+                            }]),
+                        }),
                     }],
-                    span: span.clone(),
                 },
                 // let result = fibonacci(10)
                 Stmt::VarDecl {
+                    id: next_id(),
                     name: "result".to_string(),
                     initializer: Some(Expr::Call {
-                        callee: Box::new(Expr::Identifier {
-                            name: "fibonacci".to_string(),
-                            span: span.clone(),
+                        id: next_id(),
+                        data: Box::new(CallData {
+                            callee: Expr::Identifier {
+                                id: next_id(),
+                                name: "fibonacci".to_string(),
+                            },
+                            arguments: vec![Expr::Literal {
+                                id: next_id(),
+                                value: LiteralValue::Number(10.0),
+                            }],
                         }),
-                        arguments: vec![Expr::Literal {
-                            value: LiteralValue::Number(10.0),
-                            span: span.clone(),
-                        }],
-                        span: span.clone(),
                     }),
                     is_const: false,
-                    span: span.clone(),
                 },
             ],
             span.clone(),
@@ -116,10 +133,7 @@ mod ast_construction_tests {
 
         // Verify function declaration
         if let Stmt::FnDecl {
-            name,
-            params,
-            body,
-            ..
+            name, params, body, ..
         } = &program.statements[0]
         {
             assert_eq!(name, "fibonacci");
@@ -131,9 +145,7 @@ mod ast_construction_tests {
 
         // Verify variable declaration
         if let Stmt::VarDecl {
-            name,
-            initializer,
-            ..
+            name, initializer, ..
         } = &program.statements[1]
         {
             assert_eq!(name, "result");
@@ -145,110 +157,95 @@ mod ast_construction_tests {
 
     #[test]
     fn test_complex_data_structures() {
-        let span = Span {
-            start: 0,
-            end: 50,
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
         };
 
         // Create a complex dictionary with nested structures
         let complex_dict = Expr::Dict {
+            id: next_id(),
             pairs: vec![
                 (
                     Expr::Literal {
+                        id: next_id(),
                         value: LiteralValue::String("numbers".to_string()),
-                        span: span.clone(),
                     },
                     Expr::List {
+                        id: next_id(),
                         elements: vec![
                             Expr::Literal {
+                                id: next_id(),
                                 value: LiteralValue::Number(1.0),
-                                span: span.clone(),
                             },
                             Expr::Literal {
+                                id: next_id(),
                                 value: LiteralValue::Number(2.0),
-                                span: span.clone(),
                             },
                             Expr::Binary {
+                                id: next_id(),
                                 left: Box::new(Expr::Literal {
+                                    id: next_id(),
                                     value: LiteralValue::Number(3.0),
-                                    span: span.clone(),
                                 }),
-                                operator: Token::new(TokenKind::Plus, span.clone()),
+                                operator: TokenKind::Plus,
                                 right: Box::new(Expr::Literal {
+                                    id: next_id(),
                                     value: LiteralValue::Number(4.0),
-                                    span: span.clone(),
                                 }),
-                                span: span.clone(),
                             },
                         ],
-                        span: span.clone(),
                     },
                 ),
                 (
                     Expr::Literal {
+                        id: next_id(),
                         value: LiteralValue::String("metadata".to_string()),
-                        span: span.clone(),
                     },
                     Expr::Dict {
+                        id: next_id(),
                         pairs: vec![
                             (
                                 Expr::Literal {
+                                    id: next_id(),
                                     value: LiteralValue::String("version".to_string()),
-                                    span: span.clone(),
                                 },
                                 Expr::Literal {
+                                    id: next_id(),
                                     value: LiteralValue::String("1.0".to_string()),
-                                    span: span.clone(),
                                 },
                             ),
                             (
                                 Expr::Literal {
+                                    id: next_id(),
                                     value: LiteralValue::String("author".to_string()),
-                                    span: span.clone(),
                                 },
                                 Expr::Literal {
+                                    id: next_id(),
                                     value: LiteralValue::String("test".to_string()),
-                                    span: span.clone(),
                                 },
                             ),
                         ],
-                        span: span.clone(),
                     },
                 ),
             ],
-            span: span.clone(),
         };
 
-        // Verify structure
-        assert_eq!(*complex_dict.span(), span);
-
-        if let Expr::Dict {
-            pairs, ..
-        } = complex_dict
-        {
+        // Verify structure - Dict nodes don't have span() after NodeId migration
+        if let Expr::Dict { pairs, .. } = complex_dict {
             assert_eq!(pairs.len(), 2);
 
             // Check the numbers list
-            if let (
-                _,
-                Expr::List {
-                    elements, ..
-                },
-            ) = &pairs[0]
-            {
+            if let (_, Expr::List { elements, .. }) = &pairs[0] {
                 assert_eq!(elements.len(), 3);
             } else {
                 panic!("Expected list in first pair");
             }
 
             // Check the nested metadata dict
-            if let (
-                _,
-                Expr::Dict {
-                    pairs: inner_pairs, ..
-                },
-            ) = &pairs[1]
-            {
+            if let (_, Expr::Dict { pairs: inner_pairs, .. }) = &pairs[1] {
                 assert_eq!(inner_pairs.len(), 2);
             } else {
                 panic!("Expected dict in second pair");
@@ -260,113 +257,111 @@ mod ast_construction_tests {
 
     #[test]
     fn test_control_flow_structures() {
-        let span = Span {
-            start: 0,
-            end: 80,
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
         };
 
         // Create complex control flow: for loop with nested if-elif-else
         let for_loop = Stmt::For {
+            id: next_id(),
             variable: "item".to_string(),
             iterable: Expr::Identifier {
+                id: next_id(),
                 name: "collection".to_string(),
-                span: span.clone(),
             },
             body: vec![Stmt::If {
-                condition: Expr::Binary {
-                    left: Box::new(Expr::Identifier {
-                        name: "item".to_string(),
-                        span: span.clone(),
-                    }),
-                    operator: Token::new(TokenKind::Greater, span.clone()),
-                    right: Box::new(Expr::Literal {
-                        value: LiteralValue::Number(10.0),
-                        span: span.clone(),
-                    }),
-                    span: span.clone(),
-                },
-                then_branch: vec![Stmt::Expression {
-                    expr: Expr::Call {
-                        callee: Box::new(Expr::Identifier {
-                            name: "print".to_string(),
-                            span: span.clone(),
-                        }),
-                        arguments: vec![Expr::Literal {
-                            value: LiteralValue::String("large".to_string()),
-                            span: span.clone(),
-                        }],
-                        span: span.clone(),
-                    },
-                    span: span.clone(),
-                }],
-                elif_branches: vec![(
-                    Expr::Binary {
+                id: next_id(),
+                data: Box::new(IfData {
+                    condition: Expr::Binary {
+                        id: next_id(),
                         left: Box::new(Expr::Identifier {
+                            id: next_id(),
                             name: "item".to_string(),
-                            span: span.clone(),
                         }),
-                        operator: Token::new(TokenKind::Greater, span.clone()),
+                        operator: TokenKind::Greater,
                         right: Box::new(Expr::Literal {
-                            value: LiteralValue::Number(5.0),
-                            span: span.clone(),
+                            id: next_id(),
+                            value: LiteralValue::Number(10.0),
                         }),
-                        span: span.clone(),
                     },
-                    vec![Stmt::Expression {
+                    then_branch: vec![Stmt::Expression {
+                        id: next_id(),
                         expr: Expr::Call {
-                            callee: Box::new(Expr::Identifier {
-                                name: "print".to_string(),
-                                span: span.clone(),
+                            id: next_id(),
+                            data: Box::new(CallData {
+                                callee: Expr::Identifier {
+                                    id: next_id(),
+                                    name: "print".to_string(),
+                                },
+                                arguments: vec![Expr::Literal {
+                                    id: next_id(),
+                                    value: LiteralValue::String("large".to_string()),
+                                }],
                             }),
-                            arguments: vec![Expr::Literal {
-                                value: LiteralValue::String("medium".to_string()),
-                                span: span.clone(),
-                            }],
-                            span: span.clone(),
                         },
-                        span: span.clone(),
                     }],
-                )],
-                else_branch: Some(vec![Stmt::Expression {
-                    expr: Expr::Call {
-                        callee: Box::new(Expr::Identifier {
-                            name: "print".to_string(),
-                            span: span.clone(),
-                        }),
-                        arguments: vec![Expr::Literal {
-                            value: LiteralValue::String("small".to_string()),
-                            span: span.clone(),
+                    elif_branches: vec![(
+                        Expr::Binary {
+                            id: next_id(),
+                            left: Box::new(Expr::Identifier {
+                                id: next_id(),
+                                name: "item".to_string(),
+                            }),
+                            operator: TokenKind::Greater,
+                            right: Box::new(Expr::Literal {
+                                id: next_id(),
+                                value: LiteralValue::Number(5.0),
+                            }),
+                        },
+                        vec![Stmt::Expression {
+                            id: next_id(),
+                            expr: Expr::Call {
+                                id: next_id(),
+                                data: Box::new(CallData {
+                                    callee: Expr::Identifier {
+                                        id: next_id(),
+                                        name: "print".to_string(),
+                                    },
+                                    arguments: vec![Expr::Literal {
+                                        id: next_id(),
+                                        value: LiteralValue::String("medium".to_string()),
+                                    }],
+                                }),
+                            },
                         }],
-                        span: span.clone(),
-                    },
-                    span: span.clone(),
-                }]),
-                span: span.clone(),
+                    )],
+                    else_branch: Some(vec![Stmt::Expression {
+                        id: next_id(),
+                        expr: Expr::Call {
+                            id: next_id(),
+                            data: Box::new(CallData {
+                                callee: Expr::Identifier {
+                                    id: next_id(),
+                                    name: "print".to_string(),
+                                },
+                                arguments: vec![Expr::Literal {
+                                    id: next_id(),
+                                    value: LiteralValue::String("small".to_string()),
+                                }],
+                            }),
+                        },
+                    }]),
+                }),
             }],
-            span: span.clone(),
         };
 
-        // Verify structure
-        assert_eq!(*for_loop.span(), span);
-
-        if let Stmt::For {
-            variable,
-            body,
-            ..
-        } = for_loop
-        {
+        // Verify structure - For nodes don't have span() after NodeId migration
+        if let Stmt::For { variable, body, .. } = for_loop {
             assert_eq!(variable, "item");
             assert_eq!(body.len(), 1);
 
             // Check nested if statement
-            if let Stmt::If {
-                elif_branches,
-                else_branch,
-                ..
-            } = &body[0]
-            {
-                assert_eq!(elif_branches.len(), 1);
-                assert!(else_branch.is_some());
+            if let Stmt::If { data, .. } = &body[0] {
+                assert_eq!(data.elif_branches.len(), 1);
+                assert!(data.else_branch.is_some());
             } else {
                 panic!("Expected If statement in for loop body");
             }
@@ -392,18 +387,10 @@ mod visitor_pattern_tests {
             self.total_expr_count += 1;
 
             match expr {
-                Expr::Literal {
-                    ..
-                } => self.literal_count += 1,
-                Expr::Identifier {
-                    ..
-                } => self.identifier_count += 1,
-                Expr::Binary {
-                    ..
-                } => self.binary_count += 1,
-                Expr::Call {
-                    ..
-                } => self.call_count += 1,
+                Expr::Literal { .. } => self.literal_count += 1,
+                Expr::Identifier { .. } => self.identifier_count += 1,
+                Expr::Binary { .. } => self.binary_count += 1,
+                Expr::Call { .. } => self.call_count += 1,
                 _ => {}
             }
 
@@ -413,42 +400,47 @@ mod visitor_pattern_tests {
 
     #[test]
     fn test_visitor_counting() {
-        let span = Span {
-            start: 0,
-            end: 20,
+        let span = Span { start: 0, end: 20 };
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
         };
 
         // Create program with mixed expressions
         let program = Program::new(
             vec![Stmt::VarDecl {
+                id: next_id(),
                 name: "result".to_string(),
                 initializer: Some(Expr::Binary {
+                    id: next_id(),
                     left: Box::new(Expr::Call {
-                        callee: Box::new(Expr::Identifier {
-                            name: "add".to_string(),
-                            span: span.clone(),
+                        id: next_id(),
+                        data: Box::new(CallData {
+                            callee: Expr::Identifier {
+                                id: next_id(),
+                                name: "add".to_string(),
+                            },
+                            arguments: vec![
+                                Expr::Literal {
+                                    id: next_id(),
+                                    value: LiteralValue::Number(1.0),
+                                },
+                                Expr::Literal {
+                                    id: next_id(),
+                                    value: LiteralValue::Number(2.0),
+                                },
+                            ],
                         }),
-                        arguments: vec![
-                            Expr::Literal {
-                                value: LiteralValue::Number(1.0),
-                                span: span.clone(),
-                            },
-                            Expr::Literal {
-                                value: LiteralValue::Number(2.0),
-                                span: span.clone(),
-                            },
-                        ],
-                        span: span.clone(),
                     }),
-                    operator: Token::new(TokenKind::Star, span.clone()),
+                    operator: TokenKind::Star,
                     right: Box::new(Expr::Identifier {
+                        id: next_id(),
                         name: "factor".to_string(),
-                        span: span.clone(),
                     }),
-                    span: span.clone(),
                 }),
                 is_const: false,
-                span: span.clone(),
             }],
             span,
         );
@@ -478,10 +470,7 @@ mod visitor_pattern_tests {
 
     impl Visitor<()> for IdentifierCollector {
         fn visit_expr(&mut self, expr: &Expr) -> () {
-            if let Expr::Identifier {
-                name, ..
-            } = expr
-            {
+            if let Expr::Identifier { name, .. } = expr {
                 self.identifiers.push(name.clone());
             }
             self.walk_expr(expr)
@@ -490,39 +479,42 @@ mod visitor_pattern_tests {
 
     #[test]
     fn test_identifier_collection() {
-        let span = Span {
-            start: 0,
-            end: 30,
+        let span = Span { start: 0, end: 30 };
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
         };
 
         let program = Program::new(
             vec![Stmt::FnDecl {
+                id: next_id(),
                 name: "calculate".to_string(),
                 params: vec!["x".to_string(), "y".to_string()],
                 body: vec![Stmt::Return {
+                    id: next_id(),
                     value: Some(Expr::Binary {
+                        id: next_id(),
                         left: Box::new(Expr::Identifier {
+                            id: next_id(),
                             name: "x".to_string(),
-                            span: span.clone(),
                         }),
-                        operator: Token::new(TokenKind::Plus, span.clone()),
+                        operator: TokenKind::Plus,
                         right: Box::new(Expr::Binary {
+                            id: next_id(),
                             left: Box::new(Expr::Identifier {
+                                id: next_id(),
                                 name: "y".to_string(),
-                                span: span.clone(),
                             }),
-                            operator: Token::new(TokenKind::Star, span.clone()),
+                            operator: TokenKind::Star,
                             right: Box::new(Expr::Identifier {
+                                id: next_id(),
                                 name: "z".to_string(),
-                                span: span.clone(),
                             }),
-                            span: span.clone(),
                         }),
-                        span: span.clone(),
                     }),
-                    span: span.clone(),
                 }],
-                span: span.clone(),
             }],
             span,
         );
@@ -547,10 +539,7 @@ mod visitor_pattern_tests {
 
     impl VisitorMut<()> for NameReplacer {
         fn visit_expr_mut(&mut self, expr: &mut Expr) -> () {
-            if let Expr::Identifier {
-                name, ..
-            } = expr
-            {
+            if let Expr::Identifier { name, .. } = expr {
                 if *name == self.old_name {
                     *name = self.new_name.clone();
                 }
@@ -561,26 +550,29 @@ mod visitor_pattern_tests {
 
     #[test]
     fn test_mutable_visitor() {
-        let span = Span {
-            start: 0,
-            end: 15,
+        let span = Span { start: 0, end: 15 };
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
         };
 
         let mut program = Program::new(
             vec![Stmt::Expression {
+                id: next_id(),
                 expr: Expr::Binary {
+                    id: next_id(),
                     left: Box::new(Expr::Identifier {
+                        id: next_id(),
                         name: "old_var".to_string(),
-                        span: span.clone(),
                     }),
-                    operator: Token::new(TokenKind::Plus, span.clone()),
+                    operator: TokenKind::Plus,
                     right: Box::new(Expr::Identifier {
+                        id: next_id(),
                         name: "old_var".to_string(),
-                        span: span.clone(),
                     }),
-                    span: span.clone(),
                 },
-                span: span.clone(),
             }],
             span,
         );
@@ -593,26 +585,12 @@ mod visitor_pattern_tests {
         replacer.visit_program_mut(&mut program);
 
         // Verify that identifiers were replaced
-        if let Stmt::Expression {
-            expr, ..
-        } = &program.statements[0]
-        {
-            if let Expr::Binary {
-                left,
-                right,
-                ..
-            } = expr
-            {
-                if let Expr::Identifier {
-                    name: left_name, ..
-                } = left.as_ref()
-                {
+        if let Stmt::Expression { expr, .. } = &program.statements[0] {
+            if let Expr::Binary { left, right, .. } = expr {
+                if let Expr::Identifier { name: left_name, .. } = left.as_ref() {
                     assert_eq!(left_name, "new_var");
                 }
-                if let Expr::Identifier {
-                    name: right_name, ..
-                } = right.as_ref()
-                {
+                if let Expr::Identifier { name: right_name, .. } = right.as_ref() {
                     assert_eq!(right_name, "new_var");
                 }
             }
@@ -625,110 +603,102 @@ mod span_tracking_tests {
 
     #[test]
     fn test_comprehensive_span_tracking() {
-        let span1 = Span {
-            start: 0,
-            end: 5,
-        };
-        let span2 = Span {
-            start: 6,
-            end: 10,
-        };
-        let span3 = Span {
-            start: 11,
-            end: 20,
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
         };
 
-        // Create expressions with different spans
+        // Create expressions - NodeIds are used for tracking instead of inline spans
         let expr1 = Expr::Literal {
+            id: next_id(),
             value: LiteralValue::Number(42.0),
-            span: span1.clone(),
         };
 
         let expr2 = Expr::Identifier {
+            id: next_id(),
             name: "variable".to_string(),
-            span: span2.clone(),
         };
 
         let binary_expr = Expr::Binary {
+            id: next_id(),
             left: Box::new(expr1),
-            operator: Token::new(TokenKind::Plus, span2.clone()),
+            operator: TokenKind::Plus,
             right: Box::new(expr2),
-            span: span3.clone(),
         };
 
-        // Verify spans are preserved
-        assert_eq!(*binary_expr.span(), span3);
-
-        if let Expr::Binary {
-            left,
-            right,
-            ..
-        } = binary_expr
-        {
-            assert_eq!(*left.span(), span1);
-            assert_eq!(*right.span(), span2);
+        // Verify NodeIds are assigned
+        match &binary_expr {
+            Expr::Binary { id, left, right, .. } => {
+                assert_eq!(*id, make_id(2));
+                match left.as_ref() {
+                    Expr::Literal { id, .. } => assert_eq!(*id, make_id(0)),
+                    _ => panic!("Expected Literal"),
+                }
+                match right.as_ref() {
+                    Expr::Identifier { id, .. } => assert_eq!(*id, make_id(1)),
+                    _ => panic!("Expected Identifier"),
+                }
+            }
+            _ => panic!("Expected Binary"),
         }
     }
 
     #[test]
     fn test_nested_span_consistency() {
-        let outer_span = Span {
-            start: 0,
-            end: 50,
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
         };
-        let inner_spans = vec![
-            Span {
-                start: 5,
-                end: 10,
-            },
-            Span {
-                start: 15,
-                end: 25,
-            },
-            Span {
-                start: 30,
-                end: 45,
-            },
-        ];
 
         let nested_call = Expr::Call {
-            callee: Box::new(Expr::Identifier {
-                name: "outer".to_string(),
-                span: inner_spans[0].clone(),
-            }),
-            arguments: vec![Expr::Call {
-                callee: Box::new(Expr::Identifier {
-                    name: "inner".to_string(),
-                    span: inner_spans[1].clone(),
-                }),
-                arguments: vec![Expr::Literal {
-                    value: LiteralValue::Number(123.0),
-                    span: inner_spans[2].clone(),
+            id: next_id(),
+            data: Box::new(CallData {
+                callee: Expr::Identifier {
+                    id: next_id(),
+                    name: "outer".to_string(),
+                },
+                arguments: vec![Expr::Call {
+                    id: next_id(),
+                    data: Box::new(CallData {
+                        callee: Expr::Identifier {
+                            id: next_id(),
+                            name: "inner".to_string(),
+                        },
+                        arguments: vec![Expr::Literal {
+                            id: next_id(),
+                            value: LiteralValue::Number(123.0),
+                        }],
+                    }),
                 }],
-                span: inner_spans[1].clone(),
-            }],
-            span: outer_span.clone(),
+            }),
         };
 
-        // Verify span hierarchy
-        assert_eq!(*nested_call.span(), outer_span);
+        // Verify NodeId hierarchy
+        match &nested_call {
+            Expr::Call { id, data, .. } => {
+                assert_eq!(*id, make_id(0));
+                match &data.callee {
+                    Expr::Identifier { id, .. } => assert_eq!(*id, make_id(1)),
+                    _ => panic!("Expected Identifier"),
+                }
+                assert_eq!(data.arguments.len(), 1);
 
-        if let Expr::Call {
-            callee,
-            arguments,
-            ..
-        } = nested_call
-        {
-            assert_eq!(*callee.span(), inner_spans[0]);
-            assert_eq!(arguments.len(), 1);
-
-            if let Expr::Call {
-                arguments: inner_args, ..
-            } = &arguments[0]
-            {
-                assert_eq!(inner_args.len(), 1);
-                assert_eq!(*inner_args[0].span(), inner_spans[2]);
+                match &data.arguments[0] {
+                    Expr::Call { id, data, .. } => {
+                        assert_eq!(*id, make_id(2));
+                        match &data.arguments[0] {
+                            Expr::Literal { id, .. } => assert_eq!(*id, make_id(4)),
+                            _ => panic!("Expected Literal"),
+                        }
+                    }
+                    _ => panic!("Expected Call"),
+                }
             }
+            _ => panic!("Expected Call"),
         }
     }
 }
@@ -738,58 +708,64 @@ mod ast_node_interface_tests {
 
     #[test]
     fn test_ast_node_trait_consistency() {
-        let span = Span {
-            start: 10,
-            end: 20,
+        let span = Span { start: 10, end: 20 };
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
         };
 
         let program = Program::new(
             vec![Stmt::VarDecl {
+                id: next_id(),
                 name: "test".to_string(),
                 initializer: None,
                 is_const: false,
-                span: span.clone(),
             }],
             span.clone(),
         );
 
-        // Test AstNode trait implementation
+        // Test AstNode trait implementation (Program still has span)
         assert_eq!(*program.span(), span);
 
-        // Test that span is consistent across all statements
+        // Test that all statements have NodeIds
         for stmt in &program.statements {
-            assert_eq!(*stmt.span(), span);
+            // Just verify id exists - NodeId is opaque type
+            let _ = stmt.id();
         }
     }
 
     #[test]
     fn test_deep_nesting_performance() {
-        let span = Span {
-            start: 0,
-            end: 100,
-        };
         let depth = 50;
+        let mut id_counter = 0;
+        let mut next_id = || {
+            let id = id_counter;
+            id_counter += 1;
+            make_id(id)
+        };
 
         // Create deeply nested binary expressions: ((((1 + 2) + 3) + 4) + ... )
         let mut expr = Expr::Literal {
+            id: next_id(),
             value: LiteralValue::Number(1.0),
-            span: span.clone(),
         };
 
         for i in 2..=depth {
             expr = Expr::Binary {
+                id: next_id(),
                 left: Box::new(expr),
-                operator: Token::new(TokenKind::Plus, span.clone()),
+                operator: TokenKind::Plus,
                 right: Box::new(Expr::Literal {
+                    id: next_id(),
                     value: LiteralValue::Number(i as f64),
-                    span: span.clone(),
                 }),
-                span: span.clone(),
             };
         }
 
-        // Should handle deep nesting without issues
-        assert_eq!(*expr.span(), span);
+        // Should handle deep nesting without issues - verify NodeId is assigned
+        let _ = expr.id();
 
         // Count depth using visitor
         struct DepthCounter {

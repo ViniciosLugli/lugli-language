@@ -16,9 +16,9 @@ pub enum CliError {
 pub fn run_file(file_path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(file_path).map_err(|_| CliError::FileNotFound(file_path.to_string()))?;
 
-    let program = lugli_parser::parse(&source).map_err(|e| CliError::Runtime(format_parse_error(e, file_path, &source)))?;
+    let (program, span_map) = lugli_parser::parse(&source).map_err(|e| CliError::Runtime(format_parse_error(e, file_path, &source)))?;
 
-    match lugli_vm::compile_and_run_with_source(&program, file_path, &source) {
+    match lugli_vm::compile_and_run_with_source(&program, span_map, file_path, &source) {
         Ok(_) => Ok(()),
         Err(e) => Err(CliError::Runtime(format_vm_error(e))),
     }
@@ -97,9 +97,9 @@ pub fn check_file(file_path: &str) -> Result<(), CliError> {
 pub fn disassemble_file(file_path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(file_path).map_err(|_| CliError::FileNotFound(file_path.to_string()))?;
 
-    let program = lugli_parser::parse(&source).map_err(|e| CliError::Runtime(e.to_string()))?;
+    let (program, span_map) = lugli_parser::parse(&source).map_err(|e| CliError::Runtime(e.to_string()))?;
 
-    match lugli_vm::compile(&program) {
+    match lugli_vm::compile(&program, span_map) {
         Ok(bytecode) => {
             println!("{}", lugli_vm::debug::disassemble(&bytecode, file_path));
             Ok(())

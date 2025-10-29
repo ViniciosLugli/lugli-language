@@ -7,7 +7,7 @@ fn test_basic_parsing() {
     let result = parse(source);
     assert!(result.is_ok());
 
-    let program = result.unwrap();
+    let (program, _span_map) = result.unwrap();
     assert_eq!(program.statements.len(), 1);
 }
 
@@ -19,7 +19,7 @@ fn test_variable_declarations() {
         let result = parse(source);
         assert!(result.is_ok(), "Failed to parse: {}", source);
 
-        let program = result.unwrap();
+        let (program, _span_map) = result.unwrap();
         assert_eq!(program.statements.len(), 1, "Wrong statement count for: {}", source);
 
         match &program.statements[0] {
@@ -44,7 +44,7 @@ fn test_function_declarations() {
         let result = parse(source);
         assert!(result.is_ok(), "Failed to parse function: {}", source);
 
-        let program = result.unwrap();
+        let (program, _span_map) = result.unwrap();
         assert_eq!(program.statements.len(), 1, "Wrong statement count for: {}", source);
 
         match &program.statements[0] {
@@ -133,7 +133,7 @@ fn test_complex_program() {
     let result = parse(source);
     assert!(result.is_ok(), "Failed to parse complex program");
 
-    let program = result.unwrap();
+    let (program, _span_map) = result.unwrap();
     assert!(program.statements.len() > 5, "Expected multiple statements in complex program");
 }
 
@@ -208,7 +208,7 @@ fn test_literal_values() {
     let result = parse(source);
     assert!(result.is_ok(), "Failed to parse literals");
 
-    let program = result.unwrap();
+    let (program, _span_map) = result.unwrap();
     assert_eq!(program.statements.len(), 7);
 
     // Validate each statement is a VarDecl
@@ -228,7 +228,7 @@ fn test_nested_expressions() {
     let result = parse(source);
     assert!(result.is_ok(), "Failed to parse nested expressions");
 
-    let program = result.unwrap();
+    let (program, _span_map) = result.unwrap();
     assert_eq!(program.statements.len(), 1);
 }
 

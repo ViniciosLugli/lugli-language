@@ -350,11 +350,11 @@ impl Machine {
 
         let mut parser = lugli_parser::Parser::new(&source)
             .map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
-        let ast = parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
+        let (ast, span_map) = parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
 
         let mut compiler = crate::Compiler::new();
         let module_bytecode =
-            compiler.compile(&ast).map_err(|e| LugliError::runtime(format!("Compile error in module '{}': {}", resolved_path.display(), e)))?;
+            compiler.compile(&ast, span_map).map_err(|e| LugliError::runtime(format!("Compile error in module '{}': {}", resolved_path.display(), e)))?;
 
         // Assign and register bytecode ID for this module
         let module_bytecode_id = self.next_bytecode_id;

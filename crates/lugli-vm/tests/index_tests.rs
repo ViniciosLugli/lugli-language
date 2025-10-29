@@ -268,8 +268,8 @@ fn test_index_bounds_checking() {
     "#;
 
     let mut parser = Parser::new(source).unwrap();
-    let ast = parser.parse().unwrap();
-    let result = compile_and_run(&ast);
+    let (ast, span_map) = parser.parse().unwrap();
+    let result = compile_and_run(&ast, span_map);
     assert!(result.is_err(), "Out of bounds access should error");
 }
 
@@ -406,8 +406,8 @@ fn test_negative_index_out_of_bounds() {
     "#;
 
     let mut parser = Parser::new(source).unwrap();
-    let ast = parser.parse().unwrap();
-    let result = compile_and_run(&ast);
+    let (ast, span_map) = parser.parse().unwrap();
+    let result = compile_and_run(&ast, span_map);
     assert!(result.is_err(), "Index -4 should be out of bounds for length 3");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("out of range") || err_msg.contains("Negative index"), "Error should mention out of range, got: {}", err_msg);
@@ -421,8 +421,8 @@ fn test_positive_index_out_of_bounds() {
     "#;
 
     let mut parser = Parser::new(source).unwrap();
-    let ast = parser.parse().unwrap();
-    let result = compile_and_run(&ast);
+    let (ast, span_map) = parser.parse().unwrap();
+    let result = compile_and_run(&ast, span_map);
     assert!(result.is_err(), "Index 3 should be out of bounds for length 3");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("out of range"), "Error should mention out of range");
@@ -462,8 +462,8 @@ fn test_negative_index_assignment_out_of_bounds() {
     "#;
 
     let mut parser = Parser::new(source).unwrap();
-    let ast = parser.parse().unwrap();
-    let result = compile_and_run(&ast);
+    let (ast, span_map) = parser.parse().unwrap();
+    let result = compile_and_run(&ast, span_map);
     assert!(result.is_err(), "Assignment at index -4 should fail for length 3");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("out of range") || err_msg.contains("Negative index"), "Error should mention out of range, got: {}", err_msg);

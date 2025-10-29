@@ -8,8 +8,8 @@ let foo = 10
 let bar = foe + 5
 "#;
 
-    let program = parse(source).unwrap();
-    let bytecode = compile_with_source(&program, "test.lg", source).unwrap();
+    let (program, span_map) = parse(source).unwrap();
+    let bytecode = compile_with_source(&program, span_map, "test.lg", source).unwrap();
     let mut vm = Machine::new();
 
     let result = vm.run(&bytecode);
@@ -40,8 +40,8 @@ let x = 10
 let y = unknown_var
 "#;
 
-    let program = parse(source).unwrap();
-    let bytecode = compile_with_source(&program, "test.lg", source).unwrap();
+    let (program, span_map) = parse(source).unwrap();
+    let bytecode = compile_with_source(&program, span_map, "test.lg", source).unwrap();
     let mut vm = Machine::new();
 
     let result = vm.run(&bytecode);
@@ -67,8 +67,8 @@ let x = 10
 let y = x / 0
 "#;
 
-    let program = parse(source).unwrap();
-    let bytecode = compile_with_source(&program, "test.lg", source).unwrap();
+    let (program, span_map) = parse(source).unwrap();
+    let bytecode = compile_with_source(&program, span_map, "test.lg", source).unwrap();
     let mut vm = Machine::new();
 
     let result = vm.run(&bytecode);

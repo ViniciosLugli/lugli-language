@@ -28,7 +28,7 @@ pub fn start() -> Result<(), CliError> {
                 }
 
                 match lugli_parser::parse(input) {
-                    Ok(program) => match lugli_vm::compile_and_run(&program) {
+                    Ok((program, span_map)) => match lugli_vm::compile_and_run(&program, span_map) {
                         Ok(value) => {
                             if !matches!(value, lugli_common::Value::Null) {
                                 println!("{}", value);

@@ -1,6 +1,6 @@
 use super::Compiler;
 use crate::Instruction;
-use lugli_ast::{AstNode, Stmt};
+use lugli_ast::Stmt;
 use lugli_common::{LugliError, Value};
 
 impl Compiler {
@@ -59,11 +59,12 @@ impl Compiler {
                 Ok(true) // Handled
             }
             Stmt::StructDecl {
-                name,
-                fields,
-                methods,
+                data,
                 ..
             } => {
+                let name = &data.name;
+                let fields = &data.fields;
+                let methods = &data.methods;
                 // Store struct metadata with field names and default values
                 let struct_meta = Value::Dict(std::rc::Rc::new(std::cell::RefCell::new({
                     let mut pool = self.bytecode.string_pool.borrow_mut();
@@ -124,10 +125,10 @@ impl Compiler {
                 // Compile methods as separate functions with TypeName_methodName convention
                 for method in methods {
                     if let Stmt::FnDecl {
+                        id,
                         name: method_name,
                         params,
                         body,
-                        ..
                     } = method
                     {
                         // Create function with special name for struct methods
@@ -135,10 +136,10 @@ impl Compiler {
 
                         // Compile as a regular function but with the special name
                         let modified_fn = Stmt::FnDecl {
+                            id: *id,
                             name: static_method_name,
                             params: params.clone(),
                             body: body.clone(),
-                            span: *method.span(),
                         };
                         self.compile_stmt(&modified_fn)?;
                     } else {

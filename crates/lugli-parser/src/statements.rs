@@ -1,6 +1,5 @@
 use crate::{Parser, error::ParseError};
-use lugli_ast::{AstNode, Expr, Stmt};
-use lugli_common::Span;
+use lugli_ast::{Expr, IfData, Stmt, StructDeclData};
 use lugli_lexer::TokenKind;
 
 impl<'a> Parser<'a> {
@@ -32,27 +31,22 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let start_span = self.current_span();
         let is_const = self.match_any(&[TokenKind::Const]);
         let mut _is_mutable = false;
 
         if !is_const {
-            // Handle three cases: 'let', 'let mut', or standalone 'mut'
             if self.match_any(&[TokenKind::Mut]) {
-                // Standalone 'mut x = value'
                 _is_mutable = true;
             } else {
-                // Expect 'let' [mut]
                 self.consume(&TokenKind::Let, "Expected 'let', 'mut', or 'const'")?;
-                // After 'let', check for optional 'mut'
                 _is_mutable = self.match_any(&[TokenKind::Mut]);
             }
         }
 
         let name = self.consume_identifier("Expected variable name")?;
 
-        // Skip type hint if present (e.g., let x: num = 5)
         if self.match_any(&[TokenKind::Colon]) {
-            // Skip type annotation until we hit = or newline/semicolon
             while !self.check(&TokenKind::Equal)
                 && !self.check(&TokenKind::Newline)
                 && !self.check(&TokenKind::Semicolon)
@@ -75,16 +69,16 @@ impl<'a> Parser<'a> {
 
         self.consume_statement_terminator()?;
 
-        let span = Span {
-            start: self.previous_span().start,
-            end: initializer.as_ref().map(|init| init.span().end).unwrap_or_else(|| self.previous_span().end),
-        };
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::VarDecl {
+            id,
             name,
             initializer,
             is_const,
-            span,
         })
     }
 
@@ -94,12 +88,10 @@ impl<'a> Parser<'a> {
 
         let mut name = self.consume_identifier("Expected function name")?;
 
-        // Check for ! suffix (mutating method indicator)
         if self.match_any(&[TokenKind::Bang]) {
             name.push('!');
         }
 
-        // Check for ? suffix (query method indicator)
         if self.match_any(&[TokenKind::Question]) {
             name.push('?');
         }
@@ -110,7 +102,6 @@ impl<'a> Parser<'a> {
         let mut params = Vec::new();
         if !self.check(&TokenKind::RightParen) {
             loop {
-                // Handle self parameter
                 if self.check(&TokenKind::SelfKeyword) {
                     self.advance();
                     params.push("self".to_string());
@@ -120,9 +111,7 @@ impl<'a> Parser<'a> {
                     params.push("self".to_string());
                 } else {
                     let param_name = self.consume_identifier("Expected parameter name")?;
-                    // Skip type hints for now
                     if self.match_any(&[TokenKind::Colon]) {
-                        // Skip type annotation
                         while !self.check(&TokenKind::Comma) && !self.check(&TokenKind::RightParen) {
                             self.advance();
                         }
@@ -140,9 +129,7 @@ impl<'a> Parser<'a> {
         self.skip_newlines();
         self.consume(&TokenKind::RightParen, "Expected ')' after parameters")?;
 
-        // Skip return type hint if present
         if self.match_any(&[TokenKind::Arrow]) {
-            // Skip return type
             while !self.check(&TokenKind::LeftBrace) && !self.scanner.is_at_end() {
                 self.advance();
             }
@@ -151,12 +138,15 @@ impl<'a> Parser<'a> {
         let body = self.block_body()?;
 
         let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::FnDecl {
+            id,
             name,
             params,
             body,
-            span: self.merge_spans(start_span, end_span),
         })
     }
 
@@ -180,12 +170,8 @@ impl<'a> Parser<'a> {
                 let field_name = self.consume_identifier("Expected field name")?;
 
                 let default_value = if self.match_any(&[TokenKind::Colon]) {
-                    // After colon, check if it's a type hint or default value
-                    // Type hint: starts with identifier (e.g., name: Type)
-                    // Default value: starts with literal/expression (e.g., name: "value")
                     let is_type_hint = matches!(self.peek_kind(), Some(TokenKind::Identifier(_)));
                     if is_type_hint {
-                        // Skip type annotation until we hit = or terminal
                         while !self.check(&TokenKind::Equal)
                             && !self.check(&TokenKind::Newline)
                             && !self.check(&TokenKind::Comma)
@@ -194,14 +180,11 @@ impl<'a> Parser<'a> {
                         {
                             self.advance();
                         }
-                        // Now check for optional default value after =
                         if self.match_any(&[TokenKind::Equal]) { Some(self.expression()?) } else { None }
                     } else {
-                        // Old syntax: field: default_value
                         Some(self.expression()?)
                     }
                 } else if self.match_any(&[TokenKind::Equal]) {
-                    // New syntax: field = default_value
                     Some(self.expression()?)
                 } else {
                     None
@@ -216,12 +199,17 @@ impl<'a> Parser<'a> {
         self.consume_closing(&TokenKind::RightBrace, "Expected '}' after struct definition")?;
 
         let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::StructDecl {
-            name,
-            fields,
-            methods,
-            span: self.merge_spans(start_span, end_span),
+            id,
+            data: Box::new(StructDeclData {
+                name,
+                fields,
+                methods,
+            }),
         })
     }
 
@@ -251,14 +239,17 @@ impl<'a> Parser<'a> {
         self.consume_closing(&TokenKind::RightBrace, "Expected '}' after impl block")?;
 
         let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
-        // For now, return impl as a StructDecl with only methods
-        // In a real implementation, you might want a separate ImplBlock statement
         Ok(Stmt::StructDecl {
-            name: struct_name,
-            fields: Vec::new(),
-            methods,
-            span: self.merge_spans(start_span, end_span),
+            id,
+            data: Box::new(StructDeclData {
+                name: struct_name,
+                fields: Vec::new(),
+                methods,
+            }),
         })
     }
 
@@ -278,22 +269,19 @@ impl<'a> Parser<'a> {
 
         let else_branch = if self.match_any(&[TokenKind::Else]) { Some(self.block_body()?) } else { None };
 
-        let end_span = else_branch
-            .as_ref()
-            .and_then(|stmts| stmts.last())
-            .map(|stmt| stmt.span().end)
-            .or_else(|| elif_branches.last().and_then(|(_, stmts)| stmts.last()).map(|stmt| stmt.span().end))
-            .unwrap_or_else(|| then_branch.last().map(|stmt| stmt.span().end).unwrap_or(start_span.end));
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::If {
-            condition,
-            then_branch,
-            elif_branches,
-            else_branch,
-            span: Span {
-                start: start_span.start,
-                end: end_span,
-            },
+            id,
+            data: Box::new(IfData {
+                condition,
+                then_branch,
+                elif_branches,
+                else_branch,
+            }),
         })
     }
 
@@ -304,15 +292,15 @@ impl<'a> Parser<'a> {
         let condition = self.expression()?;
         let body = self.block_body()?;
 
-        let end_span = body.last().map(|stmt| stmt.span().end).unwrap_or(start_span.end);
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::While {
+            id,
             condition,
             body,
-            span: Span {
-                start: start_span.start,
-                end: end_span,
-            },
         })
     }
 
@@ -326,16 +314,16 @@ impl<'a> Parser<'a> {
         let iterable = self.expression()?;
         let body = self.block_body()?;
 
-        let end_span = body.last().map(|stmt| stmt.span().end).unwrap_or(start_span.end);
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::For {
+            id,
             variable,
             iterable,
             body,
-            span: Span {
-                start: start_span.start,
-                end: end_span,
-            },
         })
     }
 
@@ -345,14 +333,14 @@ impl<'a> Parser<'a> {
 
         let body = self.block_body()?;
 
-        let end_span = body.last().map(|stmt| stmt.span().end).unwrap_or(start_span.end);
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::Loop {
+            id,
             body,
-            span: Span {
-                start: start_span.start,
-                end: end_span,
-            },
         })
     }
 
@@ -364,14 +352,14 @@ impl<'a> Parser<'a> {
 
         self.consume_statement_terminator()?;
 
-        let end_span = value.as_ref().map(|expr| expr.span().end).unwrap_or_else(|| self.previous_span().end);
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::Return {
+            id,
             value,
-            span: Span {
-                start: start_span.start,
-                end: end_span,
-            },
         })
     }
 
@@ -380,12 +368,12 @@ impl<'a> Parser<'a> {
         self.consume(&TokenKind::Break, "Expected 'break'")?;
         self.consume_statement_terminator()?;
 
-        Ok(Stmt::Break {
-            span: Span {
-                start: start_span.start,
-                end: self.previous_span().end,
-            },
-        })
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
+        Ok(Stmt::Break { id })
     }
 
     pub(crate) fn continue_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -393,12 +381,12 @@ impl<'a> Parser<'a> {
         self.consume(&TokenKind::Continue, "Expected 'continue'")?;
         self.consume_statement_terminator()?;
 
-        Ok(Stmt::Continue {
-            span: Span {
-                start: start_span.start,
-                end: self.previous_span().end,
-            },
-        })
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
+        Ok(Stmt::Continue { id })
     }
 
     pub(crate) fn block_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -406,9 +394,13 @@ impl<'a> Parser<'a> {
         let statements = self.block_body()?;
         let end_span = self.previous_span();
 
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
         Ok(Stmt::Block {
+            id,
             statements,
-            span: self.merge_spans(start_span, end_span),
         })
     }
 
@@ -427,7 +419,6 @@ impl<'a> Parser<'a> {
             let value = self.expression()?;
             self.consume_statement_terminator()?;
 
-            // For compound assignments, convert to binary operation
             let final_value = if operator.kind != TokenKind::Equal {
                 let binary_op = match operator.kind {
                     TokenKind::PlusEqual => TokenKind::Plus,
@@ -443,83 +434,102 @@ impl<'a> Parser<'a> {
                     }
                 };
 
-                let binary_operator = lugli_lexer::Token::new(binary_op, operator.span);
-                let span = self.merge_spans(*expr.span(), *value.span());
+                let expr_span = self.span_map.get(expr.id()).unwrap();
+                let value_span = self.span_map.get(value.id()).unwrap();
+                let bin_span = self.merge_spans(expr_span, value_span);
+                let bin_id = self.span_map.alloc_id();
+                self.span_map.insert(bin_id, bin_span);
+
                 Expr::Binary {
+                    id: bin_id,
                     left: Box::new(expr.clone()),
-                    operator: binary_operator,
+                    operator: binary_op,
                     right: Box::new(value),
-                    span,
                 }
             } else {
                 value
             };
 
-            let final_value_span = *final_value.span();
+            let final_value_span = self.span_map.get(final_value.id()).unwrap();
 
             let assignment_expr = match expr.clone() {
-                Expr::Identifier {
-                    name,
-                    span: id_span,
-                } => {
+                Expr::Identifier { name, id } => {
+                    let id_span = self.span_map.get(id).unwrap();
                     let span = self.merge_spans(id_span, final_value_span);
+                    let set_id = self.span_map.alloc_id();
+                    self.span_map.insert(set_id, span);
+
+                    let global_id = self.span_map.alloc_id();
+                    self.span_map.insert(global_id, id_span);
+
                     Expr::Set {
+                        id: set_id,
                         object: Box::new(Expr::Identifier {
+                            id: global_id,
                             name: "global".to_string(),
-                            span: id_span,
                         }),
                         name,
                         value: Box::new(final_value),
-                        span,
                     }
                 }
-                Expr::Get {
-                    object,
-                    name,
-                    span: get_span,
-                } => {
+                Expr::Get { object, name, id } => {
+                    let get_span = self.span_map.get(id).unwrap();
                     let span = self.merge_spans(get_span, final_value_span);
+                    let set_id = self.span_map.alloc_id();
+                    self.span_map.insert(set_id, span);
+
                     Expr::Set {
+                        id: set_id,
                         object,
                         name,
                         value: Box::new(final_value),
-                        span,
                     }
                 }
-                Expr::Index {
-                    object,
-                    index,
-                    span: index_span,
-                } => {
+                Expr::Index { object, index, id } => {
+                    let index_span = self.span_map.get(id).unwrap();
                     let span = self.merge_spans(index_span, final_value_span);
+                    let set_id = self.span_map.alloc_id();
+                    self.span_map.insert(set_id, span);
+
+                    let list_id = self.span_map.alloc_id();
+                    self.span_map.insert(list_id, span);
+
                     Expr::Set {
+                        id: set_id,
                         object,
                         name: "[index]".to_string(),
                         value: Box::new(Expr::List {
+                            id: list_id,
                             elements: vec![(*index).clone(), final_value.clone()],
-                            span,
                         }),
-                        span,
                     }
                 }
                 _ => {
+                    let expr_span = self.span_map.get(expr.id()).unwrap();
                     return Err(ParseError::Custom {
                         message: "Invalid assignment target".to_string(),
-                        span: *expr.span(),
+                        span: expr_span,
                     });
                 }
             };
 
+            let assignment_span = self.span_map.get(assignment_expr.id()).unwrap();
+            let stmt_id = self.span_map.alloc_id();
+            self.span_map.insert(stmt_id, assignment_span);
+
             Ok(Stmt::Expression {
+                id: stmt_id,
                 expr: assignment_expr.clone(),
-                span: self.merge_spans(*assignment_expr.span(), final_value_span),
             })
         } else {
             self.consume_statement_terminator()?;
-            let span = *expr.span();
+            let expr_span = self.span_map.get(expr.id()).unwrap();
+            let stmt_id = self.span_map.alloc_id();
+            self.span_map.insert(stmt_id, expr_span);
+
             Ok(Stmt::Expression {
+                id: stmt_id,
                 expr,
-                span,
             })
         }
     }
@@ -557,15 +567,15 @@ impl<'a> Parser<'a> {
         self.consume_statement_terminator()?;
 
         let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::Import {
+            id,
             module_path,
             items: None,
             alias,
-            span: Span {
-                start: start_span.start,
-                end: end_span.end,
-            },
         })
     }
 
@@ -601,15 +611,15 @@ impl<'a> Parser<'a> {
         self.consume_statement_terminator()?;
 
         let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::Import {
+            id,
             module_path,
             items,
             alias: None,
-            span: Span {
-                start: start_span.start,
-                end: end_span.end,
-            },
         })
     }
 
@@ -619,14 +629,14 @@ impl<'a> Parser<'a> {
 
         let item = Box::new(self.statement()?);
 
-        let end_span = *item.span();
+        let item_span = self.span_map.get(item.id()).unwrap();
+        let span = self.merge_spans(start_span, item_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
 
         Ok(Stmt::Export {
+            id,
             item,
-            span: Span {
-                start: start_span.start,
-                end: end_span.end,
-            },
         })
     }
 }

@@ -39,7 +39,7 @@ impl Compiler {
                 self.compile_expr(left)?;
                 self.compile_expr(right)?;
 
-                match operator.kind {
+                match operator {
                     lugli_lexer::TokenKind::Plus => self.emit(Instruction::Add),
                     lugli_lexer::TokenKind::Minus => self.emit(Instruction::Subtract),
                     lugli_lexer::TokenKind::Star => self.emit(Instruction::Multiply),
@@ -55,7 +55,7 @@ impl Compiler {
                     lugli_lexer::TokenKind::LessEqual => self.emit(Instruction::LessEqual),
                     lugli_lexer::TokenKind::And => self.emit(Instruction::And),
                     lugli_lexer::TokenKind::Or => self.emit(Instruction::Or),
-                    _ => return Err(LugliError::runtime(format!("Unsupported binary operator: {:?}", operator.kind))),
+                    _ => return Err(LugliError::runtime(format!("Unsupported binary operator: {:?}", operator))),
                 }
                 Ok(())
             }
@@ -66,24 +66,26 @@ impl Compiler {
             } => {
                 self.compile_expr(operand)?;
 
-                match operator.kind {
+                match operator {
                     lugli_lexer::TokenKind::Minus => self.emit(Instruction::Negate),
                     lugli_lexer::TokenKind::Bang => self.emit(Instruction::Not),
-                    _ => return Err(LugliError::runtime(format!("Unsupported unary operator: {:?}", operator.kind))),
+                    _ => return Err(LugliError::runtime(format!("Unsupported unary operator: {:?}", operator))),
                 }
                 Ok(())
             }
             Expr::Call {
-                callee,
-                arguments,
+                data,
                 ..
             } => {
+                let callee = &data.callee;
+                let arguments = &data.arguments;
+
                 // Check if this is a method call (object.method())
                 if let Expr::Get {
                     object,
                     name,
                     ..
-                } = callee.as_ref()
+                } = callee
                 {
                     // This is a method call
                     // First compile the object
@@ -397,12 +399,13 @@ impl Compiler {
                 Ok(())
             }
             Expr::ListComprehension {
-                element,
-                variable,
-                iterable,
-                condition,
+                data,
                 ..
             } => {
+                let element = &data.element;
+                let variable = &data.variable;
+                let iterable = &data.iterable;
+                let condition = &data.condition;
                 // Desugar [expr for var in iterable if condition] into indexed iteration:
                 // 1. Create empty result list
                 // 2. Store iterable in local
@@ -456,7 +459,7 @@ impl Compiler {
                 self.emit(Instruction::Store(var_local));
 
                 // Optional condition check
-                if let Some(cond) = condition {
+                if let Some(cond) = condition.as_ref() {
                     self.compile_expr(cond)?;
                     let skip_append = self.emit_jump(Instruction::JumpIfFalse(0));
 
@@ -666,23 +669,20 @@ impl Compiler {
                 // No initializer, nothing to capture
             }
             Stmt::If {
-                condition,
-                then_branch,
-                elif_branches,
-                else_branch,
+                data,
                 ..
             } => {
-                self.find_captured_identifiers_in_expr(condition, outer_locals, params, captures);
-                for s in then_branch {
+                self.find_captured_identifiers_in_expr(&data.condition, outer_locals, params, captures);
+                for s in &data.then_branch {
                     self.find_captured_identifiers(s, outer_locals, params, captures);
                 }
-                for (elif_cond, elif_body) in elif_branches {
+                for (elif_cond, elif_body) in &data.elif_branches {
                     self.find_captured_identifiers_in_expr(elif_cond, outer_locals, params, captures);
                     for s in elif_body {
                         self.find_captured_identifiers(s, outer_locals, params, captures);
                     }
                 }
-                if let Some(else_body) = else_branch {
+                if let Some(else_body) = &data.else_branch {
                     for s in else_body {
                         self.find_captured_identifiers(s, outer_locals, params, captures);
                     }
@@ -745,12 +745,11 @@ impl Compiler {
                 self.find_captured_identifiers_in_expr(operand, outer_locals, params, captures);
             }
             Expr::Call {
-                callee,
-                arguments,
+                data,
                 ..
             } => {
-                self.find_captured_identifiers_in_expr(callee, outer_locals, params, captures);
-                for arg in arguments {
+                self.find_captured_identifiers_in_expr(&data.callee, outer_locals, params, captures);
+                for arg in &data.arguments {
                     self.find_captured_identifiers_in_expr(arg, outer_locals, params, captures);
                 }
             }
@@ -793,9 +792,9 @@ impl Compiler {
             Expr::FString {
                 parts, ..
             } => {
-                for part in parts {
+                for part in parts.as_ref() {
                     if let FStringPart::Expression(expr) = part {
-                        self.find_captured_identifiers_in_expr(expr, outer_locals, params, captures);
+                        self.find_captured_identifiers_in_expr(expr.as_ref(), outer_locals, params, captures);
                     }
                 }
             }
@@ -808,14 +807,12 @@ impl Compiler {
                 }
             }
             Expr::ListComprehension {
-                element,
-                iterable,
-                condition,
+                data,
                 ..
             } => {
-                self.find_captured_identifiers_in_expr(element, outer_locals, params, captures);
-                self.find_captured_identifiers_in_expr(iterable, outer_locals, params, captures);
-                if let Some(cond) = condition {
+                self.find_captured_identifiers_in_expr(&data.element, outer_locals, params, captures);
+                self.find_captured_identifiers_in_expr(&data.iterable, outer_locals, params, captures);
+                if let Some(cond) = &data.condition {
                     self.find_captured_identifiers_in_expr(cond, outer_locals, params, captures);
                 }
             }

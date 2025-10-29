@@ -5,7 +5,7 @@ use lugli_parser::Parser;
 fn test_simple_import() {
     let source = "import math";
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
+    let (program, _span_map) = parser.parse().expect("Parse should succeed");
 
     assert_eq!(program.statements.len(), 1);
 
@@ -28,7 +28,7 @@ fn test_simple_import() {
 fn test_import_with_dots() {
     let source = "import stdlib.collections.list";
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
+    let (program, _span_map) = parser.parse().expect("Parse should succeed");
 
     assert_eq!(program.statements.len(), 1);
 
@@ -46,7 +46,7 @@ fn test_import_with_dots() {
 fn test_import_with_alias() {
     let source = "import math as m";
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
+    let (program, _span_map) = parser.parse().expect("Parse should succeed");
 
     assert_eq!(program.statements.len(), 1);
 
@@ -67,7 +67,7 @@ fn test_import_with_alias() {
 fn test_from_import_single_item() {
     let source = "from math import pi";
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
+    let (program, _span_map) = parser.parse().expect("Parse should succeed");
 
     assert_eq!(program.statements.len(), 1);
 
@@ -88,7 +88,7 @@ fn test_from_import_single_item() {
 fn test_from_import_multiple_items() {
     let source = "from math import pi, sqrt, cos";
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
+    let (program, _span_map) = parser.parse().expect("Parse should succeed");
 
     assert_eq!(program.statements.len(), 1);
 
@@ -109,7 +109,7 @@ fn test_from_import_multiple_items() {
 fn test_from_import_wildcard() {
     let source = "from math import *";
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
+    let (program, _span_map) = parser.parse().expect("Parse should succeed");
 
     assert_eq!(program.statements.len(), 1);
 
@@ -130,7 +130,7 @@ fn test_from_import_wildcard() {
 fn test_export_function() {
     let source = "export fn add(a, b) { return a + b }";
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
+    let (program, _span_map) = parser.parse().expect("Parse should succeed");
 
     assert_eq!(program.statements.len(), 1);
 
@@ -156,7 +156,7 @@ fn test_export_function() {
 fn test_export_variable() {
     let source = "export let x = 42";
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
+    let (program, _span_map) = parser.parse().expect("Parse should succeed");
 
     assert_eq!(program.statements.len(), 1);
 
@@ -183,7 +183,7 @@ fn test_multiple_imports() {
         import io as stdio
     "#;
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
+    let (program, _span_map) = parser.parse().expect("Parse should succeed");
 
     assert_eq!(program.statements.len(), 3);
 

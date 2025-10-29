@@ -38,9 +38,9 @@ fn test_lugli_code_detailed(source: &str) -> TestResult {
     };
 
     match parse_result {
-        Ok(program) => {
+        Ok((program, span_map)) => {
             let compile_start = Instant::now();
-            let compile_result = compile(&program);
+            let compile_result = compile(&program, span_map);
             result.compile_time = compile_start.elapsed();
 
             match compile_result {

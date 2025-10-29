@@ -1,109 +1,124 @@
-//! Statement AST nodes for Lugli.
-
-use crate::{AstNode, Expr};
+use crate::{AstNode, Expr, NodeId};
 use lugli_common::Span;
 
-/// Statements in Lugli.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructDeclData {
+    pub name: String,
+    pub fields: Vec<(String, Option<Expr>)>,
+    pub methods: Vec<Stmt>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IfData {
+    pub condition: Expr,
+    pub then_branch: Vec<Stmt>,
+    pub elif_branches: Vec<(Expr, Vec<Stmt>)>,
+    pub else_branch: Option<Vec<Stmt>>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
-    /// Expression statements
-    Expression { expr: Expr, span: Span },
+    Expression {
+        id: NodeId,
+        expr: Expr,
+    },
 
-    /// Variable declarations (create x = 5)
-    VarDecl { name: String, initializer: Option<Expr>, is_const: bool, span: Span },
-
-    /// Function declarations
-    FnDecl { name: String, params: Vec<String>, body: Vec<Stmt>, span: Span },
-
-    /// Struct declarations
-    StructDecl {
+    VarDecl {
+        id: NodeId,
         name: String,
-        fields: Vec<(String, Option<Expr>)>, // (field_name, optional_default)
-        methods: Vec<Stmt>,                  // FnDecl statements
-        span: Span,
+        initializer: Option<Expr>,
+        is_const: bool,
     },
 
-    /// If statements
-    If { condition: Expr, then_branch: Vec<Stmt>, elif_branches: Vec<(Expr, Vec<Stmt>)>, else_branch: Option<Vec<Stmt>>, span: Span },
+    FnDecl {
+        id: NodeId,
+        name: String,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+    },
 
-    /// While loops
-    While { condition: Expr, body: Vec<Stmt>, span: Span },
+    StructDecl {
+        id: NodeId,
+        data: Box<StructDeclData>,
+    },
 
-    /// For loops
-    For { variable: String, iterable: Expr, body: Vec<Stmt>, span: Span },
+    If {
+        id: NodeId,
+        data: Box<IfData>,
+    },
 
-    /// Infinite loops
-    Loop { body: Vec<Stmt>, span: Span },
+    While {
+        id: NodeId,
+        condition: Expr,
+        body: Vec<Stmt>,
+    },
 
-    /// Return statements
-    Return { value: Option<Expr>, span: Span },
+    For {
+        id: NodeId,
+        variable: String,
+        iterable: Expr,
+        body: Vec<Stmt>,
+    },
 
-    /// Break statements
-    Break { span: Span },
+    Loop {
+        id: NodeId,
+        body: Vec<Stmt>,
+    },
 
-    /// Continue statements
-    Continue { span: Span },
+    Return {
+        id: NodeId,
+        value: Option<Expr>,
+    },
 
-    /// Block statements
-    Block { statements: Vec<Stmt>, span: Span },
+    Break {
+        id: NodeId,
+    },
 
-    /// Import statements (import math, from math import pi)
+    Continue {
+        id: NodeId,
+    },
+
+    Block {
+        id: NodeId,
+        statements: Vec<Stmt>,
+    },
+
     Import {
+        id: NodeId,
         module_path: Vec<String>,
-        items: Option<Vec<String>>, // None = import entire module, Some = specific items
+        items: Option<Vec<String>>,
         alias: Option<String>,
-        span: Span,
     },
 
-    /// Export statements (export fn foo() {})
-    Export { item: Box<Stmt>, span: Span },
+    Export {
+        id: NodeId,
+        item: Box<Stmt>,
+    },
+}
+
+impl Stmt {
+    pub fn id(&self) -> NodeId {
+        match self {
+            Stmt::Expression { id, .. } => *id,
+            Stmt::VarDecl { id, .. } => *id,
+            Stmt::FnDecl { id, .. } => *id,
+            Stmt::StructDecl { id, .. } => *id,
+            Stmt::If { id, .. } => *id,
+            Stmt::While { id, .. } => *id,
+            Stmt::For { id, .. } => *id,
+            Stmt::Loop { id, .. } => *id,
+            Stmt::Return { id, .. } => *id,
+            Stmt::Break { id, .. } => *id,
+            Stmt::Continue { id, .. } => *id,
+            Stmt::Block { id, .. } => *id,
+            Stmt::Import { id, .. } => *id,
+            Stmt::Export { id, .. } => *id,
+        }
+    }
 }
 
 impl AstNode for Stmt {
     fn span(&self) -> &Span {
-        match self {
-            Stmt::Expression {
-                span, ..
-            } => span,
-            Stmt::VarDecl {
-                span, ..
-            } => span,
-            Stmt::FnDecl {
-                span, ..
-            } => span,
-            Stmt::StructDecl {
-                span, ..
-            } => span,
-            Stmt::If {
-                span, ..
-            } => span,
-            Stmt::While {
-                span, ..
-            } => span,
-            Stmt::For {
-                span, ..
-            } => span,
-            Stmt::Loop {
-                span, ..
-            } => span,
-            Stmt::Return {
-                span, ..
-            } => span,
-            Stmt::Break {
-                span, ..
-            } => span,
-            Stmt::Continue {
-                span, ..
-            } => span,
-            Stmt::Block {
-                span, ..
-            } => span,
-            Stmt::Import {
-                span, ..
-            } => span,
-            Stmt::Export {
-                span, ..
-            } => span,
-        }
+        panic!("AstNode::span() called on Stmt after NodeId migration. Use SpanMap instead.")
     }
 }

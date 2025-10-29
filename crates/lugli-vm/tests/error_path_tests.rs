@@ -3,8 +3,8 @@ use lugli_vm::{Bytecode, Machine, compile};
 
 fn compile_source(source: &str) -> Bytecode {
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
-    let program = parser.parse().expect("Parse should succeed");
-    compile(&program).expect("Compile should succeed")
+    let (program, span_map) = parser.parse().expect("Parse should succeed");
+    compile(&program, span_map).expect("Compile should succeed")
 }
 
 #[test]
