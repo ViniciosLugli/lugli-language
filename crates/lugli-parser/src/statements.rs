@@ -398,7 +398,15 @@ impl<'a> Parser<'a> {
                     TokenKind::StarEqual => TokenKind::Star,
                     TokenKind::SlashEqual => TokenKind::Slash,
                     TokenKind::PercentEqual => TokenKind::Percent,
-                    _ => unreachable!(),
+                    _ => {
+                        return Err(ParseError::Custom {
+                            message: format!(
+                                "Unexpected operator in assignment: {:?}. Expected one of +=, -=, *=, /=, %=",
+                                operator.kind
+                            ),
+                            span: operator.span,
+                        })
+                    }
                 };
 
                 let binary_operator = lugli_lexer::Token::new(binary_op, "".to_string(), operator.span);

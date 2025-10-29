@@ -2,6 +2,9 @@ use crate::{Parser, error::ParseError};
 use lugli_ast::FStringPart;
 use lugli_common::Span;
 use lugli_lexer::{Token, TokenKind};
+use std::sync::OnceLock;
+
+static ERROR_TOKEN: OnceLock<Token> = OnceLock::new();
 
 impl<'a> Parser<'a> {
     pub(crate) fn match_any(&mut self, types: &[TokenKind]) -> bool {
@@ -21,7 +24,15 @@ impl<'a> Parser<'a> {
         let _ = self.scanner.advance();
     }
 
-    pub(crate) fn previous(&self) -> &Token { self.previous.as_ref().expect("BUG: No previous token (advance() must be called before previous())") }
+    pub(crate) fn previous(&self) -> &Token {
+        self.previous.as_ref().unwrap_or_else(|| {
+            ERROR_TOKEN.get_or_init(|| Token {
+                kind: TokenKind::Eof,
+                lexeme: String::from(""),
+                span: Span { start: 0, end: 0 },
+            })
+        })
+    }
 
     pub(crate) fn previous_span(&self) -> Span {
         self.previous.as_ref().map(|t| t.span).unwrap_or(Span {

@@ -2,7 +2,9 @@ use lugli_common::Value;
 use lugli_stdlib::get_global_functions;
 use std::{cell::RefCell, rc::Rc};
 
-fn get_function(name: &str) -> Option<fn(&[Value]) -> Result<Value, lugli_common::LugliError>> {
+type NativeFunction = fn(&[Value]) -> Result<Value, lugli_common::LugliError>;
+
+fn get_function(name: &str) -> Option<NativeFunction> {
     get_global_functions().into_iter().find(|(n, _)| *n == name).map(|(_, f)| f)
 }
 

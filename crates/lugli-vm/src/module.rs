@@ -117,7 +117,9 @@ impl ModuleResolver {
             if let Some(parent) = current_file.parent() {
                 let relative_path = parent.join(&import_path).with_extension("lg");
                 if relative_path.exists() {
-                    return Ok(relative_path.canonicalize().unwrap_or(relative_path));
+                    return relative_path
+                        .canonicalize()
+                        .map_err(|e| LugliError::runtime(format!("Failed to resolve module path '{}': {}", relative_path.display(), e)));
                 }
             }
         }
@@ -126,7 +128,9 @@ impl ModuleResolver {
         for search_path in &self.search_paths {
             let candidate = search_path.join(&import_path).with_extension("lg");
             if candidate.exists() {
-                return Ok(candidate.canonicalize().unwrap_or(candidate));
+                return candidate
+                    .canonicalize()
+                    .map_err(|e| LugliError::runtime(format!("Failed to resolve module path '{}': {}", candidate.display(), e)));
             }
         }
 
@@ -136,7 +140,9 @@ impl ModuleResolver {
                 if let Some(parent) = current_file.parent() {
                     let relative_path = parent.join(&import_path);
                     if relative_path.exists() {
-                        return Ok(relative_path.canonicalize().unwrap_or(relative_path));
+                        return relative_path
+                            .canonicalize()
+                            .map_err(|e| LugliError::runtime(format!("Failed to resolve module path '{}': {}", relative_path.display(), e)));
                     }
                 }
             }
@@ -144,7 +150,9 @@ impl ModuleResolver {
             for search_path in &self.search_paths {
                 let candidate = search_path.join(&import_path);
                 if candidate.exists() {
-                    return Ok(candidate.canonicalize().unwrap_or(candidate));
+                    return candidate
+                        .canonicalize()
+                        .map_err(|e| LugliError::runtime(format!("Failed to resolve module path '{}': {}", candidate.display(), e)));
                 }
             }
         }
