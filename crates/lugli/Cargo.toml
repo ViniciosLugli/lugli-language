@@ -20,6 +20,8 @@ lugli-vm.workspace = true
 lugli-stdlib.workspace = true
 clap.workspace = true
 colored.workspace = true
+dirs.workspace = true
+rustyline.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

@@ -26,8 +26,10 @@ thiserror = "2.0.17"
 hashbrown = "0.16.0"
 
 # CLI and utilities
-clap = { version = "4.5.50", features = ["derive"] }
+clap = { version = "4.5.51", features = ["derive"] }
 colored = "3.0.0"
+rustyline = { version = "17.0.2", features = ["with-file-history"] }
+dirs = "6.0.0"
 
 # Standard library
 chrono = { version = "0.4.42", features = ["serde"] }
