@@ -8,8 +8,8 @@ mod basic_error_tests {
         let error = LugliError::runtime("Division by zero");
 
         match error {
-            LugliError::Runtime { message } => {
-                assert_eq!(message, "Division by zero");
+            LugliError::Runtime(data) => {
+                assert_eq!(data.message, "Division by zero");
             }
             _ => panic!("Expected Runtime error"),
         }
@@ -35,9 +35,9 @@ mod basic_error_tests {
         let error = LugliError::type_error("number", "string");
 
         match error {
-            LugliError::Type { expected, found } => {
-                assert_eq!(expected, "number");
-                assert_eq!(found, "string");
+            LugliError::Type(data) => {
+                assert_eq!(data.expected, "number");
+                assert_eq!(data.found, "string");
             }
             _ => panic!("Expected Type error"),
         }
@@ -48,8 +48,8 @@ mod basic_error_tests {
         let error = LugliError::undefined_variable("x");
 
         match error {
-            LugliError::UndefinedVariable { name } => {
-                assert_eq!(name, "x");
+            LugliError::UndefinedVariable(data) => {
+                assert_eq!(data.name, "x");
             }
             _ => panic!("Expected UndefinedVariable error"),
         }
@@ -84,8 +84,8 @@ mod error_conversion_tests {
         let error = LugliError::runtime("String error message");
 
         match error {
-            LugliError::Runtime { message } => {
-                assert_eq!(message, "String error message");
+            LugliError::Runtime(data) => {
+                assert_eq!(data.message, "String error message");
             }
             _ => panic!("Expected Runtime error"),
         }
@@ -97,9 +97,9 @@ mod error_conversion_tests {
         let lugli_error = LugliError::runtime(format!("IO Error: {}", original_error));
 
         match lugli_error {
-            LugliError::Runtime { message } => {
-                assert!(message.contains("IO Error"));
-                assert!(message.contains("File not found"));
+            LugliError::Runtime(data) => {
+                assert!(data.message.contains("IO Error"));
+                assert!(data.message.contains("File not found"));
             }
             _ => panic!("Expected Runtime error"),
         }

@@ -7,12 +7,14 @@
 ### Language Philosophy
 
 Lugli combines the best of both worlds:
-- **Python's** simplicity, readability, and rapid development experience
-- **Rust's** performance, safety concepts, and expressive modern syntax
-- **Dynamic typing** with optional type hints for enhanced tooling
-- **High-level abstractions** without sacrificing runtime performance
+
+-   **Python's** simplicity, readability, and rapid development experience
+-   **Rust's** performance, safety concepts, and expressive modern syntax
+-   **Dynamic typing** with optional type hints for enhanced tooling
+-   **High-level abstractions** without sacrificing runtime performance
 
 ### Core Principles
+
 1. **Readability counts** - Code should be self-documenting and obvious
 2. **Performance matters** - VM-based execution with bytecode compilation for speed
 3. **Developer happiness** - Intuitive syntax with excellent error messages
@@ -20,17 +22,19 @@ Lugli combines the best of both worlds:
 5. **Modern semantics** - Learn from both Python's evolution and Rust's innovations
 
 ### Design Goals
-- **High-level abstractions**: Easy syntax for complex operations
-- **Hybrid syntax**: Best patterns from both Python and Rust ecosystems
-- **High performance**: Sub-100ms startup, >1M instructions/second execution
-- **Modern tooling**: REPL, LSP, formatter, package manager
-- **Educational value**: Well-documented codebase demonstrating language implementation
+
+-   **High-level abstractions**: Easy syntax for complex operations
+-   **Hybrid syntax**: Best patterns from both Python and Rust ecosystems
+-   **High performance**: Sub-100ms startup, >1M instructions/second execution
+-   **Modern tooling**: REPL, LSP, formatter, package manager
+-   **Educational value**: Well-documented codebase demonstrating language implementation
 
 ---
 
 ## 🌊 Lugli Syntax Guide
 
 ### **Variable Declaration**
+
 ```lugli
 # Mutable variables (Python simplicity + Rust clarity)
 let name = "Lugli"          # Mutable by default
@@ -41,6 +45,7 @@ const PI = 3.14             # Compile-time constant
 ```
 
 ### **Comments**
+
 ```lugli
 # Single-line comment (Python-style)
 // Alternative single-line (Rust-style also supported)
@@ -53,6 +58,7 @@ for functions and modules
 ```
 
 ### **String Operations**
+
 ```lugli
 # String concatenation
 let greeting = "Hello, " + name
@@ -65,6 +71,7 @@ let formatted = format!("User: {}, ID: {}", name, id)
 ```
 
 ### **Print & Output**
+
 ```lugli
 # Simple print (Python-style)
 print("Hello, World")
@@ -78,6 +85,7 @@ println!("Hello, {}", name)
 ```
 
 ### **Functions**
+
 ```lugli
 # Basic function
 fn greet(name) {
@@ -96,6 +104,7 @@ fn connect(host="localhost", port=8080) {
 ```
 
 ### **Structs (Classes)**
+
 ```lugli
 # Dataclass-style
 @dataclass
@@ -118,6 +127,7 @@ let person = Person { name: "Alice", age: 30 }
 ```
 
 ### **Control Flow**
+
 ```lugli
 # If/elif/else (Python-style elif)
 if age >= 18 {
@@ -138,6 +148,7 @@ match status {
 ```
 
 ### **Collections**
+
 ```lugli
 # Lists with comprehensions (Python-style)
 let numbers = [1, 2, 3, 4, 5]
@@ -156,6 +167,7 @@ let person = {
 ```
 
 ### **Loops & Iteration**
+
 ```lugli
 # For loops (Python-style)
 for item in collection {
@@ -178,6 +190,7 @@ loop {
 ```
 
 ### **Import System**
+
 ```lugli
 # Python-style imports
 import math
@@ -189,6 +202,7 @@ import!("./module.lg")
 ```
 
 ### **Method Naming Conventions**
+
 ```lugli
 # Query methods (return info)
 len = list.len?()
@@ -210,6 +224,7 @@ new_list = old_list.filter(predicate)
 The project is organized as a **Rust workspace** with **7 professional crates** in the `crates/` directory:
 
 ### Crate Dependencies (Bottom to Top)
+
 ```
 lugli (CLI)
     ↓
@@ -227,52 +242,60 @@ lugli-lexer (Source → Tokens)              ↓
 ### Core Components
 
 #### `lugli-lexer`
-- **Purpose**: Tokenization of source code
-- **Technology**: `logos` crate for fast lexical analysis
-- **Output**: Stream of tokens with location information
-- **Key files**: `token.rs`, `scanner.rs`
+
+-   **Purpose**: Tokenization of source code
+-   **Technology**: `logos` crate for fast lexical analysis
+-   **Output**: Stream of tokens with location information
+-   **Key files**: `token.rs`, `scanner.rs`
 
 #### `lugli-ast`
-- **Purpose**: Abstract Syntax Tree definitions
-- **Features**: Immutable nodes, visitor pattern, span tracking
-- **Key files**: `expr.rs`, `stmt.rs`, `visitor.rs`
+
+-   **Purpose**: Abstract Syntax Tree definitions
+-   **Features**: Immutable nodes, visitor pattern, span tracking
+-   **Key files**: `expr.rs`, `stmt.rs`, `visitor.rs`
 
 #### `lugli-parser`
-- **Purpose**: Parse tokens into AST
-- **Technology**: Recursive descent with Pratt parsing for operators
-- **Features**: Error recovery, detailed error messages
-- **Key files**: `parser.rs`, `precedence.rs`, `error.rs`
+
+-   **Purpose**: Parse tokens into AST
+-   **Technology**: Recursive descent with Pratt parsing for operators
+-   **Features**: Error recovery, detailed error messages
+-   **Key files**: `parser.rs`, `precedence.rs`, `error.rs`
 
 #### `lugli-common`
-- **Purpose**: Shared types and foundational components
-- **Features**: Value enum, error types, source spans, common utilities
-- **Key files**: `value.rs`, `error.rs`, `span.rs`
-- **Used by**: All other crates for type consistency
+
+-   **Purpose**: Shared types and foundational components
+-   **Features**: Value enum, error types, source spans, common utilities
+-   **Key files**: `value.rs`, `error.rs`, `span.rs`
+-   **Used by**: All other crates for type consistency
 
 #### `lugli-vm`
-- **Purpose**: High-performance bytecode virtual machine
-- **Architecture**: Stack-based execution with integrated stdlib functions
-- **Features**: AST compilation, native function registry, error recovery
-- **Key files**: `machine.rs`, `compiler.rs`, `bytecode.rs`
-- **Performance**: >1M instructions/second, sub-100ms startup
+
+-   **Purpose**: High-performance bytecode virtual machine
+-   **Architecture**: Stack-based execution with integrated stdlib functions
+-   **Features**: AST compilation, native function registry, error recovery
+-   **Key files**: `machine.rs`, `compiler.rs`, `bytecode.rs`
+-   **Performance**: >1M instructions/second, sub-100ms startup
 
 #### `lugli-stdlib`
-- **Purpose**: Native function implementations for VM
-- **Architecture**: Function registry system with VM integration
-- **Method naming**: `!` for mutating, `?` for queries
-- **Key modules**: `core/`, `io/`, `time/`
-- **Integration**: Direct VM function calls via registry
+
+-   **Purpose**: Native function implementations for VM
+-   **Architecture**: Function registry system with VM integration
+-   **Method naming**: `!` for mutating, `?` for queries
+-   **Key modules**: `core/`, `io/`, `time/`
+-   **Integration**: Direct VM function calls via registry
 
 #### `lugli` (main)
-- **Purpose**: CLI tool and REPL
-- **Technology**: `clap` for CLI, custom REPL with syntax highlighting
-- **Commands**: `run`, `repl`, `check`, `fmt`, `test`
+
+-   **Purpose**: CLI tool and REPL
+-   **Technology**: `clap` for CLI, custom REPL with syntax highlighting
+-   **Commands**: `run`, `repl`, `check`, `fmt`, `test`
 
 ---
 
 ## 🔧 Code Patterns & Conventions
 
 ### Error Handling
+
 ```rust
 // Use Result for fallible operations
 fn parse_expression(&mut self) -> Result<Expr, ParseError> {
@@ -290,6 +313,7 @@ pub enum LexError {
 ```
 
 ### Memory Management
+
 ```rust
 // Use Rc<RefCell<>> for shared mutable state
 type Environment = Rc<RefCell<HashMap<String, Value>>>;
@@ -308,19 +332,22 @@ pub enum Expr {
 ```
 
 ### Documentation Policy
-- **MINIMAL DOCUMENTATION**: Only add comments/docs when absolutely necessary
-- No redundant rustdoc comments that just repeat the function name
-- Only document complex algorithms, non-obvious behavior, or public APIs that need explanation
-- Prefer self-documenting code with clear naming over comments
+
+-   **MINIMAL DOCUMENTATION**: Only add comments/docs when absolutely necessary
+-   No redundant rustdoc comments that just repeat the function name
+-   Only document complex algorithms, non-obvious behavior, or public APIs that need explanation
+-   Prefer self-documenting code with clear naming over comments
 
 ### Migration Policy
-- **REMOVE OLD/DEPRECATED CODE**: Always remove outdated code during migration
-- Don't just copy-paste old code - modernize and improve it
-- Remove TODO comments that are no longer relevant
-- Clean up unused imports and dependencies
-- Update to latest API patterns and best practices
+
+-   **REMOVE OLD/DEPRECATED CODE**: Always remove outdated code during migration
+-   Don't just copy-paste old code - modernize and improve it
+-   Remove TODO comments that are no longer relevant
+-   Clean up unused imports and dependencies
+-   Update to latest API patterns and best practices
 
 ### Type Definitions
+
 ```rust
 // Always implement Debug and Display
 #[derive(Debug, Clone, PartialEq)]
@@ -338,6 +365,7 @@ impl Display for Token {
 ```
 
 ### Testing Patterns
+
 ```rust
 // Unit tests in each crate
 #[cfg(test)]
@@ -366,6 +394,7 @@ proptest! {
 ```
 
 ### Standard Library Conventions
+
 ```rust
 // Method naming: ! for mutating, ? for queries
 impl StringObject {
@@ -385,6 +414,7 @@ impl StringObject {
 ## 🧪 Testing Strategy
 
 ### Test Organization
+
 ```
 crates/
 ├── lugli-lexer/
@@ -404,18 +434,21 @@ tests/                          # Integration tests
 ### Test Categories
 
 #### Unit Tests (per crate)
-- **Lexer**: All token types, error cases, Unicode
-- **Parser**: All language constructs, error recovery
-- **Runtime**: Variable scoping, function calls, stdlib functions
-- **Stdlib**: Every method, edge cases, error conditions
+
+-   **Lexer**: All token types, error cases, Unicode
+-   **Parser**: All language constructs, error recovery
+-   **Runtime**: Variable scoping, function calls, stdlib functions
+-   **Stdlib**: Every method, edge cases, error conditions
 
 #### Integration Tests (workspace level)
-- **Language features**: Control flow, functions, structs
-- **Standard library**: Cross-module interactions
-- **Error handling**: Parse errors, runtime errors
-- **Performance**: Regression tests, memory usage
+
+-   **Language features**: Control flow, functions, structs
+-   **Standard library**: Cross-module interactions
+-   **Error handling**: Parse errors, runtime errors
+-   **Performance**: Regression tests, memory usage
 
 #### Benchmarks
+
 ```rust
 // Use criterion for benchmarking
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -432,11 +465,12 @@ fn lexer_benchmark(c: &mut Criterion) {
 ```
 
 ### Performance Targets
-- **Lexer**: >1MB/s tokenization speed
-- **Parser**: >500KB/s parsing speed
-- **VM**: >1M instructions/second
-- **Startup**: <100ms cold start
-- **Memory**: <10MB for basic programs
+
+-   **Lexer**: >1MB/s tokenization speed
+-   **Parser**: >500KB/s parsing speed
+-   **VM**: >1M instructions/second
+-   **Startup**: <100ms cold start
+-   **Memory**: <10MB for basic programs
 
 ---
 
@@ -445,30 +479,35 @@ fn lexer_benchmark(c: &mut Criterion) {
 ### **Priority Implementation Order**
 
 #### Phase 2.1: Core Syntax Updates
+
 1. **Lexer Updates**:
-   - Add `let` and `mut` keywords
-   - Support both `#` and `//` comments
-   - Add `match` keyword for pattern matching
-   - Add f-string tokenization (`f"..."`)
+
+    - Add `let` and `mut` keywords
+    - Support both `#` and `//` comments
+    - Add `match` keyword for pattern matching
+    - Add f-string tokenization (`f"..."`)
 
 2. **Parser Updates**:
-   - Replace `create` with `let`/`mut` in variable declarations
-   - Update struct methods to use `self` instead of `this`
-   - Add pattern matching syntax parsing
-   - Support optional type hints syntax
+
+    - Replace `create` with `let`/`mut` in variable declarations
+    - Update struct methods to use `self` instead of `this`
+    - Add pattern matching syntax parsing
+    - Support optional type hints syntax
 
 3. **Example Updates**:
-   - Convert all examples to new syntax
-   - Add new examples for modern features
-   - Update REPL prompts and error messages
+    - Convert all examples to new syntax
+    - Add new examples for modern features
+    - Update REPL prompts and error messages
 
 #### Phase 2.2: Modern Features
+
 1. **String Interpolation**: F-string support
 2. **List Comprehensions**: Python-style syntax
 3. **Pattern Matching**: Rust-inspired match expressions
 4. **Type Hints**: Optional typing for better tooling
 
 #### Phase 2.3: Standard Library
+
 1. **Pythonic APIs**: `print()`, `len()`, `str()`, `int()`
 2. **Enumerate Function**: For indexed iteration
 3. **Range Function**: For numeric iteration
@@ -477,12 +516,14 @@ fn lexer_benchmark(c: &mut Criterion) {
 ### **Syntax Migration Strategy**
 
 #### Backward Compatibility
-- Keep `create` as alias for `let` during transition
-- Support both comment styles (`#` and `//`)
-- Maintain `println!` alongside new `print()`
-- Keep current method naming (`!` and `?`) working
+
+-   Keep `create` as alias for `let` during transition
+-   Support both comment styles (`#` and `//`)
+-   Maintain `println!` alongside new `print()`
+-   Keep current method naming (`!` and `?`) working
 
 #### Migration Path
+
 1. **Phase 1**: Add new syntax alongside old
 2. **Phase 2**: Update all examples to new style
 3. **Phase 3**: Deprecate old syntax with warnings
@@ -491,6 +532,7 @@ fn lexer_benchmark(c: &mut Criterion) {
 ### **Testing Each Syntax Feature**
 
 For each new syntax element:
+
 1. **Lexer tests**: Tokenization correctness
 2. **Parser tests**: AST generation
 3. **Runtime tests**: Execution behavior
@@ -530,32 +572,36 @@ examples/
 ### Adding New Language Features
 
 1. **Design Phase**
-   - Document syntax in `docs/language_spec.md`
-   - Add examples to `examples/syntax/`
-   - Consider backward compatibility
+
+    - Document syntax in `docs/language_spec.md`
+    - Add examples to `examples/syntax/`
+    - Consider backward compatibility
 
 2. **Implementation Phase**
-   - Update lexer if new tokens needed
-   - Add AST nodes in `lugli-ast`
-   - Update parser for new syntax
-   - Implement runtime behavior
-   - Add stdlib support if applicable
+
+    - Update lexer if new tokens needed
+    - Add AST nodes in `lugli-ast`
+    - Update parser for new syntax
+    - Implement runtime behavior
+    - Add stdlib support if applicable
 
 3. **Testing Phase**
-   - Unit tests for each component
-   - Integration tests for feature
-   - Performance benchmarks
-   - Update documentation
+
+    - Unit tests for each component
+    - Integration tests for feature
+    - Performance benchmarks
+    - Update documentation
 
 4. **Review Phase**
-   - Run full test suite
-   - Check performance regressions
-   - Update examples
-   - Code review
+    - Run full test suite
+    - Check performance regressions
+    - Update examples
+    - Code review
 
 ### Common Development Tasks
 
 #### Build & Test
+
 ```bash
 # Build all crates
 cargo build --workspace
@@ -575,6 +621,7 @@ cargo fmt --workspace
 ```
 
 #### Running Programs
+
 ```bash
 # Run a Lugli program
 cargo run -- run examples/hello_world.lg
@@ -590,6 +637,7 @@ cargo run -- fmt examples/
 ```
 
 #### Debugging
+
 ```bash
 # Debug mode with extra logging
 RUST_LOG=debug cargo run -- run program.lg
@@ -608,21 +656,25 @@ cargo run -- compile --bytecode program.lg
 ### Common Issues
 
 #### Parser Errors
-- Check token precedence in `precedence.rs`
-- Verify error recovery synchronization points
-- Test with minimal failing cases
+
+-   Check token precedence in `precedence.rs`
+-   Verify error recovery synchronization points
+-   Test with minimal failing cases
 
 #### Runtime Errors
-- Use `RUST_LOG=debug` for detailed execution tracing
-- Check variable scoping in environment
-- Verify function call argument matching
+
+-   Use `RUST_LOG=debug` for detailed execution tracing
+-   Check variable scoping in environment
+-   Verify function call argument matching
 
 #### Performance Issues
-- Profile with `cargo bench`
-- Use `perf` or `flamegraph` for detailed analysis
-- Check for excessive allocations
+
+-   Profile with `cargo bench`
+-   Use `perf` or `flamegraph` for detailed analysis
+-   Check for excessive allocations
 
 ### Development Environment
+
 ```bash
 # Install development tools
 cargo install cargo-watch
@@ -644,27 +696,31 @@ cargo flamegraph --bin lugli -- run large_program.lg
 ## 📚 Key Dependencies
 
 ### Core Dependencies
-- **logos** (0.15.1): Fast lexical analysis
-- **clap** (4.5.48): Command-line interface
-- **thiserror** (2.0.16): Error handling
-- **chrono** (0.4.42): Date/time operations
+
+-   **logos** (0.15.1): Fast lexical analysis
+-   **clap** (4.5.48): Command-line interface
+-   **thiserror** (2.0.16): Error handling
+-   **chrono** (0.4.42): Date/time operations
 
 ### Development Dependencies
-- **criterion**: Performance benchmarking
-- **proptest**: Property-based testing
-- **insta**: Snapshot testing for parser output
-- **pretty_assertions**: Better test failure output
+
+-   **criterion**: Performance benchmarking
+-   **proptest**: Property-based testing
+-   **insta**: Snapshot testing for parser output
+-   **pretty_assertions**: Better test failure output
 
 ### Optional Features
-- **serde**: Serialization for AST caching
-- **rayon**: Parallel compilation
-- **mimalloc**: Fast memory allocator
+
+-   **serde**: Serialization for AST caching
+-   **rayon**: Parallel compilation
+-   **mimalloc**: Fast memory allocator
 
 ---
 
 ## 🎓 Learning Resources
 
 ### Understanding the Codebase
+
 1. Start with `lugli-common` - foundational types
 2. Read `lugli-lexer` - simplest component
 3. Study `lugli-ast` for data structures
@@ -673,15 +729,17 @@ cargo flamegraph --bin lugli -- run large_program.lg
 6. Review `lugli-stdlib` for language features
 
 ### Recommended Reading
-- "Crafting Interpreters" by Robert Nystrom
-- "Language Implementation Patterns" by Terence Parr
-- Rust Programming Language Book (for Rust patterns)
+
+-   "Crafting Interpreters" by Robert Nystrom
+-   "Language Implementation Patterns" by Terence Parr
+-   Rust Programming Language Book (for Rust patterns)
 
 ### Contributing Guidelines
-- All code must have tests
-- Performance regressions require justification
-- Breaking changes need migration guide
-- Documentation must be updated
+
+-   All code must have tests
+-   Performance regressions require justification
+-   Breaking changes need migration guide
+-   Documentation must be updated
 
 ---
 
@@ -690,37 +748,43 @@ cargo flamegraph --bin lugli -- run large_program.lg
 ### ✅ **COMPLETED: Professional VM-Only Architecture**
 
 #### **Phase 1: Foundation & Core Infrastructure**
-- ✅ **7-Crate Professional Workspace**: Clean dependency graph, shared types
-- ✅ **VM-Only Execution**: Eliminated tree-walking interpreter, 10-100x performance boost
-- ✅ **Stdlib Integration**: Native function registry system with VM
-- ✅ **Parser Complete**: All modern language features with 36/36 tests passing
-- ✅ **Value System**: Sophisticated type system with structs, lists, dicts
-- ✅ **Error Handling**: Professional error types with source spans
+
+-   ✅ **7-Crate Professional Workspace**: Clean dependency graph, shared types
+-   ✅ **VM-Only Execution**: Eliminated tree-walking interpreter, 10-100x performance boost
+-   ✅ **Stdlib Integration**: Native function registry system with VM
+-   ✅ **Parser Complete**: All modern language features with 36/36 tests passing
+-   ✅ **Value System**: Sophisticated type system with structs, lists, dicts
+-   ✅ **Error Handling**: Professional error types with source spans
 
 #### **VM Architecture Benefits Achieved**
-- **Performance**: Stack-based bytecode execution >1M instructions/second
-- **Memory**: Efficient VM stack vs recursive AST traversal
-- **Maintainability**: Single execution engine, professional separation of concerns
-- **Integration**: Seamless stdlib↔VM function calls via registry system
+
+-   **Performance**: Stack-based bytecode execution >1M instructions/second
+-   **Memory**: Efficient VM stack vs recursive AST traversal
+-   **Maintainability**: Single execution engine, professional separation of concerns
+-   **Integration**: Seamless stdlib↔VM function calls via registry system
 
 ### 🎯 **CURRENT FOCUS: Advanced Language Features**
 
 #### **Priority 1: Parser Features → VM Integration**
-- **Property Access**: `obj.property` execution in VM
-- **Assignments**: All assignment types (`=`, `+=`, `-=`, etc.) in VM
-- **Enhanced Errors**: Source span integration for better debugging
+
+-   **Property Access**: `obj.property` execution in VM
+-   **Assignments**: All assignment types (`=`, `+=`, `-=`, etc.) in VM
+-   **Enhanced Errors**: Source span integration for better debugging
 
 #### **Priority 2: Modern Language Features**
-- **F-String Interpolation**: `f"Hello {name}"` runtime support
-- **List Comprehensions**: `[x*2 for x in nums if x > 0]` parsing + VM execution
-- **Pattern Matching**: `match` expressions with VM compiler support
+
+-   **F-String Interpolation**: `f"Hello {name}"` runtime support
+-   **List Comprehensions**: `[x*2 for x in nums if x > 0]` parsing + VM execution
+-   **Pattern Matching**: `match` expressions with VM compiler support
 
 #### **Priority 3: Pythonic Standard Library**
-- **Core Functions**: `print()`, `len()`, `str()`, `int()`, `range()`, `enumerate()`
-- **Collection Methods**: Enhanced list/dict/string APIs
-- **Performance**: Native function optimization in VM
+
+-   **Core Functions**: `print()`, `len()`, `str()`, `int()`, `range()`, `enumerate()`
+-   **Collection Methods**: Enhanced list/dict/string APIs
+-   **Performance**: Native function optimization in VM
 
 ### **Current Architecture Status**
+
 ```
 lugli (CLI)
     ↓
@@ -743,10 +807,10 @@ lugli-common (Foundation)
 
 ---
 
-**Last Updated**: 2025-09-28
-**Version**: 0.3.0-dev
+**Last Updated**: 2025-10-28
+**Version**: 0.3.1
 **Maintainer**: Vinicios Lugli
 
 ---
 
-*This guide is for AI assistants working on the Lugli language project. Keep it updated as the project evolves.*
+_This guide is for AI assistants working on the Lugli language project. Keep it updated as the project evolves._
