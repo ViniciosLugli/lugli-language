@@ -1,4 +1,7 @@
-use crate::error::LugliError;
+use crate::{
+    error::LugliError,
+    string_pool::{StringId, StringPool},
+};
 use hashbrown::HashMap;
 use std::{
     cell::RefCell,
@@ -6,21 +9,21 @@ use std::{
     rc::Rc,
 };
 
-pub type NativeFunction = fn(&[Value]) -> Result<Value, LugliError>;
+pub type NativeFunction = fn(&[Value], &mut StringPool) -> Result<Value, LugliError>;
 
 #[derive(Clone)]
 pub enum Value {
     Number(f64),
-    String(String),
+    String(StringId),
     Bool(bool),
     Null,
     List(Rc<RefCell<Vec<Value>>>),
-    Dict(Rc<RefCell<HashMap<String, Value>>>),
+    Dict(Rc<RefCell<HashMap<StringId, Value>>>),
     Function { name: String, params: Vec<String>, body_start: usize, bytecode_id: usize },
     Closure { name: String, params: Vec<String>, body_start: usize, bytecode_id: usize, upvalues: Vec<Rc<RefCell<Value>>> },
     NativeFunction { name: String, callback: NativeFunction, arity: usize },
-    StructInstance { name: String, fields: HashMap<String, Value> },
-    DateTime(i64), // Unix timestamp
+    StructInstance { name: String, fields: HashMap<StringId, Value> },
+    DateTime(i64),
     Module { path: String, exports: HashMap<String, Value> },
 }
 
@@ -62,14 +65,7 @@ impl PartialEq for Value {
                     bytecode_id: id2,
                     upvalues: u2,
                 },
-            ) => {
-                n1 == n2
-                    && p1 == p2
-                    && b1 == b2
-                    && id1 == id2
-                    && u1.len() == u2.len()
-                    && u1.iter().zip(u2.iter()).all(|(a, b)| Rc::ptr_eq(a, b))
-            }
+            ) => n1 == n2 && p1 == p2 && b1 == b2 && id1 == id2 && u1.len() == u2.len() && u1.iter().zip(u2.iter()).all(|(a, b)| Rc::ptr_eq(a, b)),
             (
                 Value::NativeFunction {
                     name: n1, ..
@@ -106,7 +102,7 @@ impl Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             Value::Number(n) => write!(f, "{}", n),
-            Value::String(s) => write!(f, "{}", s),
+            Value::String(id) => write!(f, "<string#{}>", id.as_u32()),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Null => write!(f, "null"),
             Value::List(l) => match l.try_borrow() {
@@ -118,7 +114,7 @@ impl Display for Value {
             },
             Value::Dict(d) => match d.try_borrow() {
                 Ok(dict_ref) => {
-                    let items: Vec<String> = dict_ref.iter().map(|(k, v)| format!("\"{}\": {}", k, v)).collect();
+                    let items: Vec<String> = dict_ref.iter().map(|(k, v)| format!("<string#{}>: {}", k.as_u32(), v)).collect();
                     write!(f, "{{ {} }}", items.join(", "))
                 }
                 Err(_) => write!(f, "{{<borrowed dict>}}"),
@@ -146,7 +142,7 @@ impl Display for Value {
 impl Debug for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            Value::String(s) => write!(f, "\"{}\"", s),
+            Value::String(id) => write!(f, "String(#{})", id.as_u32()),
             Value::List(l) => match l.try_borrow() {
                 Ok(list_ref) => {
                     let items: Vec<String> = list_ref.iter().map(|v| format!("{:?}", v)).collect();
@@ -156,7 +152,7 @@ impl Debug for Value {
             },
             Value::Dict(d) => match d.try_borrow() {
                 Ok(dict_ref) => {
-                    let items: Vec<String> = dict_ref.iter().map(|(k, v)| format!("\"{}\": {:?}", k, v)).collect();
+                    let items: Vec<String> = dict_ref.iter().map(|(k, v)| format!("<string#{}>: {:?}", k.as_u32(), v)).collect();
                     write!(f, "{{ {} }}", items.join(", "))
                 }
                 Err(_) => write!(f, "{{<borrowed dict>}}"),
@@ -231,8 +227,58 @@ impl Value {
             Value::Bool(b) => *b,
             Value::Null => false,
             Value::Number(n) => *n != 0.0,
-            Value::String(s) => !s.is_empty(),
-            _ => true, // All other types are truthy
+            Value::String(_) => true,
+            _ => true,
+        }
+    }
+
+    pub fn is_truthy_with_pool(&self, pool: &StringPool) -> bool {
+        match self {
+            Value::Bool(b) => *b,
+            Value::Null => false,
+            Value::Number(n) => *n != 0.0,
+            Value::String(id) => !pool.resolve(*id).is_empty(),
+            _ => true,
+        }
+    }
+
+    pub fn display_with_pool(&self, pool: &StringPool) -> String {
+        match self {
+            Value::Number(n) => n.to_string(),
+            Value::String(id) => pool.resolve(*id).to_string(),
+            Value::Bool(b) => b.to_string(),
+            Value::Null => "null".to_string(),
+            Value::List(l) => match l.try_borrow() {
+                Ok(list_ref) => {
+                    let items: Vec<String> = list_ref.iter().map(|v| v.display_with_pool(pool)).collect();
+                    format!("[{}]", items.join(", "))
+                }
+                Err(_) => "[<borrowed list>]".to_string(),
+            },
+            Value::Dict(d) => match d.try_borrow() {
+                Ok(dict_ref) => {
+                    let items: Vec<String> =
+                        dict_ref.iter().map(|(k, v)| format!("\"{}\": {}", pool.resolve(*k), v.display_with_pool(pool))).collect();
+                    format!("{{ {} }}", items.join(", "))
+                }
+                Err(_) => "{{<borrowed dict>}}".to_string(),
+            },
+            Value::Function {
+                name, ..
+            } => format!("<fn {}>", name),
+            Value::Closure {
+                name, ..
+            } => format!("<closure {}>", name),
+            Value::NativeFunction {
+                name, ..
+            } => format!("<native fn {}>", name),
+            Value::StructInstance {
+                name, ..
+            } => format!("<struct {} instance>", name),
+            Value::DateTime(ts) => format!("<datetime {}>", ts),
+            Value::Module {
+                path, ..
+            } => format!("<module {}>", path),
         }
     }
 
@@ -293,10 +339,26 @@ impl Value {
     pub fn add(&self, other: &Value) -> Result<Value, LugliError> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
-            (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
+            (Value::String(_), Value::String(_)) => Err(LugliError::runtime("String concatenation requires string pool (use add_with_pool)")),
             (Value::List(a), Value::List(b)) => {
                 let mut result = a.borrow().clone();
-                result.extend(b.borrow().clone());
+                result.extend(b.borrow().iter().map(|v| v.clone_for_stack()));
+                Ok(Value::List(Rc::new(RefCell::new(result))))
+            }
+            _ => Err(LugliError::runtime(format!("Unsupported operand types for +: {} and {}", self.type_name(), other.type_name()))),
+        }
+    }
+
+    pub fn add_with_pool(&self, other: &Value, pool: &mut StringPool) -> Result<Value, LugliError> {
+        match (self, other) {
+            (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+            (Value::String(a), Value::String(b)) => {
+                let concat = format!("{}{}", pool.resolve(*a), pool.resolve(*b));
+                Ok(Value::String(pool.intern(&concat)))
+            }
+            (Value::List(a), Value::List(b)) => {
+                let mut result = a.borrow().clone();
+                result.extend(b.borrow().iter().map(|v| v.clone_for_stack()));
                 Ok(Value::List(Rc::new(RefCell::new(result))))
             }
             _ => Err(LugliError::runtime(format!("Unsupported operand types for +: {} and {}", self.type_name(), other.type_name()))),

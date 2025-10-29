@@ -22,7 +22,8 @@ fn is_pascal_case(s: &str) -> bool {
 impl<'a> Parser<'a> {
     fn parse_dict_key(&mut self) -> Result<Expr, ParseError> {
         match self.peek_kind() {
-            Some(TokenKind::String(s)) => {
+            Some(TokenKind::String(id)) => {
+                let s = self.scanner.pool().resolve(*id);
                 let key = s[1..s.len() - 1].to_string();
                 let span = self.current_span();
                 self.advance();
@@ -31,8 +32,8 @@ impl<'a> Parser<'a> {
                     span,
                 })
             }
-            Some(TokenKind::Identifier(s)) => {
-                let key = s.clone();
+            Some(TokenKind::Identifier(id)) => {
+                let key = self.scanner.pool().resolve(*id).to_string();
                 let span = self.current_span();
                 self.advance();
                 Ok(Expr::Literal {
@@ -55,8 +56,9 @@ impl<'a> Parser<'a> {
             });
         }
 
-        if let Some(TokenKind::String(value)) = self.peek_kind() {
-            let unquoted_value = value[1..value.len() - 1].to_string();
+        if let Some(TokenKind::String(id)) = self.peek_kind() {
+            let s = self.scanner.pool().resolve(*id);
+            let unquoted_value = s[1..s.len() - 1].to_string();
             let span = self.current_span();
             self.advance();
             return Ok(Expr::Literal {
@@ -65,9 +67,9 @@ impl<'a> Parser<'a> {
             });
         }
 
-        if let Some(TokenKind::FString(value)) = self.peek_kind() {
-            // Clone the value to avoid borrow checker issues
-            let value = value.clone();
+        if let Some(TokenKind::FString(id)) = self.peek_kind() {
+            let s = self.scanner.pool().resolve(*id);
+            let value = s.to_string();
             let span = self.current_span();
             self.advance();
 
@@ -91,9 +93,9 @@ impl<'a> Parser<'a> {
             });
         }
 
-        if let Some(TokenKind::Identifier(name)) = self.peek_kind() {
+        if let Some(TokenKind::Identifier(id)) = self.peek_kind() {
             let span = self.current_span();
-            let name = name.clone();
+            let name = self.scanner.pool().resolve(*id).to_string();
             self.advance();
 
             // Check for associated function call (Type::function)
@@ -239,12 +241,13 @@ impl<'a> Parser<'a> {
 
         while !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
             // Parse pattern
-            let pattern = if let Some(TokenKind::Identifier(name)) = self.peek_kind() {
+            let pattern = if let Some(TokenKind::Identifier(id)) = self.peek_kind() {
+                let name = self.scanner.pool().resolve(*id);
                 if name == "_" {
                     self.advance();
                     Pattern::Wildcard
                 } else {
-                    let ident = name.clone();
+                    let ident = name.to_string();
                     self.advance();
                     Pattern::Identifier(ident)
                 }
@@ -252,7 +255,8 @@ impl<'a> Parser<'a> {
                 let num = *n;
                 self.advance();
                 Pattern::Literal(LiteralValue::Number(num))
-            } else if let Some(TokenKind::String(s)) = self.peek_kind() {
+            } else if let Some(TokenKind::String(id)) = self.peek_kind() {
+                let s = self.scanner.pool().resolve(*id);
                 let str_val = s[1..s.len() - 1].to_string();
                 self.advance();
                 Pattern::Literal(LiteralValue::String(str_val))

@@ -44,4 +44,6 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn is_at_end(&self) -> bool { self.current.as_ref().map(|token| matches!(token.kind, TokenKind::Eof)).unwrap_or(true) }
+
+    pub fn pool(&self) -> &crate::StringPool { self.lexer.pool() }
 }

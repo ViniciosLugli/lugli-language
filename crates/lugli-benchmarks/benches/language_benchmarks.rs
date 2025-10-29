@@ -1,7 +1,5 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::fs;
-use std::hint::black_box;
-use std::time::Duration;
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use std::{fs, hint::black_box, time::Duration};
 
 // Helper function to run a Lugli source file
 fn run_lugli_source(source: &str) -> Result<lugli_common::Value, String> {
@@ -16,15 +14,12 @@ fn compile_lugli_source(source: &str) -> Result<lugli_vm::Bytecode, String> {
 }
 
 // Helper function to parse Lugli source
-fn parse_lugli_source(source: &str) -> Result<lugli_ast::Program, String> {
-    lugli_parser::parse(source).map_err(|e| e.to_string())
-}
+fn parse_lugli_source(source: &str) -> Result<lugli_ast::Program, String> { lugli_parser::parse(source).map_err(|e| e.to_string()) }
 
 // Helper to load fixture (from crate's benches/fixtures/)
 fn load_fixture(name: &str) -> String {
     let path = format!("{}/benches/fixtures/{}.lg", env!("CARGO_MANIFEST_DIR"), name);
-    fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("Failed to load fixture: {} (path: {})", name, path))
+    fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to load fixture: {} (path: {})", name, path))
 }
 
 // Helper to load example from workspace root
@@ -32,8 +27,7 @@ fn load_example(relative_path: &str) -> String {
     // CARGO_MANIFEST_DIR is crates/lugli-benchmarks, so go up 2 levels to workspace root
     let workspace_root = format!("{}/../../", env!("CARGO_MANIFEST_DIR"));
     let path = format!("{}{}", workspace_root, relative_path);
-    fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("Failed to load example: {} (path: {})", relative_path, path))
+    fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to load example: {} (path: {})", relative_path, path))
 }
 
 // ========================================

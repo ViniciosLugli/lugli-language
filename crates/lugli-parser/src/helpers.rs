@@ -29,7 +29,10 @@ impl<'a> Parser<'a> {
             ERROR_TOKEN.get_or_init(|| Token {
                 kind: TokenKind::Eof,
                 lexeme: String::from(""),
-                span: Span { start: 0, end: 0 },
+                span: Span {
+                    start: 0,
+                    end: 0,
+                },
             })
         })
     }
@@ -81,8 +84,8 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn consume_identifier(&mut self, message: &str) -> Result<String, ParseError> {
-        if let Some(TokenKind::Identifier(name)) = self.peek_kind() {
-            let name = name.clone();
+        if let Some(TokenKind::Identifier(id)) = self.peek_kind() {
+            let name = self.scanner.pool().resolve(*id).to_string();
             self.advance();
             Ok(name)
         } else {

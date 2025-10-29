@@ -1,6 +1,6 @@
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringPool, Value};
 
-pub fn number_abs(args: &[Value]) -> Result<Value, LugliError> {
+pub fn number_abs(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("abs expects 1 argument"));
     }

@@ -1,18 +1,18 @@
 use crate::NativeFunction;
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringPool, Value};
 use std::io::{self, Write};
 
 pub mod console;
 
 pub fn get_functions() -> Vec<(&'static str, NativeFunction)> { vec![("print", print_fn), ("input", input_fn)] }
 
-fn print_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn print_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     // Print all arguments with spaces between them
     for (i, arg) in args.iter().enumerate() {
         if i > 0 {
             print!(" ");
         }
-        print!("{}", arg);
+        print!("{}", arg.display_with_pool(pool));
     }
 
     // Always add newline like Python's print()
@@ -21,11 +21,11 @@ fn print_fn(args: &[Value]) -> Result<Value, LugliError> {
     Ok(Value::Null)
 }
 
-fn input_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn input_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     // Print prompt if provided
     if !args.is_empty() {
         for arg in args {
-            print!("{}", arg);
+            print!("{}", arg.display_with_pool(pool));
         }
         io::stdout().flush().map_err(|e| LugliError::runtime(format!("IO error: {}", e)))?;
     }
@@ -42,5 +42,5 @@ fn input_fn(args: &[Value]) -> Result<Value, LugliError> {
         }
     }
 
-    Ok(Value::String(buffer))
+    Ok(Value::String(pool.intern(&buffer)))
 }

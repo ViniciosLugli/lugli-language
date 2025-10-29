@@ -140,13 +140,19 @@ fn test_compiler_dictionary_creation() {
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
+    let bytecode = lugli_vm::compile(&program).unwrap();
+    let result = lugli_vm::run(&bytecode).unwrap();
 
     if let Value::Dict(dict) = result {
+        let mut pool = bytecode.string_pool.borrow_mut();
+        let name_id = pool.intern("name");
+        let age_id = pool.intern("age");
+        let alice_id = pool.intern("Alice");
+
         let dict_ref = dict.borrow();
         assert_eq!(dict_ref.len(), 2);
-        assert_value_eq(dict_ref.get("name").unwrap(), &Value::String("Alice".to_string()));
-        assert_value_eq(dict_ref.get("age").unwrap(), &Value::Number(30.0));
+        assert_value_eq(dict_ref.get(&name_id).unwrap(), &Value::String(alice_id));
+        assert_value_eq(dict_ref.get(&age_id).unwrap(), &Value::Number(30.0));
     } else {
         panic!("Expected Dict, got {:?}", result);
     }
@@ -230,8 +236,11 @@ fn test_compiler_property_access() {
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
-    assert_value_eq(&result, &Value::String("Alice".to_string()));
+    let bytecode = lugli_vm::compile(&program).unwrap();
+    let result = lugli_vm::run(&bytecode).unwrap();
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let alice_id = pool.intern("Alice");
+    assert_value_eq(&result, &Value::String(alice_id));
 }
 
 #[test]
@@ -335,15 +344,17 @@ fn test_compiler_property_assignment() {
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program);
+    let bytecode = lugli_vm::compile(&program).unwrap();
+    let result = lugli_vm::run(&bytecode);
 
     if let Err(e) = &result {
-        let bytecode = lugli_vm::compile(&program).unwrap();
         println!("{}", lugli_vm::debug::disassemble(&bytecode, "test_compiler_property_assignment"));
         panic!("Test failed with error: {}\nBytecode:\n{}", e, lugli_vm::debug::disassemble(&bytecode, "test_compiler_property_assignment"));
     }
 
-    assert_value_eq(&result.unwrap(), &Value::String("Bob".to_string()));
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let bob_id = pool.intern("Bob");
+    assert_value_eq(&result.unwrap(), &Value::String(bob_id));
 }
 
 #[test]
@@ -359,8 +370,11 @@ fn test_compiler_return_statement() {
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
-    assert_value_eq(&result, &Value::String("Hello, World!".to_string()));
+    let bytecode = lugli_vm::compile(&program).unwrap();
+    let result = lugli_vm::run(&bytecode).unwrap();
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let hello_id = pool.intern("Hello, World!");
+    assert_value_eq(&result, &Value::String(hello_id));
 }
 
 #[test]
@@ -408,17 +422,22 @@ fn test_compiler_complex_nested_structure() {
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
+    let bytecode = lugli_vm::compile(&program).unwrap();
+    let result = lugli_vm::run(&bytecode).unwrap();
 
     if let Value::Dict(main_dict) = result {
-        if let Value::List(data_list) = main_dict.borrow().get("data").unwrap() {
+        let mut pool = bytecode.string_pool.borrow_mut();
+        let data_id = pool.intern("data");
+        let nested_id = pool.intern("nested");
+
+        if let Value::List(data_list) = main_dict.borrow().get(&data_id).unwrap() {
             let data = data_list.borrow();
             assert_eq!(data.len(), 3);
             assert_value_eq(&data[0], &Value::Number(1.0));
             assert_value_eq(&data[1], &Value::Number(2.0));
 
             if let Value::Dict(nested_dict) = &data[2] {
-                assert_value_eq(nested_dict.borrow().get("nested").unwrap(), &Value::Bool(true));
+                assert_value_eq(nested_dict.borrow().get(&nested_id).unwrap(), &Value::Bool(true));
             } else {
                 panic!("Expected nested dict");
             }

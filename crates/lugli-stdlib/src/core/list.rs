@@ -1,6 +1,7 @@
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringPool, Value};
+use std::{cell::RefCell, rc::Rc};
 
-pub fn list_length(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_length(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("list.len expects 1 argument"));
     }
@@ -10,7 +11,7 @@ pub fn list_length(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_push(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_push(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 2 {
         return Err(LugliError::runtime("list.push expects 2 arguments (list, item)"));
     }
@@ -23,7 +24,7 @@ pub fn list_push(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_pop(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_pop(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("list.pop expects 1 argument"));
     }
@@ -36,14 +37,14 @@ pub fn list_pop(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_join(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_join(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.is_empty() || args.len() > 2 {
         return Err(LugliError::runtime("list.join expects 1 or 2 arguments"));
     }
 
     let separator = if args.len() == 2 {
         match &args[1] {
-            Value::String(s) => s.as_str(),
+            Value::String(id) => pool.resolve(*id),
             _ => return Err(LugliError::type_error("string", args[1].type_name())),
         }
     } else {
@@ -52,14 +53,15 @@ pub fn list_join(args: &[Value]) -> Result<Value, LugliError> {
 
     match &args[0] {
         Value::List(l) => {
-            let strings: Vec<String> = l.borrow().iter().map(|v| v.to_string()).collect();
-            Ok(Value::String(strings.join(separator)))
+            let strings: Vec<String> = l.borrow().iter().map(|v| v.display_with_pool(pool)).collect();
+            let joined = strings.join(separator);
+            Ok(Value::String(pool.intern(&joined)))
         }
         _ => Err(LugliError::type_error("list", args[0].type_name())),
     }
 }
 
-pub fn list_contains(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_contains(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 2 {
         return Err(LugliError::runtime("list.contains expects 2 arguments (list, item)"));
     }
@@ -72,7 +74,7 @@ pub fn list_contains(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_is_empty(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_is_empty(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("list.is_empty expects 1 argument"));
     }
@@ -82,7 +84,7 @@ pub fn list_is_empty(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_clear(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_clear(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("list.clear expects 1 argument"));
     }
@@ -95,7 +97,7 @@ pub fn list_clear(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_reverse(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_reverse(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("list.reverse expects 1 argument"));
     }
@@ -108,7 +110,7 @@ pub fn list_reverse(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_append(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_append(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 2 {
         return Err(LugliError::runtime("list.append expects 2 arguments"));
     }
@@ -123,7 +125,7 @@ pub fn list_append(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_get(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_get(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 2 {
         return Err(LugliError::runtime("list.get expects 2 arguments (list, index)"));
     }
@@ -138,7 +140,7 @@ pub fn list_get(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_set(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_set(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 3 {
         return Err(LugliError::runtime("list.set expects 3 arguments (list, index, value)"));
     }
@@ -158,39 +160,21 @@ pub fn list_set(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-// Higher-order functions
-use std::{cell::RefCell, rc::Rc};
-
-pub fn list_map(_args: &[Value]) -> Result<Value, LugliError> {
-    // NOTE: map() requires VM context to execute callback functions
-    // This functionality is currently implemented via list comprehensions:
-    //   mapped = [transform(x) for x in list]
-    //
-    // Same limitation as filter() - requires VM integration
+pub fn list_map(_args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     Err(LugliError::runtime(
         "map() is not yet implemented as a native function. Use list comprehensions instead:\n  \
          result = [transform(x) for x in list]",
     ))
 }
 
-pub fn list_filter(_args: &[Value]) -> Result<Value, LugliError> {
-    // NOTE: filter() requires VM context to execute callback functions
-    // This functionality is currently implemented via list comprehensions:
-    //   filtered = [x for x in list if predicate(x)]
-    //
-    // To implement as a native function would require:
-    // 1. Passing VM/Machine context to stdlib functions
-    // 2. Calling user-defined functions from native code
-    // 3. Handling errors and stack management
-    //
-    // This is a future enhancement - use list comprehensions for now
+pub fn list_filter(_args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     Err(LugliError::runtime(
         "filter() is not yet implemented as a native function. Use list comprehensions instead:\n  \
          result = [x for x in list if condition(x)]",
     ))
 }
 
-pub fn list_sorted(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_sorted(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.is_empty() || args.len() > 2 {
         return Err(LugliError::runtime("sorted expects 1 or 2 arguments"));
     }
@@ -231,7 +215,7 @@ pub fn list_sorted(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-pub fn list_reversed(args: &[Value]) -> Result<Value, LugliError> {
+pub fn list_reversed(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("reversed expects 1 argument"));
     }

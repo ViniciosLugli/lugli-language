@@ -10,6 +10,7 @@ struct TestResult {
     pub execution_time: std::time::Duration,
     pub bytecode_stats: Option<BytecodeStats>,
     pub result: Result<Value, String>,
+    pub bytecode: Option<Bytecode>,
 }
 
 #[derive(Debug)]
@@ -33,6 +34,7 @@ fn test_lugli_code_detailed(source: &str) -> TestResult {
         execution_time: std::time::Duration::default(),
         bytecode_stats: None,
         result: Err("Unknown error".to_string()),
+        bytecode: None,
     };
 
     match parse_result {
@@ -54,6 +56,7 @@ fn test_lugli_code_detailed(source: &str) -> TestResult {
                     result.execution_time = execute_start.elapsed();
 
                     result.result = vm_result.map_err(|e| format!("VM error: {}", e));
+                    result.bytecode = Some(bytecode);
                 }
                 Err(compile_error) => {
                     result.result = Err(format!("Compile error: {}", compile_error));
@@ -167,7 +170,22 @@ fn assert_equals(source: &str, expected: Value, test_name: &str) {
     let result = test_lugli_code_detailed(source);
     match &result.result {
         Ok(value) => {
-            if value.equals(&expected) {
+            // For string comparisons, resolve StringIds
+            let matches = match (value, &expected) {
+                (Value::String(result_id), Value::String(expected_id)) => {
+                    if let Some(bytecode) = &result.bytecode {
+                        let pool = bytecode.string_pool.borrow();
+                        let result_str = pool.resolve(*result_id);
+                        let expected_str = pool.resolve(*expected_id);
+                        result_str == expected_str
+                    } else {
+                        false
+                    }
+                }
+                _ => value.equals(&expected),
+            };
+
+            if matches {
                 println!("✅ {}: Correct result", test_name);
                 println!("   Value: {:?}", value);
                 print_performance_stats(&result);
@@ -183,6 +201,42 @@ fn assert_equals(source: &str, expected: Value, test_name: &str) {
         Err(error) => {
             println!("❌ {} failed when expecting result:", test_name);
             println!("   Expected: {:?}", expected);
+            println!("   Error: {}", error);
+            print_debug_info(&result);
+            panic!("Test failed: {}", test_name);
+        }
+    }
+}
+
+/// Assert that code returns expected string value
+fn assert_equals_str(source: &str, expected_str: &str, test_name: &str) {
+    let result = test_lugli_code_detailed(source);
+    match &result.result {
+        Ok(value) => {
+            let matches = if let (Value::String(result_id), Some(bytecode)) = (value, &result.bytecode) {
+                let pool = bytecode.string_pool.borrow();
+                let resolved = pool.resolve(*result_id);
+                resolved == expected_str
+            } else {
+                false
+            };
+
+            if matches {
+                println!("✅ {}: Correct result", test_name);
+                println!("   Value: {:?}", value);
+                print_performance_stats(&result);
+                print_bytecode_quality(&result);
+            } else {
+                println!("❌ {} returned wrong value:", test_name);
+                println!("   Expected string: {:?}", expected_str);
+                println!("   Got: {:?}", value);
+                print_debug_info(&result);
+                panic!("Wrong result in test: {}", test_name);
+            }
+        }
+        Err(error) => {
+            println!("❌ {} failed when expecting result:", test_name);
+            println!("   Expected string: {:?}", expected_str);
             println!("   Error: {}", error);
             print_debug_info(&result);
             panic!("Test failed: {}", test_name);
@@ -299,13 +353,13 @@ mod working_features {
 
     #[test]
     fn test_property_assignment() {
-        assert_equals(
+        assert_equals_str(
             r#"
             let person = {"name": "Alice", "age": 30}
             person.name = "Bob"
             person.name
             "#,
-            Value::String("Bob".to_string()),
+            "Bob",
             "Property assignment",
         );
     }
@@ -546,7 +600,7 @@ mod error_cases {
 
     #[test]
     fn test_pattern_matching_works() {
-        assert_equals(
+        assert_equals_str(
             r#"
             let x = 42
             match x {
@@ -555,7 +609,7 @@ mod error_cases {
                 _ => "other"
             }
             "#,
-            Value::String("answer".to_string()),
+            "answer",
             "Pattern matching works",
         );
     }

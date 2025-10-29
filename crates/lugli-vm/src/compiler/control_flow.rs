@@ -176,7 +176,8 @@ impl Compiler {
                 // Check if index < len(iterable)
                 self.emit(Instruction::Load(index_local));
                 self.emit(Instruction::Load(iterable_local));
-                let len_name = self.add_constant(lugli_common::Value::String("len".to_string()));
+                let len_id = self.bytecode.string_pool.borrow_mut().intern("len");
+                let len_name = self.add_constant(lugli_common::Value::String(len_id));
                 self.emit(Instruction::CallMethod(len_name, 0));
 
                 // Now stack has: [index, length]

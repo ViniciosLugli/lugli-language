@@ -1,9 +1,8 @@
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringPool, Value};
 use lugli_lexer::TokenKind;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
-pub fn apply_binary_op(left: &Value, op: &TokenKind, right: &Value) -> Result<Value, LugliError> {
+pub fn apply_binary_op(left: &Value, op: &TokenKind, right: &Value, pool: &mut StringPool) -> Result<Value, LugliError> {
     match (left, op, right) {
         (Value::Number(l), TokenKind::Plus, Value::Number(r)) => Ok(Value::Number(l + r)),
         (Value::Number(l), TokenKind::Minus, Value::Number(r)) => Ok(Value::Number(l - r)),
@@ -22,7 +21,10 @@ pub fn apply_binary_op(left: &Value, op: &TokenKind, right: &Value) -> Result<Va
                 Ok(Value::Number(l % r))
             }
         }
-        (Value::String(l), TokenKind::Plus, Value::String(r)) => Ok(Value::String(format!("{}{}", l, r))),
+        (Value::String(l), TokenKind::Plus, Value::String(r)) => {
+            let concat = format!("{}{}", pool.resolve(*l), pool.resolve(*r));
+            Ok(Value::String(pool.intern(&concat)))
+        }
         // List concatenation
         (Value::List(l), TokenKind::Plus, Value::List(r)) => {
             let mut result = l.borrow().clone();
