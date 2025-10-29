@@ -46,15 +46,12 @@ impl<'a> Parser<'a> {
 
         let name = self.consume_identifier("Expected variable name")?;
 
-        if self.match_any(&[TokenKind::Colon]) {
-            while !self.check(&TokenKind::Equal)
-                && !self.check(&TokenKind::Newline)
-                && !self.check(&TokenKind::Semicolon)
-                && !self.scanner.is_at_end()
-            {
-                self.advance();
-            }
-        }
+        // Parse optional type hint
+        let type_hint = if self.match_any(&[TokenKind::Colon]) {
+            Some(self.parse_type_hint()?)
+        } else {
+            None
+        };
 
         let initializer = if self.match_any(&[TokenKind::Equal]) {
             Some(self.expression()?)
@@ -77,6 +74,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::VarDecl {
             id,
             name,
+            type_hint,
             initializer,
             is_const,
         })
@@ -99,41 +97,21 @@ impl<'a> Parser<'a> {
         self.consume(&TokenKind::LeftParen, "Expected '(' after function name")?;
         self.skip_newlines();
 
-        let mut params = Vec::new();
-        if !self.check(&TokenKind::RightParen) {
-            loop {
-                if self.check(&TokenKind::SelfKeyword) {
-                    self.advance();
-                    params.push("self".to_string());
-                } else if self.check(&TokenKind::Mut) && self.peek_next_kind() == Some(TokenKind::SelfKeyword) {
-                    self.advance(); // consume mut
-                    self.advance(); // consume self
-                    params.push("self".to_string());
-                } else {
-                    let param_name = self.consume_identifier("Expected parameter name")?;
-                    if self.match_any(&[TokenKind::Colon]) {
-                        while !self.check(&TokenKind::Comma) && !self.check(&TokenKind::RightParen) {
-                            self.advance();
-                        }
-                    }
-                    params.push(param_name);
-                }
-
-                if !self.match_any(&[TokenKind::Comma]) {
-                    break;
-                }
-                self.skip_newlines();
-            }
-        }
+        let parsed_params = self.parse_params()?;
+        let params: Vec<(String, Option<lugli_ast::TypeHint>)> = parsed_params
+            .iter()
+            .map(|p| (p.name.clone(), p.type_hint.clone()))
+            .collect();
 
         self.skip_newlines();
         self.consume(&TokenKind::RightParen, "Expected ')' after parameters")?;
 
-        if self.match_any(&[TokenKind::Arrow]) {
-            while !self.check(&TokenKind::LeftBrace) && !self.scanner.is_at_end() {
-                self.advance();
-            }
-        }
+        // Parse optional return type hint
+        let return_type = if self.match_any(&[TokenKind::Arrow]) {
+            Some(self.parse_type_hint()?)
+        } else {
+            None
+        };
 
         let body = self.block_body()?;
 
@@ -146,6 +124,7 @@ impl<'a> Parser<'a> {
             id,
             name,
             params,
+            return_type,
             body,
         })
     }
@@ -169,28 +148,32 @@ impl<'a> Parser<'a> {
             } else if !self.check(&TokenKind::RightBrace) {
                 let field_name = self.consume_identifier("Expected field name")?;
 
-                let default_value = if self.match_any(&[TokenKind::Colon]) {
+                // Parse optional type hint and default value
+                let (type_hint, default_value) = if self.check(&TokenKind::Colon) {
+                    self.advance();  // consume colon
                     let is_type_hint = matches!(self.peek_kind(), Some(TokenKind::Identifier(_)));
                     if is_type_hint {
-                        while !self.check(&TokenKind::Equal)
-                            && !self.check(&TokenKind::Newline)
-                            && !self.check(&TokenKind::Comma)
-                            && !self.check(&TokenKind::RightBrace)
-                            && !self.scanner.is_at_end()
-                        {
-                            self.advance();
-                        }
-                        if self.match_any(&[TokenKind::Equal]) { Some(self.expression()?) } else { None }
+                        let hint = Some(self.parse_type_hint()?);
+                        let default = if self.match_any(&[TokenKind::Equal]) {
+                            Some(self.expression()?)
+                        } else {
+                            None
+                        };
+                        (hint, default)
                     } else {
-                        Some(self.expression()?)
+                        (None, Some(self.expression()?))
                     }
                 } else if self.match_any(&[TokenKind::Equal]) {
-                    Some(self.expression()?)
+                    (None, Some(self.expression()?))
                 } else {
-                    None
+                    (None, None)
                 };
 
-                fields.push((field_name, default_value));
+                fields.push(lugli_ast::StructField {
+                    name: field_name,
+                    type_hint,
+                    default: default_value,
+                });
 
                 self.match_any(&[TokenKind::Comma, TokenKind::Newline]);
             }

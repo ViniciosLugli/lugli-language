@@ -39,8 +39,8 @@ where
                 }
             }
             Stmt::StructDecl { data, .. } => {
-                for (_, default_value) in &data.fields {
-                    if let Some(expr) = default_value {
+                for field in &data.fields {
+                    if let Some(expr) = &field.default {
                         self.visit_expr(expr);
                     }
                 }
@@ -201,8 +201,8 @@ where
                 }
             }
             Stmt::StructDecl { data, .. } => {
-                for (_, default_value) in &mut data.fields {
-                    if let Some(expr) = default_value {
+                for field in &mut data.fields {
+                    if let Some(expr) = &mut field.default {
                         self.visit_expr_mut(expr);
                     }
                 }

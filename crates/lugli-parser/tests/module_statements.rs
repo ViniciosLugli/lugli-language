@@ -144,7 +144,8 @@ fn test_export_function() {
                 ..
             } => {
                 assert_eq!(name, "add");
-                assert_eq!(params, &vec!["a".to_string(), "b".to_string()]);
+                let param_names: Vec<String> = params.iter().map(|(n, _)| n.clone()).collect();
+                assert_eq!(param_names, vec!["a".to_string(), "b".to_string()]);
             }
             _ => panic!("Expected FnDecl inside Export"),
         },

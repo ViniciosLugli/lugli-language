@@ -97,6 +97,7 @@ fn test_compiler_variable_declaration_and_access() {
         statements: vec![
             // let x = 42
             Stmt::VarDecl {
+                type_hint: None,
                 id: make_id(0),
                 name: "x".to_string(),
                 initializer: Some(Expr::Literal {
@@ -221,6 +222,7 @@ fn test_compiler_property_access() {
         statements: vec![
             // let person = {"name": "Alice"}
             Stmt::VarDecl {
+                type_hint: None,
                 id: make_id(0),
                 name: "person".to_string(),
                 initializer: Some(Expr::Dict {
@@ -268,6 +270,7 @@ fn test_compiler_global_variable_assignment() {
         statements: vec![
             // let x = 10
             Stmt::VarDecl {
+                type_hint: None,
                 id: make_id(0),
                 name: "x".to_string(),
                 initializer: Some(Expr::Literal {
@@ -315,6 +318,7 @@ fn test_compiler_property_assignment() {
         statements: vec![
             // let person = {"name": "Alice"}
             Stmt::VarDecl {
+                type_hint: None,
                 id: make_id(0),
                 name: "person".to_string(),
                 initializer: Some(Expr::Dict {
@@ -501,6 +505,7 @@ fn test_compiler_multiple_variable_declarations() {
         statements: vec![
             // let a = 10
             Stmt::VarDecl {
+                type_hint: None,
                 id: make_id(0),
                 name: "a".to_string(),
                 initializer: Some(Expr::Literal {
@@ -511,6 +516,7 @@ fn test_compiler_multiple_variable_declarations() {
             },
             // let b = 20
             Stmt::VarDecl {
+                type_hint: None,
                 id: make_id(2),
                 name: "b".to_string(),
                 initializer: Some(Expr::Literal {

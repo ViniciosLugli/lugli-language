@@ -81,8 +81,8 @@ impl Compiler {
                     // Store field names
                     let field_names: Vec<Value> = fields
                         .iter()
-                        .map(|(name, _)| {
-                            let id = pool.intern(name);
+                        .map(|field| {
+                            let id = pool.intern(&field.name);
                             Value::String(id)
                         })
                         .collect();
@@ -92,14 +92,14 @@ impl Compiler {
 
                     // Store default values as a dict (field_name -> default_expr_as_constant)
                     let mut defaults_dict = hashbrown::HashMap::new();
-                    for (field_name, default_expr) in fields {
-                        if let Some(expr) = default_expr {
+                    for field in fields {
+                        if let Some(expr) = &field.default {
                             // Evaluate constant default expressions at compile time
                             // Drop pool borrow before recursing
                             drop(pool);
                             if let Some(const_value) = self.try_evaluate_constant(expr) {
                                 pool = self.bytecode.string_pool.borrow_mut();
-                                let field_id = pool.intern(field_name);
+                                let field_id = pool.intern(&field.name);
                                 defaults_dict.insert(field_id, const_value);
                             } else {
                                 pool = self.bytecode.string_pool.borrow_mut();
@@ -128,6 +128,7 @@ impl Compiler {
                         id,
                         name: method_name,
                         params,
+                        return_type,
                         body,
                     } = method
                     {
@@ -139,6 +140,7 @@ impl Compiler {
                             id: *id,
                             name: static_method_name,
                             params: params.clone(),
+                            return_type: return_type.clone(),
                             body: body.clone(),
                         };
                         self.compile_stmt(&modified_fn)?;
@@ -166,8 +168,11 @@ impl Compiler {
                 let saved_upvalues = self.upvalues.clone();
                 let saved_upvalue_count = self.upvalue_count;
 
+                // Extract param names (ignore type hints)
+                let param_names: Vec<String> = params.iter().map(|(name, _)| name.clone()).collect();
+
                 // Detect which variables will be captured from outer scope
-                let captures = self.detect_captures(body, &saved_locals, params);
+                let captures = self.detect_captures(body, &saved_locals, &param_names);
 
                 // Enter function scope
                 self.locals.clear();
@@ -183,8 +188,8 @@ impl Compiler {
                 }
 
                 // Declare parameters as local variables
-                for param in params {
-                    self.declare_local(param.clone());
+                for param_name in &param_names {
+                    self.declare_local(param_name.clone());
                 }
 
                 // Compile function body
@@ -208,10 +213,10 @@ impl Compiler {
                 self.upvalues = saved_upvalues;
                 self.upvalue_count = saved_upvalue_count;
 
-                // Create the function value
+                // Create the function value (use param_names instead of params)
                 let function_value = Value::Function {
                     name: name.clone(),
-                    params: params.clone(),
+                    params: param_names,
                     body_start,
                     bytecode_id: 0, // Main bytecode
                 };

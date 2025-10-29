@@ -1,10 +1,15 @@
 use crate::{Parser, error::ParseError};
-use lugli_ast::FStringPart;
+use lugli_ast::{FStringPart, TypeHint};
 use lugli_common::Span;
 use lugli_lexer::{Token, TokenKind};
 use std::sync::OnceLock;
 
 static ERROR_TOKEN: OnceLock<Token> = OnceLock::new();
+
+pub struct Param {
+    pub name: String,
+    pub type_hint: Option<TypeHint>,
+}
 
 impl<'a> Parser<'a> {
     pub(crate) fn match_any(&mut self, types: &[TokenKind]) -> bool {
@@ -268,5 +273,271 @@ impl<'a> Parser<'a> {
         }
 
         Ok(parts)
+    }
+
+    pub(crate) fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {
+        let mut params = Vec::new();
+
+        if self.check(&TokenKind::RightParen) {
+            return Ok(params);
+        }
+
+        loop {
+            if self.check(&TokenKind::SelfKeyword) {
+                self.advance();
+                params.push(Param {
+                    name: "self".to_string(),
+                    type_hint: None,
+                });
+            } else if self.check(&TokenKind::Mut) && self.peek_next_kind() == Some(TokenKind::SelfKeyword) {
+                self.advance(); // consume mut
+                self.advance(); // consume self
+                params.push(Param {
+                    name: "self".to_string(),
+                    type_hint: None,
+                });
+            } else {
+                let param_name = self.consume_identifier("Expected parameter name")?;
+
+                // Parse optional type hint
+                let type_hint = if self.match_any(&[TokenKind::Colon]) {
+                    Some(self.parse_type_hint()?)
+                } else {
+                    None
+                };
+
+                params.push(Param { name: param_name, type_hint });
+            }
+
+            if !self.match_any(&[TokenKind::Comma]) {
+                break;
+            }
+            self.skip_newlines();
+        }
+
+        Ok(params)
+    }
+
+    pub(crate) fn skip_type_hint_if_present(&mut self) -> Result<(), ParseError> {
+        if !self.match_any(&[TokenKind::Colon]) {
+            return Ok(());
+        }
+
+        let terminals = [
+            TokenKind::Equal,
+            TokenKind::Comma,
+            TokenKind::RightParen,
+            TokenKind::LeftBrace,
+            TokenKind::Newline,
+            TokenKind::Semicolon,
+            TokenKind::RightBrace,
+        ];
+
+        while !self.scanner.is_at_end() && !self.check_any(&terminals) {
+            self.advance();
+        }
+
+        Ok(())
+    }
+
+    fn check_any(&self, kinds: &[TokenKind]) -> bool {
+        kinds.iter().any(|k| self.check(k))
+    }
+
+    pub(crate) fn parse_delimited<T, F>(
+        &mut self,
+        end_token: &TokenKind,
+        separator: &TokenKind,
+        parse_fn: F,
+    ) -> Result<Vec<T>, ParseError>
+    where
+        F: Fn(&mut Self) -> Result<T, ParseError>,
+    {
+        let mut items = Vec::new();
+
+        if self.check(end_token) {
+            return Ok(items);
+        }
+
+        loop {
+            items.push(parse_fn(self)?);
+
+            if !self.match_any(&[separator.clone()]) {
+                break;
+            }
+
+            self.skip_newlines();
+            if self.check(end_token) {
+                break;
+            }
+        }
+
+        Ok(items)
+    }
+
+    pub(crate) fn parse_type_hint(&mut self) -> Result<TypeHint, ParseError> {
+        let base_name = self.consume_identifier("Expected type name")?;
+
+        // Check for generic type: List<T>, Dict<K, V>
+        if self.match_any(&[TokenKind::Less]) {
+            let args = self.parse_type_arguments()?;
+            self.consume(&TokenKind::Greater, "Expected '>' after type arguments")?;
+
+            return Ok(TypeHint::Generic {
+                base: base_name,
+                args,
+            });
+        }
+
+        // Check for optional: T?
+        if self.match_any(&[TokenKind::Question]) {
+            return Ok(TypeHint::Optional(Box::new(TypeHint::Simple(base_name))));
+        }
+
+        // Check for union: T | U | V
+        if self.match_any(&[TokenKind::Pipe]) {
+            let mut types = vec![TypeHint::Simple(base_name)];
+            loop {
+                let next_name = self.consume_identifier("Expected type name")?;
+                types.push(TypeHint::Simple(next_name));
+                if !self.match_any(&[TokenKind::Pipe]) {
+                    break;
+                }
+            }
+            return Ok(TypeHint::Union(types));
+        }
+
+        // Simple type
+        Ok(TypeHint::Simple(base_name))
+    }
+
+    fn parse_type_arguments(&mut self) -> Result<Vec<TypeHint>, ParseError> {
+        let mut args = Vec::new();
+
+        if self.check(&TokenKind::Greater) {
+            return Ok(args);
+        }
+
+        loop {
+            args.push(self.parse_type_hint()?);
+
+            if !self.match_any(&[TokenKind::Comma]) {
+                break;
+            }
+        }
+
+        Ok(args)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_params_empty() {
+        let source = "fn test() {}";
+        let mut parser = Parser::new(source).unwrap();
+        parser.advance(); // fn
+        parser.advance(); // test
+        parser.advance(); // (
+        let params = parser.parse_params().unwrap();
+        assert_eq!(params.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_params_simple() {
+        let source = "fn test(x, y, z) {}";
+        let mut parser = Parser::new(source).unwrap();
+        parser.advance(); // fn
+        parser.advance(); // test
+        parser.advance(); // (
+        let params = parser.parse_params().unwrap();
+        assert_eq!(params.len(), 3);
+        assert_eq!(params[0].name, "x");
+        assert_eq!(params[1].name, "y");
+        assert_eq!(params[2].name, "z");
+    }
+
+    #[test]
+    fn test_parse_params_with_self() {
+        let source = "fn test(self, x) {}";
+        let mut parser = Parser::new(source).unwrap();
+        parser.advance(); // fn
+        parser.advance(); // test
+        parser.advance(); // (
+        let params = parser.parse_params().unwrap();
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0].name, "self");
+        assert_eq!(params[1].name, "x");
+    }
+
+    #[test]
+    fn test_parse_params_with_type_hints() {
+        let source = "fn test(x: num, y: str) {}";
+        let mut parser = Parser::new(source).unwrap();
+        parser.advance(); // fn
+        parser.advance(); // test
+        parser.advance(); // (
+        let params = parser.parse_params().unwrap();
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0].name, "x");
+        assert_eq!(params[1].name, "y");
+    }
+
+    #[test]
+    fn test_skip_type_hint_with_colon() {
+        let source = ": num = 42";
+        let mut parser = Parser::new(source).unwrap();
+        parser.skip_type_hint_if_present().unwrap();
+        assert!(parser.check(&TokenKind::Equal));
+    }
+
+    #[test]
+    fn test_skip_type_hint_without_colon() {
+        let source = "= 42";
+        let mut parser = Parser::new(source).unwrap();
+        parser.skip_type_hint_if_present().unwrap();
+        assert!(parser.check(&TokenKind::Equal));
+    }
+
+    #[test]
+    fn test_parse_delimited_empty() {
+        let source = "]";
+        let mut parser = Parser::new(source).unwrap();
+        let items: Vec<String> = parser
+            .parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| {
+                p.consume_identifier("Expected identifier")
+            })
+            .unwrap();
+        assert_eq!(items.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_delimited_single() {
+        let source = "x]";
+        let mut parser = Parser::new(source).unwrap();
+        let items = parser
+            .parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| {
+                p.consume_identifier("Expected identifier")
+            })
+            .unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0], "x");
+    }
+
+    #[test]
+    fn test_parse_delimited_multiple() {
+        let source = "a, b, c]";
+        let mut parser = Parser::new(source).unwrap();
+        let items = parser
+            .parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| {
+                p.consume_identifier("Expected identifier")
+            })
+            .unwrap();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0], "a");
+        assert_eq!(items[1], "b");
+        assert_eq!(items[2], "c");
     }
 }

@@ -28,7 +28,8 @@ mod ast_construction_tests {
                 Stmt::FnDecl {
                     id: next_id(),
                     name: "fibonacci".to_string(),
-                    params: vec!["n".to_string()],
+                    params: vec![("n".to_string(), None)],
+                    return_type: None,
                     body: vec![Stmt::If {
                         id: next_id(),
                         data: Box::new(IfData {
@@ -108,6 +109,7 @@ mod ast_construction_tests {
                 Stmt::VarDecl {
                     id: next_id(),
                     name: "result".to_string(),
+                    type_hint: None,
                     initializer: Some(Expr::Call {
                         id: next_id(),
                         data: Box::new(CallData {
@@ -413,6 +415,7 @@ mod visitor_pattern_tests {
             vec![Stmt::VarDecl {
                 id: next_id(),
                 name: "result".to_string(),
+                type_hint: None,
                 initializer: Some(Expr::Binary {
                     id: next_id(),
                     left: Box::new(Expr::Call {
@@ -491,7 +494,8 @@ mod visitor_pattern_tests {
             vec![Stmt::FnDecl {
                 id: next_id(),
                 name: "calculate".to_string(),
-                params: vec!["x".to_string(), "y".to_string()],
+                params: vec![("x".to_string(), None), ("y".to_string(), None)],
+                return_type: None,
                 body: vec![Stmt::Return {
                     id: next_id(),
                     value: Some(Expr::Binary {
@@ -720,6 +724,7 @@ mod ast_node_interface_tests {
             vec![Stmt::VarDecl {
                 id: next_id(),
                 name: "test".to_string(),
+                type_hint: None,
                 initializer: None,
                 is_const: false,
             }],
