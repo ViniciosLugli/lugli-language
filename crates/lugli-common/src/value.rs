@@ -5,7 +5,9 @@ use crate::{
 use hashbrown::HashMap;
 use std::{
     cell::RefCell,
+    collections::hash_map::DefaultHasher,
     fmt::{Debug, Display, Formatter, Result as FmtResult},
+    hash::{Hash, Hasher},
     rc::Rc,
 };
 
@@ -35,7 +37,17 @@ impl PartialEq for Value {
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Null, Value::Null) => true,
             (Value::List(a), Value::List(b)) => Rc::ptr_eq(a, b),
-            (Value::Dict(a), Value::Dict(b)) => Rc::ptr_eq(a, b),
+            (Value::Dict(a), Value::Dict(b)) => {
+                match (a.try_borrow(), b.try_borrow()) {
+                    (Ok(a_ref), Ok(b_ref)) => {
+                        if a_ref.len() != b_ref.len() {
+                            return false;
+                        }
+                        a_ref.iter().all(|(k, v)| b_ref.get(k).map_or(false, |v2| v.equals(v2)))
+                    }
+                    _ => false,
+                }
+            }
             (
                 Value::Function {
                     name: n1,
@@ -65,7 +77,17 @@ impl PartialEq for Value {
                     bytecode_id: id2,
                     upvalues: u2,
                 },
-            ) => n1 == n2 && p1 == p2 && b1 == b2 && id1 == id2 && u1.len() == u2.len() && u1.iter().zip(u2.iter()).all(|(a, b)| Rc::ptr_eq(a, b)),
+            ) => {
+                if n1 != n2 || p1 != p2 || b1 != b2 || id1 != id2 || u1.len() != u2.len() {
+                    return false;
+                }
+                u1.iter().zip(u2.iter()).all(|(uv_a, uv_b)| {
+                    match (uv_a.try_borrow(), uv_b.try_borrow()) {
+                        (Ok(a_ref), Ok(b_ref)) => a_ref.equals(&b_ref),
+                        _ => false,
+                    }
+                })
+            }
             (
                 Value::NativeFunction {
                     name: n1, ..
@@ -94,6 +116,55 @@ impl PartialEq for Value {
                 },
             ) => p1 == p2,
             _ => false,
+        }
+    }
+}
+
+impl Eq for Value {}
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+
+        match self {
+            Value::Number(n) => n.to_bits().hash(state),
+            Value::String(id) => id.hash(state),
+            Value::Bool(b) => b.hash(state),
+            Value::Null => {}
+            Value::List(list) => {
+                if let Ok(list_ref) = list.try_borrow() {
+                    list_ref.len().hash(state);
+                    for item in list_ref.iter() {
+                        item.hash(state);
+                    }
+                }
+            }
+            Value::Dict(dict) => {
+                if let Ok(dict_ref) = dict.try_borrow() {
+                    let mut hash_acc = 0u64;
+                    for (k, v) in dict_ref.iter() {
+                        let mut hasher = DefaultHasher::new();
+                        k.hash(&mut hasher);
+                        v.hash(&mut hasher);
+                        hash_acc ^= hasher.finish();
+                    }
+                    hash_acc.hash(state);
+                }
+            }
+            Value::Function { bytecode_id, .. } => bytecode_id.hash(state),
+            Value::Closure { bytecode_id, upvalues, .. } => {
+                bytecode_id.hash(state);
+                upvalues.len().hash(state);
+                for uv in upvalues {
+                    if let Ok(uv_ref) = uv.try_borrow() {
+                        uv_ref.hash(state);
+                    }
+                }
+            }
+            Value::NativeFunction { name, .. } => name.hash(state),
+            Value::StructInstance { name, .. } => name.hash(state),
+            Value::DateTime(ts) => ts.hash(state),
+            Value::Module { path, .. } => path.hash(state),
         }
     }
 }
@@ -289,7 +360,17 @@ impl Value {
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Null, Value::Null) => true,
             (Value::List(a), Value::List(b)) => Rc::ptr_eq(a, b),
-            (Value::Dict(a), Value::Dict(b)) => Rc::ptr_eq(a, b),
+            (Value::Dict(a), Value::Dict(b)) => {
+                match (a.try_borrow(), b.try_borrow()) {
+                    (Ok(a_ref), Ok(b_ref)) => {
+                        if a_ref.len() != b_ref.len() {
+                            return false;
+                        }
+                        a_ref.iter().all(|(k, v)| b_ref.get(k).map_or(false, |v2| v.equals(v2)))
+                    }
+                    _ => false,
+                }
+            }
             (
                 Value::Function {
                     name: n1,
@@ -304,6 +385,32 @@ impl Value {
                     bytecode_id: id2,
                 },
             ) => n1 == n2 && p1 == p2 && b1 == b2 && id1 == id2,
+            (
+                Value::Closure {
+                    name: n1,
+                    params: p1,
+                    body_start: b1,
+                    bytecode_id: id1,
+                    upvalues: u1,
+                },
+                Value::Closure {
+                    name: n2,
+                    params: p2,
+                    body_start: b2,
+                    bytecode_id: id2,
+                    upvalues: u2,
+                },
+            ) => {
+                if n1 != n2 || p1 != p2 || b1 != b2 || id1 != id2 || u1.len() != u2.len() {
+                    return false;
+                }
+                u1.iter().zip(u2.iter()).all(|(uv_a, uv_b)| {
+                    match (uv_a.try_borrow(), uv_b.try_borrow()) {
+                        (Ok(a_ref), Ok(b_ref)) => a_ref.equals(&b_ref),
+                        _ => false,
+                    }
+                })
+            }
             (
                 Value::NativeFunction {
                     name: n1, ..

@@ -104,7 +104,7 @@ mod collection_tests {
     }
 
     #[test]
-    fn test_dict_equality() {
+    fn test_dict_content_equality() {
         let mut pool = StringPool::new();
         let key = pool.intern("key");
 
@@ -116,12 +116,61 @@ mod collection_tests {
         dict2_map.insert(key, Value::Number(42.0));
         let dict2 = Value::Dict(Rc::new(RefCell::new(dict2_map)));
 
-        let mut dict3_map = HashMap::new();
-        dict3_map.insert(key, Value::Number(43.0));
-        let dict3 = Value::Dict(Rc::new(RefCell::new(dict3_map)));
+        // After fix: dicts with same content should be equal
+        assert!(dict1.equals(&dict2));
+        assert_eq!(dict1, dict2);
+    }
+
+    #[test]
+    fn test_dict_different_contents() {
+        let mut pool = StringPool::new();
+        let key = pool.intern("key");
+
+        let mut dict1_map = HashMap::new();
+        dict1_map.insert(key, Value::Number(42.0));
+        let dict1 = Value::Dict(Rc::new(RefCell::new(dict1_map)));
+
+        let mut dict2_map = HashMap::new();
+        dict2_map.insert(key, Value::Number(43.0));
+        let dict2 = Value::Dict(Rc::new(RefCell::new(dict2_map)));
 
         assert!(!dict1.equals(&dict2));
-        assert!(!dict1.equals(&dict3));
+        assert_ne!(dict1, dict2);
+    }
+
+    #[test]
+    fn test_dict_different_keys() {
+        let mut pool = StringPool::new();
+        let key1 = pool.intern("key1");
+        let key2 = pool.intern("key2");
+
+        let mut dict1_map = HashMap::new();
+        dict1_map.insert(key1, Value::Number(42.0));
+        let dict1 = Value::Dict(Rc::new(RefCell::new(dict1_map)));
+
+        let mut dict2_map = HashMap::new();
+        dict2_map.insert(key2, Value::Number(42.0));
+        let dict2 = Value::Dict(Rc::new(RefCell::new(dict2_map)));
+
+        assert!(!dict1.equals(&dict2));
+    }
+
+    #[test]
+    fn test_dict_different_sizes() {
+        let mut pool = StringPool::new();
+        let key1 = pool.intern("key1");
+        let key2 = pool.intern("key2");
+
+        let mut dict1_map = HashMap::new();
+        dict1_map.insert(key1, Value::Number(42.0));
+        let dict1 = Value::Dict(Rc::new(RefCell::new(dict1_map)));
+
+        let mut dict2_map = HashMap::new();
+        dict2_map.insert(key1, Value::Number(42.0));
+        dict2_map.insert(key2, Value::Number(43.0));
+        let dict2 = Value::Dict(Rc::new(RefCell::new(dict2_map)));
+
+        assert!(!dict1.equals(&dict2));
     }
 }
 
@@ -247,4 +296,197 @@ fn test_modulo_special_cases() {
     // Modulo by zero
     let result = Value::Number(10.0).modulo(&Value::Number(0.0));
     assert!(result.is_err());
+}
+
+mod closure_tests {
+    use super::*;
+
+    #[test]
+    fn test_closure_upvalue_equality() {
+        let upvalues1 = vec![Rc::new(RefCell::new(Value::Number(5.0)))];
+        let upvalues2 = vec![Rc::new(RefCell::new(Value::Number(10.0)))];
+
+        let closure1 = Value::Closure {
+            name: "add".to_string(),
+            params: vec!["y".to_string()],
+            body_start: 0,
+            bytecode_id: 1,
+            upvalues: upvalues1,
+        };
+
+        let closure2 = Value::Closure {
+            name: "add".to_string(),
+            params: vec!["y".to_string()],
+            body_start: 0,
+            bytecode_id: 1,
+            upvalues: upvalues2,
+        };
+
+        // Different upvalues should make closures unequal
+        assert!(!closure1.equals(&closure2));
+        assert_ne!(closure1, closure2);
+    }
+
+    #[test]
+    fn test_closure_same_upvalue_equality() {
+        let upvalues1 = vec![Rc::new(RefCell::new(Value::Number(5.0)))];
+        let upvalues2 = vec![Rc::new(RefCell::new(Value::Number(5.0)))];
+
+        let closure1 = Value::Closure {
+            name: "add".to_string(),
+            params: vec!["y".to_string()],
+            body_start: 0,
+            bytecode_id: 1,
+            upvalues: upvalues1,
+        };
+
+        let closure2 = Value::Closure {
+            name: "add".to_string(),
+            params: vec!["y".to_string()],
+            body_start: 0,
+            bytecode_id: 1,
+            upvalues: upvalues2,
+        };
+
+        // Same upvalue values should make closures equal
+        assert!(closure1.equals(&closure2));
+        assert_eq!(closure1, closure2);
+    }
+
+    #[test]
+    fn test_closure_different_bytecode() {
+        let upvalues1 = vec![Rc::new(RefCell::new(Value::Number(5.0)))];
+        let upvalues2 = vec![Rc::new(RefCell::new(Value::Number(5.0)))];
+
+        let closure1 = Value::Closure {
+            name: "add".to_string(),
+            params: vec!["y".to_string()],
+            body_start: 0,
+            bytecode_id: 1,
+            upvalues: upvalues1,
+        };
+
+        let closure2 = Value::Closure {
+            name: "add".to_string(),
+            params: vec!["y".to_string()],
+            body_start: 0,
+            bytecode_id: 2,
+            upvalues: upvalues2,
+        };
+
+        // Different bytecode IDs should make closures unequal
+        assert!(!closure1.equals(&closure2));
+    }
+}
+
+mod list_concat_tests {
+    use super::*;
+
+    #[test]
+    fn test_list_concat_efficiency() {
+        let list1 = Value::List(Rc::new(RefCell::new(vec![
+            Value::Number(1.0),
+            Value::Number(2.0),
+        ])));
+
+        let list2 = Value::List(Rc::new(RefCell::new(vec![
+            Value::Number(3.0),
+            Value::Number(4.0),
+        ])));
+
+        let result = list1.add(&list2).unwrap();
+
+        if let Value::List(list) = result {
+            let items = list.borrow();
+            assert_eq!(items.len(), 4);
+            assert_eq!(items[0], Value::Number(1.0));
+            assert_eq!(items[1], Value::Number(2.0));
+            assert_eq!(items[2], Value::Number(3.0));
+            assert_eq!(items[3], Value::Number(4.0));
+        } else {
+            panic!("Expected list");
+        }
+    }
+
+    #[test]
+    fn test_list_concat_empty() {
+        let list1 = Value::List(Rc::new(RefCell::new(vec![Value::Number(1.0)])));
+        let list2 = Value::List(Rc::new(RefCell::new(vec![])));
+
+        let result = list1.add(&list2).unwrap();
+
+        if let Value::List(list) = result {
+            let items = list.borrow();
+            assert_eq!(items.len(), 1);
+            assert_eq!(items[0], Value::Number(1.0));
+        } else {
+            panic!("Expected list");
+        }
+    }
+}
+
+mod hash_tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_value_hash_basic() {
+        let mut set = HashSet::new();
+        set.insert(Value::Number(42.0));
+        set.insert(Value::Bool(true));
+        set.insert(Value::Null);
+
+        assert!(set.contains(&Value::Number(42.0)));
+        assert!(set.contains(&Value::Bool(true)));
+        assert!(set.contains(&Value::Null));
+    }
+
+    #[test]
+    fn test_value_hash_strings() {
+        let mut pool = StringPool::new();
+        let id1 = pool.intern("hello");
+        let id2 = pool.intern("world");
+
+        let mut set = HashSet::new();
+        set.insert(Value::String(id1));
+        set.insert(Value::String(id2));
+
+        assert!(set.contains(&Value::String(id1)));
+        assert!(set.contains(&Value::String(id2)));
+        assert_eq!(set.len(), 2);
+    }
+
+    #[test]
+    fn test_dict_as_hashmap_key() {
+        let mut pool = StringPool::new();
+        let key = pool.intern("nested");
+
+        let mut inner_dict = HashMap::new();
+        inner_dict.insert(key, Value::String(pool.intern("key")));
+        let dict_value = Value::Dict(Rc::new(RefCell::new(inner_dict)));
+
+        let mut outer_map = HashMap::new();
+        outer_map.insert(dict_value.clone(), Value::String(pool.intern("value")));
+
+        assert!(outer_map.contains_key(&dict_value));
+    }
+
+    #[test]
+    fn test_hash_consistency() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let val1 = Value::Number(42.0);
+        let val2 = Value::Number(42.0);
+
+        let mut hasher1 = DefaultHasher::new();
+        val1.hash(&mut hasher1);
+        let hash1 = hasher1.finish();
+
+        let mut hasher2 = DefaultHasher::new();
+        val2.hash(&mut hasher2);
+        let hash2 = hasher2.finish();
+
+        assert_eq!(hash1, hash2, "Equal values should have equal hashes");
+    }
 }
