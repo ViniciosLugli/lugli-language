@@ -19,13 +19,11 @@ pub enum Precedence {
 impl Precedence {
     pub fn of(token_kind: &TokenKind) -> Self {
         match token_kind {
-            TokenKind::Equal | TokenKind::PlusEqual | TokenKind::MinusEqual
-            | TokenKind::StarEqual | TokenKind::SlashEqual => Precedence::Assignment,
+            TokenKind::Equal | TokenKind::PlusEqual | TokenKind::MinusEqual | TokenKind::StarEqual | TokenKind::SlashEqual => Precedence::Assignment,
             TokenKind::Or => Precedence::Or,
             TokenKind::And => Precedence::And,
             TokenKind::EqualEqual | TokenKind::BangEqual => Precedence::Equality,
-            TokenKind::Greater | TokenKind::GreaterEqual
-            | TokenKind::Less | TokenKind::LessEqual => Precedence::Comparison,
+            TokenKind::Greater | TokenKind::GreaterEqual | TokenKind::Less | TokenKind::LessEqual => Precedence::Comparison,
             TokenKind::Plus | TokenKind::Minus => Precedence::Term,
             TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Precedence::Factor,
             TokenKind::Power => Precedence::Power,

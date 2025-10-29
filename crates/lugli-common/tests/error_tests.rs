@@ -17,11 +17,17 @@ mod basic_error_tests {
 
     #[test]
     fn test_parse_error() {
-        let span = Span { start: 10, end: 15 };
+        let span = Span {
+            start: 10,
+            end: 15,
+        };
         let error = LugliError::parse("Unexpected token", span);
 
         match error {
-            LugliError::Parse { message, span: error_span } => {
+            LugliError::Parse {
+                message,
+                span: error_span,
+            } => {
                 assert_eq!(message, "Unexpected token");
                 assert_eq!(error_span.start, 10);
                 assert_eq!(error_span.end, 15);
@@ -61,7 +67,10 @@ mod basic_error_tests {
         let display_string = format!("{}", runtime_error);
         assert!(display_string.contains("Test runtime error"));
 
-        let span = Span { start: 5, end: 10 };
+        let span = Span {
+            start: 5,
+            end: 10,
+        };
         let parse_error = LugliError::parse("Test parse error", span);
         let parse_display = format!("{}", parse_error);
         assert!(parse_display.contains("Test parse error"));
@@ -111,11 +120,17 @@ mod error_context_tests {
 
     #[test]
     fn test_error_with_context() {
-        let span = Span { start: 0, end: 5 };
+        let span = Span {
+            start: 0,
+            end: 5,
+        };
         let error = LugliError::parse("Syntax error", span);
 
         // Test that we can extract context information
-        if let LugliError::Parse { span: error_span, .. } = error {
+        if let LugliError::Parse {
+            span: error_span, ..
+        } = error
+        {
             assert_eq!(error_span.start, 0);
             assert_eq!(error_span.end, 5);
         }
@@ -125,7 +140,13 @@ mod error_context_tests {
     fn test_multiple_error_types() {
         let errors = vec![
             LugliError::runtime("Runtime issue"),
-            LugliError::parse("Parse issue", Span { start: 0, end: 1 }),
+            LugliError::parse(
+                "Parse issue",
+                Span {
+                    start: 0,
+                    end: 1,
+                },
+            ),
             LugliError::type_error("expected", "actual"),
             LugliError::undefined_variable("var_name"),
         ];

@@ -8,7 +8,10 @@ pub fn start() -> Result<(), CliError> {
 
     loop {
         print!("{} ", "lugli>".bright_green().bold());
-        io::stdout().flush().unwrap();
+        if let Err(e) = io::stdout().flush() {
+            eprintln!("{}: Failed to flush stdout: {}", "IO Error".red().bold(), e);
+            break;
+        }
 
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
@@ -25,18 +28,16 @@ pub fn start() -> Result<(), CliError> {
                 }
 
                 match lugli_parser::parse(input) {
-                    Ok(program) => {
-                        match lugli_vm::compile_and_run(&program) {
-                            Ok(value) => {
-                                if !matches!(value, lugli_common::Value::Null) {
-                                    println!("{}", value);
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("{}: {}", "Runtime Error".red().bold(), e);
+                    Ok(program) => match lugli_vm::compile_and_run(&program) {
+                        Ok(value) => {
+                            if !matches!(value, lugli_common::Value::Null) {
+                                println!("{}", value);
                             }
                         }
-                    }
+                        Err(e) => {
+                            eprintln!("{}: {}", "Runtime Error".red().bold(), e);
+                        }
+                    },
                     Err(e) => {
                         eprintln!("{}: {}", "Parse Error".red().bold(), e);
                     }

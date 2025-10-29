@@ -1,17 +1,17 @@
-use lugli_lexer::LexError;
 use lugli_ast::Program;
+use lugli_lexer::LexError;
 use thiserror::Error;
 
-pub mod parser;
-pub mod precedence;
 pub mod error;
+mod expressions;
 mod helpers;
 mod literals;
-mod expressions;
+pub mod parser;
+pub mod precedence;
 mod statements;
 
-pub use parser::Parser;
 pub use error::ParseError;
+pub use parser::Parser;
 
 #[derive(Error, Debug)]
 pub enum ParserError {
@@ -25,4 +25,3 @@ pub fn parse(source: &str) -> Result<Program, ParserError> {
     let mut parser = Parser::new(source)?;
     Ok(parser.parse()?)
 }
-

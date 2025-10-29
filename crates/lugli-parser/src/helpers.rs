@@ -1,8 +1,7 @@
-use lugli_lexer::{Token, TokenKind};
-use lugli_common::Span;
+use crate::{Parser, error::ParseError};
 use lugli_ast::FStringPart;
-use crate::error::ParseError;
-use crate::Parser;
+use lugli_common::Span;
+use lugli_lexer::{Token, TokenKind};
 
 impl<'a> Parser<'a> {
     pub(crate) fn match_any(&mut self, types: &[TokenKind]) -> bool {
@@ -15,31 +14,27 @@ impl<'a> Parser<'a> {
         false
     }
 
-    pub(crate) fn check(&self, token_type: &TokenKind) -> bool {
-        self.scanner.current()
-            .map(|token| &token.kind == token_type)
-            .unwrap_or(false)
-    }
+    pub(crate) fn check(&self, token_type: &TokenKind) -> bool { self.scanner.current().map(|token| &token.kind == token_type).unwrap_or(false) }
 
     pub(crate) fn advance(&mut self) {
         self.previous = self.scanner.current().cloned();
         let _ = self.scanner.advance();
     }
 
-    pub(crate) fn previous(&self) -> &Token {
-        self.previous.as_ref().expect("BUG: No previous token (advance() must be called before previous())")
-    }
+    pub(crate) fn previous(&self) -> &Token { self.previous.as_ref().expect("BUG: No previous token (advance() must be called before previous())") }
 
     pub(crate) fn previous_span(&self) -> Span {
-        self.previous.as_ref()
-            .map(|t| t.span)
-            .unwrap_or(Span { start: 0, end: 0 })
+        self.previous.as_ref().map(|t| t.span).unwrap_or(Span {
+            start: 0,
+            end: 0,
+        })
     }
 
     pub(crate) fn current_span(&self) -> Span {
-        self.scanner.current()
-            .map(|t| t.span)
-            .unwrap_or(Span { start: 0, end: 0 })
+        self.scanner.current().map(|t| t.span).unwrap_or(Span {
+            start: 0,
+            end: 0,
+        })
     }
 
     pub(crate) fn merge_spans(&self, start: Span, end: Span) -> Span {
@@ -50,18 +45,15 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn span_from_to(&self, start: usize, end: usize) -> Span {
-        Span { start, end }
+        Span {
+            start,
+            end,
+        }
     }
 
+    pub(crate) fn peek_kind(&self) -> Option<&TokenKind> { self.scanner.current().map(|token| &token.kind) }
 
-
-    pub(crate) fn peek_kind(&self) -> Option<&TokenKind> {
-        self.scanner.current().map(|token| &token.kind)
-    }
-
-    pub(crate) fn peek_next_kind(&self) -> Option<TokenKind> {
-        self.scanner.peek().map(|token| token.kind.clone())
-    }
+    pub(crate) fn peek_next_kind(&self) -> Option<TokenKind> { self.scanner.peek().map(|token| token.kind.clone()) }
 
     pub(crate) fn consume(&mut self, token_type: &TokenKind, message: &str) -> Result<Token, ParseError> {
         if self.check(token_type) {
@@ -146,13 +138,10 @@ impl<'a> Parser<'a> {
             }
         }
         false
-    }	
+    }
 
     fn should_skip_newlines_after(&self, token_type: &TokenKind) -> bool {
-        matches!(token_type,
-            TokenKind::LeftBrace | TokenKind::LeftBracket | TokenKind::LeftParen |
-            TokenKind::Comma | TokenKind::Colon 
-        )
+        matches!(token_type, TokenKind::LeftBrace | TokenKind::LeftBracket | TokenKind::LeftParen | TokenKind::Comma | TokenKind::Colon)
     }
 
     pub(crate) fn is_dict_literal(&self) -> bool {
@@ -267,5 +256,4 @@ impl<'a> Parser<'a> {
 
         Ok(parts)
     }
-
 }

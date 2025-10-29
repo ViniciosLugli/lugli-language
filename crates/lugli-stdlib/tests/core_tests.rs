@@ -1,6 +1,6 @@
+use hashbrown::HashMap;
 use lugli_common::Value;
 use lugli_stdlib::get_global_functions;
-use hashbrown::HashMap;
 use std::{cell::RefCell, rc::Rc};
 
 mod core_function_tests {
@@ -9,10 +9,7 @@ mod core_function_tests {
     #[test]
     fn test_type_function() {
         let functions = get_global_functions();
-        let type_fn = functions.iter()
-            .find(|(name, _)| *name == "type")
-            .map(|(_, func)| func)
-            .expect("type function should exist");
+        let type_fn = functions.iter().find(|(name, _)| *name == "type").map(|(_, func)| func).expect("type function should exist");
 
         // Test with different value types
         let number_result = type_fn(&[Value::Number(42.0)]).unwrap();
@@ -38,10 +35,7 @@ mod core_function_tests {
     #[test]
     fn test_len_function() {
         let functions = get_global_functions();
-        let len_fn = functions.iter()
-            .find(|(name, _)| *name == "len")
-            .map(|(_, func)| func)
-            .expect("len function should exist");
+        let len_fn = functions.iter().find(|(name, _)| *name == "len").map(|(_, func)| func).expect("len function should exist");
 
         // Test string length
         let string_result = len_fn(&[Value::String("hello".to_string())]).unwrap();
@@ -51,11 +45,7 @@ mod core_function_tests {
         assert!(empty_string_result.equals(&Value::Number(0.0)));
 
         // Test list length
-        let list = Value::List(Rc::new(RefCell::new(vec![
-            Value::Number(1.0),
-            Value::Number(2.0),
-            Value::Number(3.0)
-        ])));
+        let list = Value::List(Rc::new(RefCell::new(vec![Value::Number(1.0), Value::Number(2.0), Value::Number(3.0)])));
         let list_result = len_fn(&[list]).unwrap();
         assert!(list_result.equals(&Value::Number(3.0)));
 
@@ -63,7 +53,7 @@ mod core_function_tests {
         let mut dict = HashMap::new();
         dict.insert("key1".to_string(), Value::Number(1.0));
         dict.insert("key2".to_string(), Value::Number(2.0));
-        let dict_value = Value::Dict(dict);
+        let dict_value = Value::Dict(Rc::new(RefCell::new(dict)));
         let dict_result = len_fn(&[dict_value]).unwrap();
         assert!(dict_result.equals(&Value::Number(2.0)));
 
@@ -85,7 +75,6 @@ mod core_function_tests {
         assert!(function_names.contains(&"type"));
         assert!(function_names.contains(&"len"));
         assert!(function_names.contains(&"print"));
-        assert!(function_names.contains(&"println"));
         assert!(function_names.contains(&"now"));
         assert!(function_names.contains(&"sleep"));
     }

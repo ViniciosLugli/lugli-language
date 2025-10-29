@@ -1,11 +1,11 @@
 use logos::Logos;
 use thiserror::Error;
 
-pub mod token;
 pub mod scanner;
+pub mod token;
 
-pub use token::{Token, TokenKind};
 pub use scanner::Scanner;
+pub use token::{Token, TokenKind};
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum LexError {
@@ -39,16 +39,12 @@ impl<'a> Iterator for Lexer<'a> {
 
         match kind {
             Ok(token_kind) => Some(Ok(Token::new(token_kind, lexeme, span.into()))),
-            Err(_) => Some(Err(LexError::UnexpectedChar(
-                lexeme.chars().next().unwrap_or('\0')
-            ))),
+            Err(_) => Some(Err(LexError::UnexpectedChar(lexeme.chars().next().unwrap_or('\0')))),
         }
     }
 }
 
-pub fn tokenize(source: &str) -> Result<Vec<Token>, LexError> {
-    Lexer::new(source).collect()
-}
+pub fn tokenize(source: &str) -> Result<Vec<Token>, LexError> { Lexer::new(source).collect() }
 
 #[cfg(test)]
 mod tests {
@@ -136,12 +132,7 @@ mod tests {
 
     #[test]
     fn test_numbers() {
-        let numbers = vec![
-            ("42", 42.0),
-            ("3.14", 3.14),
-            ("-5", -5.0),
-            ("0.0", 0.0),
-        ];
+        let numbers = vec![("42", 42.0), ("3.14", 3.14), ("-5", -5.0), ("0.0", 0.0)];
 
         for (input, expected) in numbers {
             let tokens = tokenize(input).unwrap();
@@ -156,11 +147,7 @@ mod tests {
 
     #[test]
     fn test_strings() {
-        let strings = vec![
-            (r#""hello""#, "hello"),
-            (r#""hello world""#, "hello world"),
-            (r#""with\nnewline""#, "with\\nnewline"),
-        ];
+        let strings = vec![(r#""hello""#, "hello"), (r#""hello world""#, "hello world"), (r#""with\nnewline""#, "with\\nnewline")];
 
         for (input, expected_content) in strings {
             let tokens = tokenize(input).unwrap();

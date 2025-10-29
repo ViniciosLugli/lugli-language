@@ -1,56 +1,51 @@
-use lugli_lexer::TokenKind;
-use lugli_ast::{Stmt, AstNode, Expr};
+use crate::{Parser, error::ParseError};
+use lugli_ast::{AstNode, Expr, Stmt};
 use lugli_common::Span;
-use crate::error::ParseError;
-use crate::Parser;
+use lugli_lexer::TokenKind;
 
 impl<'a> Parser<'a> {
     pub(crate) fn statement(&mut self) -> Result<Stmt, ParseError> {
         match self.peek_kind() {
-            Some(TokenKind::Let) | Some(TokenKind::Mut) | Some(TokenKind::Const) => {
-                self.var_declaration()
-            },
-            Some(TokenKind::Fn) => {
-                self.function_declaration()
-            },
-            Some(TokenKind::If) => {
-                self.if_statement()
-            },
-            Some(TokenKind::While) => {
-                self.while_statement()
-            },
-            Some(TokenKind::For) => {
-                self.for_statement()
-            },
-            Some(TokenKind::Loop) => {
-                self.loop_statement()
-            },
-            Some(TokenKind::Return) => {
-                self.return_statement()
-            },
-            Some(TokenKind::Break) => {
-                self.break_statement()
-            },
-            Some(TokenKind::Continue) => {
-                self.continue_statement()
-            },
+            Some(TokenKind::Let) | Some(TokenKind::Const) | Some(TokenKind::Mut) => self.var_declaration(),
+            Some(TokenKind::Fn) => self.function_declaration(),
+            Some(TokenKind::Struct) => self.struct_declaration(),
+            Some(TokenKind::Impl) => self.impl_block(),
+            Some(TokenKind::Import) => self.import_statement(),
+            Some(TokenKind::From) => self.from_import_statement(),
+            Some(TokenKind::Export) => self.export_statement(),
+            Some(TokenKind::If) => self.if_statement(),
+            Some(TokenKind::While) => self.while_statement(),
+            Some(TokenKind::For) => self.for_statement(),
+            Some(TokenKind::Loop) => self.loop_statement(),
+            Some(TokenKind::Return) => self.return_statement(),
+            Some(TokenKind::Break) => self.break_statement(),
+            Some(TokenKind::Continue) => self.continue_statement(),
             Some(TokenKind::LeftBrace) => {
                 if self.is_dict_literal() {
                     self.expression_statement()
                 } else {
                     self.block_statement()
                 }
-            },
+            }
             _ => self.expression_statement(),
         }
     }
 
     pub(crate) fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
         let is_const = self.match_any(&[TokenKind::Const]);
-        let _is_mutable = self.match_any(&[TokenKind::Mut]);
+        let mut _is_mutable = false;
 
-        if !is_const && !_is_mutable {
-            self.consume(&TokenKind::Let, "Expected 'let', 'mut', or 'const'")?;
+        if !is_const {
+            // Handle three cases: 'let', 'let mut', or standalone 'mut'
+            if self.match_any(&[TokenKind::Mut]) {
+                // Standalone 'mut x = value'
+                _is_mutable = true;
+            } else {
+                // Expect 'let' [mut]
+                self.consume(&TokenKind::Let, "Expected 'let', 'mut', or 'const'")?;
+                // After 'let', check for optional 'mut'
+                _is_mutable = self.match_any(&[TokenKind::Mut]);
+            }
         }
 
         let name = self.consume_identifier("Expected variable name")?;
@@ -70,9 +65,7 @@ impl<'a> Parser<'a> {
 
         let span = Span {
             start: self.previous_span().start,
-            end: initializer.as_ref()
-                .map(|init| init.span().end)
-                .unwrap_or_else(|| self.previous_span().end),
+            end: initializer.as_ref().map(|init| init.span().end).unwrap_or_else(|| self.previous_span().end),
         };
 
         Ok(Stmt::VarDecl {
@@ -87,7 +80,12 @@ impl<'a> Parser<'a> {
         let start_span = self.current_span();
         self.consume(&TokenKind::Fn, "Expected 'fn'")?;
 
-        let name = self.consume_identifier("Expected function name")?;
+        let mut name = self.consume_identifier("Expected function name")?;
+
+        // Check for ! suffix (mutating method indicator)
+        if self.match_any(&[TokenKind::Bang]) {
+            name.push('!');
+        }
 
         self.consume(&TokenKind::LeftParen, "Expected '(' after function name")?;
         self.skip_newlines();
@@ -95,8 +93,25 @@ impl<'a> Parser<'a> {
         let mut params = Vec::new();
         if !self.check(&TokenKind::RightParen) {
             loop {
-                let param_name = self.consume_identifier("Expected parameter name")?;
-                params.push(param_name);
+                // Handle self parameter
+                if self.check(&TokenKind::SelfKeyword) {
+                    self.advance();
+                    params.push("self".to_string());
+                } else if self.check(&TokenKind::Mut) && self.peek_next_kind() == Some(TokenKind::SelfKeyword) {
+                    self.advance(); // consume mut
+                    self.advance(); // consume self
+                    params.push("self".to_string());
+                } else {
+                    let param_name = self.consume_identifier("Expected parameter name")?;
+                    // Skip type hints for now
+                    if self.match_any(&[TokenKind::Colon]) {
+                        // Skip type annotation
+                        while !self.check(&TokenKind::Comma) && !self.check(&TokenKind::RightParen) {
+                            self.advance();
+                        }
+                    }
+                    params.push(param_name);
+                }
 
                 if !self.match_any(&[TokenKind::Comma]) {
                     break;
@@ -108,6 +123,14 @@ impl<'a> Parser<'a> {
         self.skip_newlines();
         self.consume(&TokenKind::RightParen, "Expected ')' after parameters")?;
 
+        // Skip return type hint if present
+        if self.match_any(&[TokenKind::Arrow]) {
+            // Skip return type
+            while !self.check(&TokenKind::LeftBrace) && !self.scanner.is_at_end() {
+                self.advance();
+            }
+        }
+
         let body = self.block_body()?;
 
         let end_span = self.previous_span();
@@ -116,6 +139,88 @@ impl<'a> Parser<'a> {
             name,
             params,
             body,
+            span: self.merge_spans(start_span, end_span),
+        })
+    }
+
+    pub(crate) fn struct_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let start_span = self.current_span();
+        self.consume(&TokenKind::Struct, "Expected 'struct'")?;
+
+        let name = self.consume_identifier("Expected struct name")?;
+
+        self.consume_with_newlines(&TokenKind::LeftBrace, "Expected '{' after struct name")?;
+
+        let mut fields = Vec::new();
+        let mut methods = Vec::new();
+
+        while !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
+            self.skip_newlines();
+
+            if self.check(&TokenKind::Fn) {
+                methods.push(self.function_declaration()?);
+            } else if !self.check(&TokenKind::RightBrace) {
+                let field_name = self.consume_identifier("Expected field name")?;
+
+                // Handle optional type hint or default value after colon
+                let default_value = if self.match_any(&[TokenKind::Colon]) {
+                    // Parse default value expression
+                    self.expression().ok()
+                } else {
+                    None
+                };
+
+                fields.push((field_name, default_value));
+
+                self.match_any(&[TokenKind::Comma, TokenKind::Newline]);
+            }
+        }
+
+        self.consume_closing(&TokenKind::RightBrace, "Expected '}' after struct definition")?;
+
+        let end_span = self.previous_span();
+
+        Ok(Stmt::StructDecl {
+            name,
+            fields,
+            methods,
+            span: self.merge_spans(start_span, end_span),
+        })
+    }
+
+    pub(crate) fn impl_block(&mut self) -> Result<Stmt, ParseError> {
+        let start_span = self.current_span();
+        self.consume(&TokenKind::Impl, "Expected 'impl'")?;
+
+        let struct_name = self.consume_identifier("Expected struct name")?;
+
+        self.consume_with_newlines(&TokenKind::LeftBrace, "Expected '{' after struct name")?;
+
+        let mut methods = Vec::new();
+
+        while !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
+            self.skip_newlines();
+
+            if self.check(&TokenKind::Fn) && !self.scanner.is_at_end() {
+                methods.push(self.function_declaration()?);
+            } else if !self.check(&TokenKind::RightBrace) {
+                return Err(ParseError::Custom {
+                    message: "Expected method declaration in impl block".to_string(),
+                    span: self.current_span(),
+                });
+            }
+        }
+
+        self.consume_closing(&TokenKind::RightBrace, "Expected '}' after impl block")?;
+
+        let end_span = self.previous_span();
+
+        // For now, return impl as a StructDecl with only methods
+        // In a real implementation, you might want a separate ImplBlock statement
+        Ok(Stmt::StructDecl {
+            name: struct_name,
+            fields: Vec::new(),
+            methods,
             span: self.merge_spans(start_span, end_span),
         })
     }
@@ -134,25 +239,14 @@ impl<'a> Parser<'a> {
             elif_branches.push((elif_condition, elif_body));
         }
 
-        let else_branch = if self.match_any(&[TokenKind::Else]) {
-            Some(self.block_body()?)
-        } else {
-            None
-        };
+        let else_branch = if self.match_any(&[TokenKind::Else]) { Some(self.block_body()?) } else { None };
 
-        let end_span = else_branch.as_ref()
+        let end_span = else_branch
+            .as_ref()
             .and_then(|stmts| stmts.last())
             .map(|stmt| stmt.span().end)
-            .or_else(|| {
-                elif_branches.last()
-                    .and_then(|(_, stmts)| stmts.last())
-                    .map(|stmt| stmt.span().end)
-            })
-            .unwrap_or_else(|| {
-                then_branch.last()
-                    .map(|stmt| stmt.span().end)
-                    .unwrap_or(start_span.end)
-            });
+            .or_else(|| elif_branches.last().and_then(|(_, stmts)| stmts.last()).map(|stmt| stmt.span().end))
+            .unwrap_or_else(|| then_branch.last().map(|stmt| stmt.span().end).unwrap_or(start_span.end));
 
         Ok(Stmt::If {
             condition,
@@ -173,9 +267,7 @@ impl<'a> Parser<'a> {
         let condition = self.expression()?;
         let body = self.block_body()?;
 
-        let end_span = body.last()
-            .map(|stmt| stmt.span().end)
-            .unwrap_or(start_span.end);
+        let end_span = body.last().map(|stmt| stmt.span().end).unwrap_or(start_span.end);
 
         Ok(Stmt::While {
             condition,
@@ -197,9 +289,7 @@ impl<'a> Parser<'a> {
         let iterable = self.expression()?;
         let body = self.block_body()?;
 
-        let end_span = body.last()
-            .map(|stmt| stmt.span().end)
-            .unwrap_or(start_span.end);
+        let end_span = body.last().map(|stmt| stmt.span().end).unwrap_or(start_span.end);
 
         Ok(Stmt::For {
             variable,
@@ -218,9 +308,7 @@ impl<'a> Parser<'a> {
 
         let body = self.block_body()?;
 
-        let end_span = body.last()
-            .map(|stmt| stmt.span().end)
-            .unwrap_or(start_span.end);
+        let end_span = body.last().map(|stmt| stmt.span().end).unwrap_or(start_span.end);
 
         Ok(Stmt::Loop {
             body,
@@ -235,17 +323,11 @@ impl<'a> Parser<'a> {
         let start_span = self.current_span();
         self.consume(&TokenKind::Return, "Expected 'return'")?;
 
-        let value = if self.check(&TokenKind::Newline) || self.check(&TokenKind::Semicolon) {
-            None
-        } else {
-            Some(self.expression()?)
-        };
+        let value = if self.check(&TokenKind::Newline) || self.check(&TokenKind::Semicolon) { None } else { Some(self.expression()?) };
 
         self.consume_statement_terminator()?;
 
-        let end_span = value.as_ref()
-            .map(|expr| expr.span().end)
-            .unwrap_or_else(|| self.previous_span().end);
+        let end_span = value.as_ref().map(|expr| expr.span().end).unwrap_or_else(|| self.previous_span().end);
 
         Ok(Stmt::Return {
             value,
@@ -296,8 +378,14 @@ impl<'a> Parser<'a> {
     pub(crate) fn expression_statement(&mut self) -> Result<Stmt, ParseError> {
         let expr = self.expression()?;
 
-        if self.match_any(&[TokenKind::Equal, TokenKind::PlusEqual, TokenKind::MinusEqual,
-                            TokenKind::StarEqual, TokenKind::SlashEqual, TokenKind::PercentEqual]) {
+        if self.match_any(&[
+            TokenKind::Equal,
+            TokenKind::PlusEqual,
+            TokenKind::MinusEqual,
+            TokenKind::StarEqual,
+            TokenKind::SlashEqual,
+            TokenKind::PercentEqual,
+        ]) {
             let operator = self.previous().clone();
             let value = self.expression()?;
             self.consume_statement_terminator()?;
@@ -325,37 +413,53 @@ impl<'a> Parser<'a> {
                 value
             };
 
-            let assignment_expr = match expr {
-                Expr::Identifier { name, span: id_span } => {
-                    let span = self.merge_spans(id_span, *final_value.span());
+            let final_value_span = *final_value.span();
+
+            let assignment_expr = match expr.clone() {
+                Expr::Identifier {
+                    name,
+                    span: id_span,
+                } => {
+                    let span = self.merge_spans(id_span, final_value_span);
                     Expr::Set {
-                        object: Box::new(Expr::Identifier { name: "global".to_string(), span: id_span }),
+                        object: Box::new(Expr::Identifier {
+                            name: "global".to_string(),
+                            span: id_span,
+                        }),
                         name,
                         value: Box::new(final_value),
                         span,
                     }
-                },
-                Expr::Get { object, name, span: get_span } => {
-                    let span = self.merge_spans(get_span, *final_value.span());
+                }
+                Expr::Get {
+                    object,
+                    name,
+                    span: get_span,
+                } => {
+                    let span = self.merge_spans(get_span, final_value_span);
                     Expr::Set {
                         object,
                         name,
                         value: Box::new(final_value),
                         span,
                     }
-                },
-                Expr::Index { object, index, span: index_span } => {
-                    let span = self.merge_spans(index_span, *final_value.span());
+                }
+                Expr::Index {
+                    object,
+                    index,
+                    span: index_span,
+                } => {
+                    let span = self.merge_spans(index_span, final_value_span);
                     Expr::Set {
                         object,
-                        name: format!("[{}]", "index"), // Use a marker for index assignments
+                        name: "[index]".to_string(),
                         value: Box::new(Expr::List {
-                            elements: vec![*index, final_value],
+                            elements: vec![(*index).clone(), final_value.clone()],
                             span,
                         }),
                         span,
                     }
-                },
+                }
                 _ => {
                     return Err(ParseError::Custom {
                         message: "Invalid assignment target".to_string(),
@@ -364,12 +468,17 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            let span = *assignment_expr.span();
-            Ok(Stmt::Expression { expr: assignment_expr, span })
+            Ok(Stmt::Expression {
+                expr: assignment_expr.clone(),
+                span: self.merge_spans(*assignment_expr.span(), final_value_span),
+            })
         } else {
             self.consume_statement_terminator()?;
             let span = *expr.span();
-            Ok(Stmt::Expression { expr, span })
+            Ok(Stmt::Expression {
+                expr,
+                span,
+            })
         }
     }
 
@@ -389,5 +498,92 @@ impl<'a> Parser<'a> {
         self.consume_closing(&TokenKind::RightBrace, "Expected '}'")?;
 
         Ok(statements)
+    }
+
+    pub(crate) fn import_statement(&mut self) -> Result<Stmt, ParseError> {
+        let start_span = self.current_span();
+        self.consume(&TokenKind::Import, "Expected 'import'")?;
+
+        let mut module_path = vec![self.consume_identifier("Expected module name")?];
+
+        while self.match_any(&[TokenKind::Dot]) {
+            module_path.push(self.consume_identifier("Expected module component")?);
+        }
+
+        let alias = if self.match_any(&[TokenKind::As]) { Some(self.consume_identifier("Expected alias name")?) } else { None };
+
+        self.consume_statement_terminator()?;
+
+        let end_span = self.previous_span();
+
+        Ok(Stmt::Import {
+            module_path,
+            items: None,
+            alias,
+            span: Span {
+                start: start_span.start,
+                end: end_span.end,
+            },
+        })
+    }
+
+    pub(crate) fn from_import_statement(&mut self) -> Result<Stmt, ParseError> {
+        let start_span = self.current_span();
+        self.consume(&TokenKind::From, "Expected 'from'")?;
+
+        let mut module_path = vec![self.consume_identifier("Expected module name")?];
+
+        while self.match_any(&[TokenKind::Dot]) {
+            module_path.push(self.consume_identifier("Expected module component")?);
+        }
+
+        self.consume(&TokenKind::Import, "Expected 'import' after module path")?;
+
+        let items = if self.match_any(&[TokenKind::Star]) {
+            None
+        } else {
+            let mut import_items = vec![self.consume_identifier("Expected item name")?];
+
+            while self.match_any(&[TokenKind::Comma]) {
+                self.skip_newlines();
+                if self.scanner.is_at_end() || self.check(&TokenKind::Newline) {
+                    break;
+                }
+                import_items.push(self.consume_identifier("Expected item name")?);
+            }
+
+            Some(import_items)
+        };
+
+        self.consume_statement_terminator()?;
+
+        let end_span = self.previous_span();
+
+        Ok(Stmt::Import {
+            module_path,
+            items,
+            alias: None,
+            span: Span {
+                start: start_span.start,
+                end: end_span.end,
+            },
+        })
+    }
+
+    pub(crate) fn export_statement(&mut self) -> Result<Stmt, ParseError> {
+        let start_span = self.current_span();
+        self.consume(&TokenKind::Export, "Expected 'export'")?;
+
+        let item = Box::new(self.statement()?);
+
+        let end_span = *item.span();
+
+        Ok(Stmt::Export {
+            item,
+            span: Span {
+                start: start_span.start,
+                end: end_span.end,
+            },
+        })
     }
 }

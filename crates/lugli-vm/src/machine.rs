@@ -1,10 +1,11 @@
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::time::Instant;
+use crate::{
+    Bytecode, Instruction,
+    module::{ModuleCache, ModuleResolver},
+};
 use hashbrown::HashMap;
-use lugli_common::{Value, LugliError};
+use lugli_common::{LugliError, Value};
 use lugli_stdlib::get_global_functions;
-use crate::{Bytecode, Instruction};
+use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
 
 pub type NativeFunction = fn(&[Value]) -> Result<Value, LugliError>;
 
@@ -21,11 +22,21 @@ struct CallFrame {
 
 impl CallFrame {
     fn new(function_name: String, return_ip: usize, stack_base: usize) -> Self {
-        Self { function_name, return_ip, stack_base, closure_upvalues: None }
+        Self {
+            function_name,
+            return_ip,
+            stack_base,
+            closure_upvalues: None,
+        }
     }
 
     fn new_closure(function_name: String, return_ip: usize, stack_base: usize, upvalues: Rc<RefCell<Vec<Value>>>) -> Self {
-        Self { function_name, return_ip, stack_base, closure_upvalues: Some(upvalues) }
+        Self {
+            function_name,
+            return_ip,
+            stack_base,
+            closure_upvalues: Some(upvalues),
+        }
     }
 }
 
@@ -60,13 +71,25 @@ pub struct Machine {
     pub ip: usize,
     call_stack: Vec<CallFrame>,
     pub debug: DebugContext,
+    module_cache: ModuleCache,
+    module_resolver: ModuleResolver,
+    current_file: Option<PathBuf>,
+    bytecode_registry: HashMap<usize, Rc<Bytecode>>,
+    next_bytecode_id: usize,
 }
 
 impl Machine {
     pub fn new() -> Self {
         let mut globals = HashMap::new();
         for (name, func) in get_global_functions() {
-            globals.insert(name.to_string(), Value::NativeFunction { name: name.to_string(), callback: func, arity: 0 }); // Arity is a placeholder here
+            globals.insert(
+                name.to_string(),
+                Value::NativeFunction {
+                    name: name.to_string(),
+                    callback: func,
+                    arity: 0,
+                },
+            ); // Arity is a placeholder here
         }
 
         let mut debug = DebugContext::default();
@@ -80,6 +103,11 @@ impl Machine {
             ip: 0,
             call_stack: vec![CallFrame::new("<script>".to_string(), 0, 0)],
             debug,
+            module_cache: ModuleCache::new(),
+            module_resolver: ModuleResolver::new(),
+            current_file: None,
+            bytecode_registry: HashMap::new(),
+            next_bytecode_id: 1, // Start at 1, main bytecode uses ID 0
         }
     }
 
@@ -93,22 +121,20 @@ impl Machine {
         if self.debug.trace_execution || self.debug.trace_stack || self.debug.trace_calls {
             self.debug.start_time = Some(Instant::now());
         }
+        self.module_cache.clear();
+        self.current_file = None;
+        self.bytecode_registry.clear();
+        self.next_bytecode_id = 1; // Start at 1, main bytecode uses ID 0
     }
 
-    fn peek(&self) -> Result<&Value, LugliError> {
-        self.stack.last().ok_or_else(|| LugliError::runtime("Stack underflow"))
-    }
+    fn peek(&self) -> Result<&Value, LugliError> { self.stack.last().ok_or_else(|| LugliError::runtime("Stack underflow")) }
 
     fn peek_n(&self, n: usize) -> Result<&Value, LugliError> {
-        let index = self.stack.len().checked_sub(1 + n)
-            .ok_or_else(|| LugliError::runtime("Stack underflow in peek_n"))?;
-        self.stack.get(index)
-            .ok_or_else(|| LugliError::runtime("Invalid stack access"))
+        let index = self.stack.len().checked_sub(1 + n).ok_or_else(|| LugliError::runtime("Stack underflow in peek_n"))?;
+        self.stack.get(index).ok_or_else(|| LugliError::runtime("Invalid stack access"))
     }
 
-    fn pop(&mut self) -> Result<Value, LugliError> {
-        self.stack.pop().ok_or_else(|| LugliError::runtime("Stack underflow"))
-    }
+    fn pop(&mut self) -> Result<Value, LugliError> { self.stack.pop().ok_or_else(|| LugliError::runtime("Stack underflow")) }
 
     fn generate_stack_trace(&self, bytecode: &Bytecode) -> Vec<String> {
         let mut traces = Vec::new();
@@ -118,12 +144,7 @@ impl Machine {
 
             let trace = if let Some(location) = bytecode.get_location(ip) {
                 if location.line > 0 {
-                    format!("  at {} in {}:{}:{}",
-                        frame.function_name,
-                        location.file_path,
-                        location.line,
-                        location.column
-                    )
+                    format!("  at {} in {}:{}:{}", frame.function_name, location.file_path, location.line, location.column)
                 } else {
                     format!("  at {} (ip {:04})", frame.function_name, ip)
                 }
@@ -143,21 +164,18 @@ impl Machine {
     }
 
     fn get_method_args(&self, arg_count: usize) -> Result<&[Value], LugliError> {
-        let args_start = self.stack.len()
-            .checked_sub(arg_count)
-            .ok_or_else(|| LugliError::runtime(format!(
-                "Stack underflow: method expects {} args but stack has {}",
-                arg_count, self.stack.len()
-            )))?;
+        let args_start =
+            self.stack.len().checked_sub(arg_count).ok_or_else(|| {
+                LugliError::runtime(format!("Stack underflow: method expects {} args but stack has {}", arg_count, self.stack.len()))
+            })?;
         Ok(&self.stack[args_start..])
     }
 
     fn get_constant<'a>(&self, bytecode: &'a Bytecode, index: usize) -> Result<&'a Value, LugliError> {
-        bytecode.constants.get(index)
-            .ok_or_else(|| LugliError::runtime(format!(
-                "Invalid constant index {} (total: {})",
-                index, bytecode.constants.len()
-            )))
+        bytecode
+            .constants
+            .get(index)
+            .ok_or_else(|| LugliError::runtime(format!("Invalid constant index {} (total: {})", index, bytecode.constants.len())))
     }
 
     #[allow(dead_code)]
@@ -167,12 +185,7 @@ impl Machine {
             return None;
         }
 
-        let mut context = lugli_common::SourceContext::new(
-            location.file_path.clone(),
-            location.line,
-            location.column,
-            location.span,
-        );
+        let mut context = lugli_common::SourceContext::new(location.file_path.clone(), location.line, location.column, location.span);
 
         if let Some(ref source_code) = bytecode.source_code {
             let lines: Vec<&str> = source_code.lines().collect();
@@ -187,17 +200,13 @@ impl Machine {
     fn call_string_method(&mut self, method: &str, s: String, arg_count: usize) -> Result<Value, LugliError> {
         let args = self.get_method_args(arg_count)?;
 
-        
-
         match method {
             "len" => Ok(Value::Number(s.len() as f64)),
             "trim" => Ok(Value::String(s.trim().to_string())),
             "lower" => Ok(Value::String(s.to_lowercase())),
             "upper" => Ok(Value::String(s.to_uppercase())),
             "chars" => {
-                let chars: Vec<Value> = s.chars()
-                    .map(|c| Value::String(c.to_string()))
-                    .collect();
+                let chars: Vec<Value> = s.chars().map(|c| Value::String(c.to_string())).collect();
                 Ok(Value::List(Rc::new(RefCell::new(chars))))
             }
             "split" => {
@@ -208,9 +217,7 @@ impl Machine {
                     Value::String(sep) => sep.as_str(),
                     _ => return Err(LugliError::runtime("split separator must be a string")),
                 };
-                let parts: Vec<Value> = s.split(separator)
-                    .map(|part| Value::String(part.to_string()))
-                    .collect();
+                let parts: Vec<Value> = s.split(separator).map(|part| Value::String(part.to_string())).collect();
                 Ok(Value::List(Rc::new(RefCell::new(parts))))
             }
             "is_alphabetic" => Ok(Value::Bool(s.chars().all(|c| c.is_alphabetic()))),
@@ -254,15 +261,11 @@ impl Machine {
                 if arg_count != 1 {
                     return Err(LugliError::runtime("push expects 1 argument"));
                 }
-                list.try_borrow_mut()
-                    .map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?
-                    .push(args[0].clone());
+                list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?.push(args[0].clone());
                 Ok(Value::Null)
             }
             "pop" | "pop!" => {
-                let val = list.try_borrow_mut()
-                    .map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?
-                    .pop();
+                let val = list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?.pop();
                 Ok(val.unwrap_or(Value::Null))
             }
             "join" => {
@@ -274,10 +277,7 @@ impl Machine {
                 } else {
                     ""
                 };
-                let strings: Vec<String> = list.borrow()
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect();
+                let strings: Vec<String> = list.borrow().iter().map(|v| v.to_string()).collect();
                 Ok(Value::String(strings.join(separator)))
             }
             "contains" => {
@@ -289,15 +289,11 @@ impl Machine {
             }
             "is_empty" => Ok(Value::Bool(list.borrow().is_empty())),
             "clear" => {
-                list.try_borrow_mut()
-                    .map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?
-                    .clear();
+                list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?.clear();
                 Ok(Value::Null)
             }
             "reverse" => {
-                list.try_borrow_mut()
-                    .map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?
-                    .reverse();
+                list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?.reverse();
                 Ok(Value::Null)
             }
             "filter" => {
@@ -344,24 +340,41 @@ impl Machine {
         Ok(Value::List(Rc::new(RefCell::new(mapped))))
     }
 
-    fn call_user_function(&mut self, function: &Value, args: &[Value], bytecode: &Bytecode) -> Result<Value, LugliError> {
+    fn call_user_function(&mut self, function: &Value, args: &[Value], _bytecode: &Bytecode) -> Result<Value, LugliError> {
         match function {
-            Value::NativeFunction { callback, arity, .. } => {
+            Value::NativeFunction {
+                callback,
+                arity,
+                ..
+            } => {
                 if args.len() != *arity {
-                    return Err(LugliError::runtime(format!(
-                        "Function expects {} arguments, got {}",
-                        arity, args.len()
-                    )));
+                    return Err(LugliError::runtime(format!("Function expects {} arguments, got {}", arity, args.len())));
                 }
                 callback(args)
             }
-            Value::Function { name, params, body_start } | Value::Closure { name, params, body_start, .. } => {
+            Value::Function {
+                name,
+                params,
+                body_start,
+                bytecode_id,
+            }
+            | Value::Closure {
+                name,
+                params,
+                body_start,
+                bytecode_id,
+                ..
+            } => {
                 if args.len() != params.len() {
-                    return Err(LugliError::runtime(format!(
-                        "Function expects {} arguments, got {}",
-                        params.len(), args.len()
-                    )));
+                    return Err(LugliError::runtime(format!("Function expects {} arguments, got {}", params.len(), args.len())));
                 }
+
+                // Look up the correct bytecode from the registry
+                let function_bytecode = self
+                    .bytecode_registry
+                    .get(bytecode_id)
+                    .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found in registry", bytecode_id)))?
+                    .clone();
 
                 // Save current state for cleanup on error
                 let saved_stack_len = self.stack.len();
@@ -382,8 +395,8 @@ impl Machine {
                 // Jump to function body
                 self.ip = *body_start;
 
-                // Execute function body and handle result/errors
-                let execution_result = self.execute_function_until_return(bytecode, saved_call_stack_len);
+                // Execute function body and handle result/errors - use the correct bytecode!
+                let execution_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
 
                 // Always restore IP, even on error
                 self.ip = saved_ip;
@@ -393,14 +406,10 @@ impl Machine {
                     Ok(()) => {
                         // Function returned successfully, get return value
                         if self.stack.len() > saved_stack_len {
-                            Ok(self.stack.pop()
-                                .expect("BUG: Stack should have return value after len check"))
+                            self.stack.pop().ok_or_else(|| LugliError::runtime("Internal error: Function return value missing from stack"))
                         } else {
                             // Stack underflow - function didn't leave return value
-                            Err(LugliError::runtime(format!(
-                                "Function '{}' returned without value on stack",
-                                name
-                            )))
+                            Err(LugliError::runtime(format!("Function '{}' returned without value on stack", name)))
                         }
                     }
                     Err(e) => {
@@ -426,9 +435,7 @@ impl Machine {
 
             // Bounds check
             if self.ip >= bytecode.instructions.len() {
-                return Err(LugliError::runtime(
-                    "Function execution ran past end of bytecode"
-                ));
+                return Err(LugliError::runtime("Function execution ran past end of bytecode"));
             }
 
             // Execute one instruction
@@ -448,17 +455,11 @@ impl Machine {
         match method {
             "len" => Ok(Value::Number(dict.borrow().len() as f64)),
             "keys" => {
-                let keys: Vec<Value> = dict.borrow()
-                    .keys()
-                    .map(|k| Value::String(k.clone()))
-                    .collect();
+                let keys: Vec<Value> = dict.borrow().keys().map(|k| Value::String(k.clone())).collect();
                 Ok(Value::List(Rc::new(RefCell::new(keys))))
             }
             "values" => {
-                let values: Vec<Value> = dict.borrow()
-                    .values()
-                    .cloned()
-                    .collect();
+                let values: Vec<Value> = dict.borrow().values().cloned().collect();
                 Ok(Value::List(Rc::new(RefCell::new(values))))
             }
             "get" => {
@@ -467,11 +468,7 @@ impl Machine {
                 }
                 match &args[0] {
                     Value::String(key) => {
-                        let default = if arg_count == 2 {
-                            args[1].clone()
-                        } else {
-                            Value::Null
-                        };
+                        let default = if arg_count == 2 { args[1].clone() } else { Value::Null };
                         Ok(dict.borrow().get(key).cloned().unwrap_or(default))
                     }
                     _ => Err(LugliError::runtime("Dictionary key must be a string")),
@@ -482,23 +479,137 @@ impl Machine {
                     return Err(LugliError::runtime("contains expects 1 argument"));
                 }
                 match &args[0] {
-                    Value::String(key) => {
-                        Ok(Value::Bool(dict.borrow().contains_key(key)))
-                    }
+                    Value::String(key) => Ok(Value::Bool(dict.borrow().contains_key(key))),
                     _ => Err(LugliError::runtime("Dictionary key must be a string")),
                 }
             }
             "clear" => {
-                dict.try_borrow_mut()
-                    .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
-                    .clear();
+                dict.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?.clear();
                 Ok(Value::Null)
             }
             _ => Err(LugliError::runtime(format!("Dict has no method '{}'", method))),
         }
     }
 
+    fn load_module(&mut self, module_path: &str) -> Result<HashMap<String, Value>, LugliError> {
+        let resolved_path = self.module_resolver.resolve(module_path, self.current_file.as_deref())?;
+
+        // Prevent self-import
+        if let Some(ref current) = self.current_file {
+            if resolved_path == *current {
+                return Err(LugliError::runtime(format!("Module cannot import itself: '{}'", resolved_path.display())));
+            }
+        }
+
+        if self.module_cache.is_loading(&resolved_path) {
+            return Err(LugliError::runtime(format!("Circular import detected: module '{}' is already being loaded", resolved_path.display())));
+        }
+
+        if let Some(cached_module) = self.module_cache.get(&resolved_path) {
+            return Ok(cached_module.exports.clone());
+        }
+
+        self.module_cache.mark_loading(resolved_path.clone());
+
+        let source = std::fs::read_to_string(&resolved_path)
+            .map_err(|e| LugliError::runtime(format!("Failed to read module '{}': {}", resolved_path.display(), e)))?;
+
+        let mut parser = lugli_parser::Parser::new(&source)
+            .map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
+        let ast = parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
+
+        let mut compiler = crate::Compiler::new();
+        let module_bytecode =
+            compiler.compile(&ast).map_err(|e| LugliError::runtime(format!("Compile error in module '{}': {}", resolved_path.display(), e)))?;
+
+        // Assign and register bytecode ID for this module
+        let module_bytecode_id = self.next_bytecode_id;
+        self.next_bytecode_id += 1;
+        self.bytecode_registry.insert(module_bytecode_id, Rc::new(module_bytecode.clone()));
+
+        let saved_globals = self.globals.clone();
+        let saved_file = self.current_file.clone();
+        let saved_stack_len = self.stack.len();
+        let saved_ip = self.ip;
+        let saved_call_stack = self.call_stack.clone();
+
+        self.globals = HashMap::new();
+        for (name, func) in get_global_functions() {
+            self.globals.insert(
+                name.to_string(),
+                Value::NativeFunction {
+                    name: name.to_string(),
+                    callback: func,
+                    arity: 0,
+                },
+            );
+        }
+        self.current_file = Some(resolved_path.clone());
+
+        // Execute module bytecode directly without calling run() to avoid overwriting bytecode ID
+        // 0
+        self.ip = 0;
+        let mut result = Ok(());
+        while self.ip < module_bytecode.instructions.len() {
+            let instruction = &module_bytecode.instructions[self.ip];
+            match self.execute_instruction(instruction, &module_bytecode) {
+                Ok(should_continue) => {
+                    if !should_continue {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    result = Err(e);
+                    break;
+                }
+            }
+        }
+
+        result?;
+
+        let mut module_exports = self.globals.clone();
+
+        // Update all functions in exports to have correct bytecode_id
+        for (_, value) in module_exports.iter_mut() {
+            match value {
+                Value::Function {
+                    bytecode_id, ..
+                } => {
+                    *bytecode_id = module_bytecode_id;
+                }
+                Value::Closure {
+                    bytecode_id, ..
+                } => {
+                    *bytecode_id = module_bytecode_id;
+                }
+                _ => {}
+            }
+        }
+
+        self.globals = saved_globals;
+        self.current_file = saved_file;
+        self.stack.truncate(saved_stack_len);
+        self.ip = saved_ip;
+        self.call_stack = saved_call_stack;
+
+        self.module_cache.unmark_loading(&resolved_path);
+
+        let module = crate::module::Module {
+            path: resolved_path.clone(),
+            bytecode: module_bytecode,
+            exports: module_exports.clone(),
+        };
+
+        self.module_cache.insert(resolved_path, module);
+
+        Ok(module_exports)
+    }
+
     pub fn run(&mut self, bytecode: &Bytecode) -> Result<Value, LugliError> {
+        // Register main bytecode with ID 0
+        let bytecode_rc = Rc::new(bytecode.clone());
+        self.bytecode_registry.insert(0, bytecode_rc.clone());
+
         self.ip = 0;
         while self.ip < bytecode.instructions.len() {
             let instruction = &bytecode.instructions[self.ip];
@@ -523,17 +634,11 @@ impl Machine {
     fn execute_instruction(&mut self, instruction: &Instruction, bytecode: &Bytecode) -> Result<bool, LugliError> {
         // Stack overflow protection
         if self.stack.len() > MAX_STACK_SIZE {
-            return Err(LugliError::runtime(format!(
-                "Stack overflow: exceeded maximum stack size of {} values",
-                MAX_STACK_SIZE
-            )));
+            return Err(LugliError::runtime(format!("Stack overflow: exceeded maximum stack size of {} values", MAX_STACK_SIZE)));
         }
 
         if self.call_stack.len() > MAX_CALL_DEPTH {
-            return Err(LugliError::runtime(format!(
-                "Maximum recursion depth exceeded: {} nested calls",
-                MAX_CALL_DEPTH
-            )));
+            return Err(LugliError::runtime(format!("Maximum recursion depth exceeded: {} nested calls", MAX_CALL_DEPTH)));
         }
 
         // Debug tracing
@@ -546,11 +651,7 @@ impl Machine {
             eprintln!("[STACK] depth:{} top:{:?}", self.stack.len(), self.stack.last());
         }
 
-        let inst_start = if self.debug.trace_execution {
-            Some(Instant::now())
-        } else {
-            None
-        };
+        let inst_start = if self.debug.trace_execution { Some(Instant::now()) } else { None };
 
         match instruction {
             Instruction::Constant(index) => {
@@ -672,54 +773,125 @@ impl Machine {
 
                 if self.debug.trace_calls {
                     let func_name = match &callee {
-                        Value::NativeFunction { name, .. } => format!("<native:{}>", name),
-                        Value::Function { name, .. } | Value::Closure { name, .. } => name.clone(),
+                        Value::NativeFunction {
+                            name, ..
+                        } => format!("<native:{}>", name),
+                        Value::Function {
+                            name, ..
+                        }
+                        | Value::Closure {
+                            name, ..
+                        } => name.clone(),
                         _ => "<unknown>".to_string(),
                     };
                     eprintln!("[CALL] {} with {} arguments", func_name, arg_count);
                 }
 
                 match callee {
-                    Value::NativeFunction { name, callback, .. } => {
+                    Value::NativeFunction {
+                        name,
+                        callback,
+                        ..
+                    } => {
                         if self.debug.trace_calls {
                             eprintln!("[CALL] Executing native function: {}", name);
                         }
                         let args_start_index = self.stack.len() - arg_count - 1;
                         let args_end_index = self.stack.len() - 1;
-                        let args = &self.stack[args_start_index..args_end_index];
+                        let args = self.stack.get(args_start_index..args_end_index).ok_or_else(|| {
+                            LugliError::runtime(format!(
+                                "Stack corruption: invalid argument range [{}, {}) for function '{}'",
+                                args_start_index, args_end_index, name
+                            ))
+                        })?;
                         let result = callback(args)?;
                         self.stack.truncate(self.stack.len() - arg_count - 1); // Pop args and function
                         self.stack.push(result);
                     }
-                    Value::Function { name, params, body_start } => {
+                    Value::Function {
+                        name,
+                        params,
+                        body_start,
+                        bytecode_id,
+                    } => {
                         let arity = params.len();
                         if arg_count != arity {
-                            return Err(LugliError::runtime(format!(
-                                "Function expects {} arguments, got {}",
-                                arity, arg_count
-                            )));
+                            return Err(LugliError::runtime(format!("Function expects {} arguments, got {}", arity, arg_count)));
                         }
-                        // The new frame starts where the callee is, which is `len - arg_count - 1`
-                        let stack_base = self.stack.len() - arg_count - 1;
-                        let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base);
-                        self.call_stack.push(frame);
-                        self.ip = body_start;
-                        return Ok(true);
+
+                        // Check if this is a cross-bytecode call (module function)
+                        if bytecode_id != 0 {
+                            // Cross-bytecode call - need to execute in function's bytecode
+                            let function_bytecode = self
+                                .bytecode_registry
+                                .get(&bytecode_id)
+                                .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
+                                .clone();
+
+                            let saved_call_stack_len = self.call_stack.len();
+                            let stack_base = self.stack.len() - arg_count - 1;
+                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base);
+                            self.call_stack.push(frame);
+
+                            let saved_ip = self.ip;
+                            self.ip = body_start;
+
+                            let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
+                            self.ip = saved_ip + 1; // Move past Call instruction
+                            exec_result?;
+
+                            // Return value is now on stack
+                        } else {
+                            // Same-bytecode call - normal path
+                            let stack_base = self.stack.len() - arg_count - 1;
+                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base);
+                            self.call_stack.push(frame);
+                            self.ip = body_start;
+                            return Ok(true);
+                        }
                     }
-                    Value::Closure { name, params, body_start, upvalues } => {
+                    Value::Closure {
+                        name,
+                        params,
+                        body_start,
+                        bytecode_id,
+                        upvalues,
+                    } => {
                         let arity = params.len();
                         if arg_count != arity {
-                            return Err(LugliError::runtime(format!(
-                                "Closure expects {} arguments, got {}",
-                                arity, arg_count
-                            )));
+                            return Err(LugliError::runtime(format!("Closure expects {} arguments, got {}", arity, arg_count)));
                         }
-                        // The new frame starts where the callee is, which is `len - arg_count - 1`
-                        let stack_base = self.stack.len() - arg_count - 1;
-                        let frame = CallFrame::new_closure(name.clone(), self.ip + 1, stack_base, upvalues.clone());
-                        self.call_stack.push(frame);
-                        self.ip = body_start;
-                        return Ok(true);
+
+                        // Check if this is a cross-bytecode call (module closure)
+                        if bytecode_id != 0 {
+                            // Cross-bytecode call - need to execute in closure's bytecode
+                            let function_bytecode = self
+                                .bytecode_registry
+                                .get(&bytecode_id)
+                                .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
+                                .clone();
+
+                            let saved_call_stack_len = self.call_stack.len();
+                            let stack_base = self.stack.len() - arg_count - 1;
+                            let frame = CallFrame::new_closure(name.clone(), self.ip + 1, stack_base, upvalues.clone());
+                            self.call_stack.push(frame);
+
+                            let saved_ip = self.ip;
+                            self.ip = body_start;
+
+                            let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
+                            self.ip = saved_ip + 1; // Move past Call instruction
+                            exec_result?;
+
+                            // Return value is now on stack
+                        } else {
+                            // Same-bytecode call - normal path
+                            let stack_base = self.stack.len() - arg_count - 1;
+                            let frame = CallFrame::new_closure(name.clone(), self.ip + 1, stack_base, upvalues.clone());
+                            self.call_stack.push(frame);
+                            self.ip = body_start;
+                            return Ok(true);
+                        }
                     }
                     _ => {
                         return Err(LugliError::runtime(format!("Not callable: {}", callee.type_name())));
@@ -727,8 +899,7 @@ impl Machine {
                 }
             }
             Instruction::Return => {
-                let frame = self.call_stack.pop()
-                    .ok_or_else(|| LugliError::runtime("Call stack underflow"))?;
+                let frame = self.call_stack.pop().ok_or_else(|| LugliError::runtime("Call stack underflow"))?;
                 let return_value = self.pop().unwrap_or(Value::Null);
 
                 if self.call_stack.is_empty() {
@@ -742,21 +913,25 @@ impl Machine {
                 return Ok(true);
             }
             Instruction::Load(index) => {
-                let frame = self.call_stack.last()
-                    .ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
+                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
                 let target_index = frame.stack_base + index;
-                let value = self.stack.get(target_index)
-                    .ok_or_else(|| LugliError::runtime(format!(
-                        "Stack underflow: attempted to load local {} at index {} (stack size: {})",
-                        index, target_index, self.stack.len()
-                    )))?
+                let value = self
+                    .stack
+                    .get(target_index)
+                    .ok_or_else(|| {
+                        LugliError::runtime(format!(
+                            "Stack underflow: attempted to load local {} at index {} (stack size: {})",
+                            index,
+                            target_index,
+                            self.stack.len()
+                        ))
+                    })?
                     .clone();
                 self.stack.push(value);
             }
             Instruction::Store(index) => {
                 let value = self.pop()?;
-                let frame = self.call_stack.last()
-                    .ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
+                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
                 let target_index = frame.stack_base + index;
 
                 // Grow stack if necessary
@@ -767,15 +942,14 @@ impl Machine {
                 self.stack[target_index] = value;
             }
             Instruction::LoadUpvalue(index) => {
-                let frame = self.call_stack.last()
-                    .ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
+                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
 
                 if let Some(upvalues) = &frame.closure_upvalues {
-                    let upvalue = upvalues.borrow().get(*index).cloned()
-                        .ok_or_else(|| LugliError::runtime(format!(
-                            "Upvalue index {} out of bounds (have {} upvalues)",
-                            index, upvalues.borrow().len()
-                        )))?;
+                    let upvalues_ref =
+                        upvalues.try_borrow().map_err(|_| LugliError::runtime("Cannot access closure upvalues while they're being modified"))?;
+                    let upvalue = upvalues_ref.get(*index).cloned().ok_or_else(|| {
+                        LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues_ref.len()))
+                    })?;
                     self.stack.push(upvalue);
                 } else {
                     return Err(LugliError::runtime("LoadUpvalue used in non-closure context"));
@@ -783,17 +957,13 @@ impl Machine {
             }
             Instruction::StoreUpvalue(index) => {
                 let value = self.pop()?;
-                let frame = self.call_stack.last()
-                    .ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
+                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
 
                 if let Some(upvalues) = &frame.closure_upvalues {
-                    let mut upvalues_mut = upvalues.try_borrow_mut()
-                        .map_err(|_| LugliError::runtime("Cannot modify closure upvalues while they're being used"))?;
+                    let mut upvalues_mut =
+                        upvalues.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify closure upvalues while they're being used"))?;
                     if *index >= upvalues_mut.len() {
-                        return Err(LugliError::runtime(format!(
-                            "Upvalue index {} out of bounds (have {} upvalues)",
-                            index, upvalues_mut.len()
-                        )));
+                        return Err(LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues_mut.len())));
                     }
                     upvalues_mut[*index] = value;
                 } else {
@@ -832,15 +1002,27 @@ impl Machine {
                 let object = self.pop()?;
                 let prop_name = self.get_constant(bytecode, *name_index)?;
                 if let Value::String(name) = prop_name {
-                    if let Value::Dict(dict_ref) = object {
-                        let dict = dict_ref.borrow();
-                        if let Some(value) = dict.get(name) {
-                            self.stack.push(value.clone());
-                        } else {
-                            self.stack.push(Value::Null);
+                    match object {
+                        Value::Dict(dict_ref) => {
+                            let dict = dict_ref.borrow();
+                            if let Some(value) = dict.get(name) {
+                                self.stack.push(value.clone());
+                            } else {
+                                self.stack.push(Value::Null);
+                            }
                         }
-                    } else {
-                        return Err(LugliError::runtime(format!("Cannot access property '{}' on a value of type {}", name, object.type_name())));
+                        Value::Module {
+                            exports, ..
+                        } => {
+                            if let Some(value) = exports.get(name) {
+                                self.stack.push(value.clone());
+                            } else {
+                                return Err(LugliError::runtime(format!("Module has no export '{}'", name)));
+                            }
+                        }
+                        _ => {
+                            return Err(LugliError::runtime(format!("Cannot access property '{}' on a value of type {}", name, object.type_name())));
+                        }
                     }
                 } else {
                     return Err(LugliError::runtime("Property name must be a string"));
@@ -853,7 +1035,8 @@ impl Machine {
 
                 if let Value::String(name) = prop_name {
                     if let Value::Dict(dict_ref) = &object {
-                        dict_ref.try_borrow_mut()
+                        dict_ref
+                            .try_borrow_mut()
                             .map_err(|_| LugliError::runtime("Cannot modify struct while it's being used"))?
                             .insert(name.clone(), value.clone());
                         // Push the value back as the expression result
@@ -864,7 +1047,7 @@ impl Machine {
                 } else {
                     return Err(LugliError::runtime("Property name must be a string"));
                 }
-            },
+            }
             Instruction::MakeList(count) => {
                 let mut list = Vec::with_capacity(*count);
                 for _ in 0..*count {
@@ -911,25 +1094,37 @@ impl Machine {
                 let function_value = self.get_constant(bytecode, *function_index)?.clone();
                 self.stack.push(function_value);
             }
-            Instruction::MakeClosure { function_index, capture_indices } => {
+            Instruction::MakeClosure {
+                function_index,
+                capture_indices,
+            } => {
                 // Get the base function template
                 let function_value = self.get_constant(bytecode, *function_index)?;
 
-                if let Value::Function { name, params, body_start } = function_value {
+                if let Value::Function {
+                    name,
+                    params,
+                    body_start,
+                    bytecode_id,
+                } = function_value
+                {
                     // Get current stack frame to calculate absolute positions
-                    let frame = self.call_stack.last()
-                        .ok_or_else(|| LugliError::runtime("Call stack is empty during closure creation"))?;
+                    let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty during closure creation"))?;
 
                     // Capture values from the stack based on local indices
                     // Convert local indices to absolute stack positions
-                    let upvalues: Vec<Value> = capture_indices.iter()
+                    let upvalues: Vec<Value> = capture_indices
+                        .iter()
                         .map(|&local_index| {
                             let absolute_index = frame.stack_base + local_index;
-                            self.stack.get(absolute_index).cloned()
-                                .ok_or_else(|| LugliError::runtime(format!(
+                            self.stack.get(absolute_index).cloned().ok_or_else(|| {
+                                LugliError::runtime(format!(
                                     "Invalid upvalue capture: local {} (absolute {}) out of bounds (stack size: {})",
-                                    local_index, absolute_index, self.stack.len()
-                                )))
+                                    local_index,
+                                    absolute_index,
+                                    self.stack.len()
+                                ))
+                            })
                         })
                         .collect::<Result<Vec<_>, _>>()?;
 
@@ -938,6 +1133,7 @@ impl Machine {
                         name: name.clone(),
                         params: params.clone(),
                         body_start: *body_start,
+                        bytecode_id: *bytecode_id,
                         upvalues: Rc::new(RefCell::new(upvalues)),
                     };
 
@@ -963,7 +1159,81 @@ impl Machine {
                     if let Some(Value::String(struct_type)) = dict_ref.get("__struct_type__") {
                         // Clone the struct type name before dropping the borrow
                         let struct_type = struct_type.clone();
+
+                        // Check if the property is a function field
+                        let field_func = dict_ref.get(&method_name).cloned();
                         drop(dict_ref); // Release the borrow before method call
+
+                        // If the field exists and is a function, call it (property call)
+                        if let Some(func) = field_func {
+                            match &func {
+                                Value::Function {
+                                    params,
+                                    body_start,
+                                    bytecode_id,
+                                    ..
+                                }
+                                | Value::Closure {
+                                    params,
+                                    body_start,
+                                    bytecode_id,
+                                    ..
+                                } => {
+                                    // Check arity
+                                    let arity = params.len();
+                                    if arg_count != arity {
+                                        return Err(LugliError::runtime(format!("Function expects {} arguments, got {}", arity, arg_count)));
+                                    }
+
+                                    // For property function calls, we don't pass self
+                                    // Collect arguments, remove object+args from stack, push just args
+                                    let args_start = self.stack.len() - arg_count;
+                                    let args: Vec<Value> = self.stack.drain(args_start..).collect();
+
+                                    // Remove the object from the stack
+                                    self.stack.pop();
+
+                                    // Push arguments back
+                                    for arg in args {
+                                        self.stack.push(arg);
+                                    }
+
+                                    // Now set up the call frame
+                                    if *bytecode_id != 0 {
+                                        // Cross-bytecode call
+                                        let function_bytecode = self
+                                            .bytecode_registry
+                                            .get(bytecode_id)
+                                            .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
+                                            .clone();
+
+                                        let saved_call_stack_len = self.call_stack.len();
+                                        let stack_base = self.stack.len() - arg_count;
+                                        let frame = CallFrame::new("".to_string(), self.ip + 1, stack_base);
+                                        self.call_stack.push(frame);
+
+                                        let saved_ip = self.ip;
+                                        self.ip = *body_start;
+
+                                        let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
+                                        self.ip = saved_ip + 1;
+                                        exec_result?;
+                                        return Ok(false);
+                                    } else {
+                                        // Same-bytecode call
+                                        let stack_base = self.stack.len() - arg_count;
+                                        let frame = CallFrame::new("".to_string(), self.ip + 1, stack_base);
+                                        self.call_stack.push(frame);
+                                        self.ip = *body_start;
+                                        return Ok(true);
+                                    }
+                                }
+                                _ => {
+                                    // Not a function, fall through to check for struct
+                                    // methods
+                                }
+                            }
+                        }
 
                         // This is a struct instance - look up the method as StructType_methodName
                         let struct_method_name = format!("{}_{}", struct_type, method_name);
@@ -971,13 +1241,25 @@ impl Machine {
                         // Look up the global function
                         if let Some(func) = self.globals.get(&struct_method_name) {
                             match func {
-                                Value::Function { name, params, body_start } | Value::Closure { name, params, body_start, .. } => {
+                                Value::Function {
+                                    name,
+                                    params,
+                                    body_start,
+                                    ..
+                                }
+                                | Value::Closure {
+                                    name,
+                                    params,
+                                    body_start,
+                                    ..
+                                } => {
                                     // Check arity - should be args + 1 for self parameter
                                     let arity = params.len();
                                     if arg_count + 1 != arity {
                                         return Err(LugliError::runtime(format!(
                                             "Method expects {} arguments (including self), got {}",
-                                            arity, arg_count + 1
+                                            arity,
+                                            arg_count + 1
                                         )));
                                     }
 
@@ -988,10 +1270,14 @@ impl Machine {
                                     self.ip = *body_start;
                                     return Ok(true); // Function call will handle stack management
                                 }
-                                Value::NativeFunction { callback, .. } => {
+                                Value::NativeFunction {
+                                    callback, ..
+                                } => {
                                     // For native functions, collect args including self
                                     let args_start = self.stack.len() - arg_count - 1;
-                                    let args = &self.stack[args_start..];
+                                    let args = self.stack.get(args_start..).ok_or_else(|| {
+                                        LugliError::runtime(format!("Stack corruption: invalid argument start index {} for method call", args_start))
+                                    })?;
                                     let result = callback(args)?;
 
                                     // Pop arguments and object, push result
@@ -1004,60 +1290,65 @@ impl Machine {
                                 }
                             }
                         } else {
-                            return Err(LugliError::runtime(format!(
-                                "Struct '{}' has no method '{}'",
-                                struct_type,
-                                method_name
-                            )));
+                            return Err(LugliError::runtime(format!("Struct '{}' has no method or property '{}'", struct_type, method_name)));
                         }
                     }
                 }
 
                 // Special handling for higher-order list methods that need bytecode access
                 if let Value::List(l) = object
-                    && (method_name == "filter" || method_name == "map" || method_name == "map!") && arg_count == 1 {
-                        // Save current IP to restore after function calls
-                        let callmethod_ip = self.ip;
+                    && (method_name == "filter" || method_name == "map" || method_name == "map!")
+                    && arg_count == 1
+                {
+                    // Save current IP to restore after function calls
+                    let callmethod_ip = self.ip;
 
-                        let args_start = self.stack.len() - arg_count;
-                        let function = self.stack[args_start].clone();
+                    let args_start = self.stack.len() - arg_count;
+                    let function = self.stack[args_start].clone();
 
-                        let result_list = if method_name == "filter" {
-                            self.list_filter(l.clone(), &function, bytecode)?
-                        } else {
-                            self.list_map(l.clone(), &function, bytecode)?
-                        };
+                    let result_list = if method_name == "filter" {
+                        self.list_filter(l.clone(), &function, bytecode)?
+                    } else {
+                        self.list_map(l.clone(), &function, bytecode)?
+                    };
 
-                        // Pop arguments and object, push result
-                        self.stack.truncate(object_index);
-                        self.stack.push(result_list);
+                    // Pop arguments and object, push result
+                    self.stack.truncate(object_index);
+                    self.stack.push(result_list);
 
-                        // Set IP to continue after this CallMethod instruction
-                        // The main loop will increment IP, so we don't need to add 1
-                        self.ip = callmethod_ip + 1;
+                    // Set IP to continue after this CallMethod instruction
+                    // The main loop will increment IP, so we don't need to add 1
+                    self.ip = callmethod_ip + 1;
 
-                        // Return false to indicate we handled IP advancement
-                        return Ok(false);
-                    }
+                    // Return false to indicate we handled IP advancement
+                    return Ok(false);
+                }
 
                 // Dispatch based on object type for built-in types
                 let result = match object {
-                    Value::String(s) => {
-                        self.call_string_method(&method_name, s.clone(), arg_count)?
-                    }
-                    Value::List(l) => {
-                        self.call_list_method(&method_name, l.clone(), arg_count)?
-                    }
+                    Value::String(s) => self.call_string_method(&method_name, s.clone(), arg_count)?,
+                    Value::List(l) => self.call_list_method(&method_name, l.clone(), arg_count)?,
                     Value::Dict(d) => {
                         // Regular dict method call (not a struct)
                         self.call_dict_method(&method_name, d.clone(), arg_count)?
                     }
+                    Value::Module {
+                        exports, ..
+                    } => {
+                        // Module "method call" is actually accessing an exported function
+                        // Clone the function to avoid borrow checker issues
+                        let function =
+                            exports.get(&method_name).ok_or_else(|| LugliError::runtime(format!("Module has no export '{}'", method_name)))?.clone();
+
+                        // Get the arguments from stack
+                        let args_start = self.stack.len() - arg_count;
+                        let args: Vec<Value> = self.stack[args_start..].to_vec();
+
+                        // Call the function
+                        self.call_user_function(&function, &args, bytecode)?
+                    }
                     _ => {
-                        return Err(LugliError::runtime(format!(
-                            "Object of type {} has no method '{}'",
-                            object.type_name(),
-                            method_name
-                        )));
+                        return Err(LugliError::runtime(format!("Object of type {} has no method '{}'", object.type_name(), method_name)));
                     }
                 };
 
@@ -1071,6 +1362,14 @@ impl Machine {
 
                 match (&object, &index) {
                     (Value::List(list), Value::Number(idx)) => {
+                        // Validate index is finite and in valid range
+                        if !idx.is_finite() {
+                            return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+                        }
+                        if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
+                            return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
+                        }
+
                         let list_ref = list.borrow();
                         let len = list_ref.len() as i64;
                         let idx_i64 = *idx as i64;
@@ -1086,10 +1385,7 @@ impl Machine {
                             positive_offset as usize
                         } else {
                             if idx_i64 >= len {
-                                return Err(LugliError::runtime(format!(
-                                    "Index {} out of range for list of length {}",
-                                    idx_i64, len
-                                )));
+                                return Err(LugliError::runtime(format!("Index {} out of range for list of length {}", idx_i64, len)));
                             }
                             idx_i64 as usize
                         };
@@ -1105,6 +1401,14 @@ impl Machine {
                         }
                     }
                     (Value::String(s), Value::Number(idx)) => {
+                        // Validate index is finite and in valid range
+                        if !idx.is_finite() {
+                            return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+                        }
+                        if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
+                            return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
+                        }
+
                         let chars: Vec<char> = s.chars().collect();
                         let len = chars.len() as i64;
                         let idx_i64 = *idx as i64;
@@ -1120,10 +1424,7 @@ impl Machine {
                             positive_offset as usize
                         } else {
                             if idx_i64 >= len {
-                                return Err(LugliError::runtime(format!(
-                                    "Index {} out of range for string of length {}",
-                                    idx_i64, len
-                                )));
+                                return Err(LugliError::runtime(format!("Index {} out of range for string of length {}", idx_i64, len)));
                             }
                             idx_i64 as usize
                         };
@@ -1131,11 +1432,7 @@ impl Machine {
                         self.stack.push(Value::String(chars[actual_idx].to_string()));
                     }
                     _ => {
-                        return Err(LugliError::runtime(format!(
-                            "Cannot index {} with {}",
-                            object.type_name(),
-                            index.type_name()
-                        )));
+                        return Err(LugliError::runtime(format!("Cannot index {} with {}", object.type_name(), index.type_name())));
                     }
                 }
             }
@@ -1146,8 +1443,15 @@ impl Machine {
 
                 match (&object, &index) {
                     (Value::List(list), Value::Number(idx)) => {
-                        let mut list_ref = list.try_borrow_mut()
-                            .map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?;
+                        // Validate index is finite and in valid range
+                        if !idx.is_finite() {
+                            return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+                        }
+                        if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
+                            return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
+                        }
+
+                        let mut list_ref = list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?;
                         let len = list_ref.len() as i64;
                         let idx_i64 = *idx as i64;
 
@@ -1162,10 +1466,7 @@ impl Machine {
                             positive_offset as usize
                         } else {
                             if idx_i64 >= len {
-                                return Err(LugliError::runtime(format!(
-                                    "Index {} out of range for list assignment (length {})",
-                                    idx_i64, len
-                                )));
+                                return Err(LugliError::runtime(format!("Index {} out of range for list assignment (length {})", idx_i64, len)));
                             }
                             idx_i64 as usize
                         };
@@ -1180,11 +1481,7 @@ impl Machine {
                         self.stack.push(value); // Return the assigned value
                     }
                     _ => {
-                        return Err(LugliError::runtime(format!(
-                            "Cannot set index on {} with {}",
-                            object.type_name(),
-                            index.type_name()
-                        )));
+                        return Err(LugliError::runtime(format!("Cannot set index on {} with {}", object.type_name(), index.type_name())));
                     }
                 }
             }
@@ -1196,11 +1493,7 @@ impl Machine {
                         if n.is_nan() {
                             "NaN".to_string()
                         } else if n.is_infinite() {
-                            if n.is_sign_positive() {
-                                "Infinity".to_string()
-                            } else {
-                                "-Infinity".to_string()
-                            }
+                            if n.is_sign_positive() { "Infinity".to_string() } else { "-Infinity".to_string() }
                         } else if n.fract() == 0.0 && n.abs() < 1e15 {
                             // Format as integer if whole number and not too large
                             format!("{:.0}", n)
@@ -1212,7 +1505,8 @@ impl Machine {
                     Value::Null => "null".to_string(),
                     Value::List(list) => {
                         let list_ref = list.borrow();
-                        let elements: Vec<String> = list_ref.iter()
+                        let elements: Vec<String> = list_ref
+                            .iter()
                             .map(|v| match v {
                                 Value::String(s) => format!("\"{}\"", s),
                                 _ => v.to_string(),
@@ -1222,7 +1516,8 @@ impl Machine {
                     }
                     Value::Dict(dict) => {
                         let dict_ref = dict.borrow();
-                        let pairs: Vec<String> = dict_ref.iter()
+                        let pairs: Vec<String> = dict_ref
+                            .iter()
                             .map(|(k, v)| match v {
                                 Value::String(s) => format!("\"{}\": \"{}\"", k, s),
                                 _ => format!("\"{}\": {}", k, v),
@@ -1230,12 +1525,61 @@ impl Machine {
                             .collect();
                         format!("{{{}}}", pairs.join(", "))
                     }
-                    Value::Function { name, .. } | Value::Closure { name, .. } => format!("<function {}>", name),
-                    Value::NativeFunction { name, .. } => format!("<native function {}>", name),
-                    Value::StructInstance { name, .. } => format!("<{} instance>", name),
+                    Value::Function {
+                        name, ..
+                    }
+                    | Value::Closure {
+                        name, ..
+                    } => format!("<function {}>", name),
+                    Value::NativeFunction {
+                        name, ..
+                    } => format!("<native function {}>", name),
+                    Value::StructInstance {
+                        name, ..
+                    } => format!("<{} instance>", name),
                     Value::DateTime(dt) => dt.to_string(),
+                    Value::Module {
+                        path, ..
+                    } => format!("<module {}>", path),
                 };
                 self.stack.push(Value::String(string_value));
+            }
+            Instruction::ImportModule {
+                module_idx,
+                bind_name,
+            } => {
+                let module_path = match &bytecode.constants[*module_idx] {
+                    Value::String(s) => s.clone(),
+                    _ => return Err(LugliError::runtime("ImportModule: expected string constant")),
+                };
+
+                let exports = self.load_module(&module_path)?;
+
+                let module_value = Value::Module {
+                    path: module_path.clone(),
+                    exports,
+                };
+
+                // Store directly in globals - no stack effect
+                self.globals.insert(bind_name.clone(), module_value);
+            }
+            Instruction::ImportFrom {
+                module_idx,
+                names,
+            } => {
+                let module_path = match &bytecode.constants[*module_idx] {
+                    Value::String(s) => s.clone(),
+                    _ => return Err(LugliError::runtime("ImportFrom: expected string constant")),
+                };
+
+                let exports = self.load_module(&module_path)?;
+
+                for name in names {
+                    let value =
+                        exports.get(name).ok_or_else(|| LugliError::runtime(format!("Module '{}' does not export '{}'", module_path, name)))?.clone();
+
+                    self.globals.insert(name.clone(), value);
+                }
             }
         };
 
@@ -1253,7 +1597,5 @@ impl Machine {
 }
 
 impl Default for Machine {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }

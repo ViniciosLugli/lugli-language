@@ -1,0 +1,17 @@
+# Hello World - The simplest Lugli program
+
+# Variables and f-strings
+let name = "Lugli"
+let version = "0.3.0"
+
+# F-string interpolation (NEW in v0.3.0!)
+print(f"Hello from {name} v{version}!")
+
+# Basic arithmetic
+let x = 10
+let y = 20
+print(f"{x} + {y} = {x + y}")
+
+# Strings
+let greeting = "Welcome to " + name
+print(greeting)

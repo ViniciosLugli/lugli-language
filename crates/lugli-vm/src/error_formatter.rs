@@ -1,5 +1,5 @@
 use colored::*;
-use lugli_common::{LugliError, SourceContext, ErrorCode};
+use lugli_common::{ErrorCode, LugliError, SourceContext};
 
 pub struct ErrorFormatter {
     use_colors: bool,
@@ -7,11 +7,15 @@ pub struct ErrorFormatter {
 
 impl ErrorFormatter {
     pub fn new() -> Self {
-        Self { use_colors: true }
+        Self {
+            use_colors: true,
+        }
     }
 
     pub fn without_colors() -> Self {
-        Self { use_colors: false }
+        Self {
+            use_colors: false,
+        }
     }
 
     pub fn format(&self, error: &LugliError) -> String {
@@ -19,7 +23,14 @@ impl ErrorFormatter {
 
         match error {
             LugliError::Runtime(data) => {
-                self.format_runtime_error(&mut output, &data.message, data.code, data.context.as_ref(), data.suggestion.as_deref(), &data.stack_trace);
+                self.format_runtime_error(
+                    &mut output,
+                    &data.message,
+                    data.code,
+                    data.context.as_ref(),
+                    data.suggestion.as_deref(),
+                    &data.stack_trace,
+                );
             }
             LugliError::Type(data) => {
                 self.format_type_error(&mut output, &data.expected, &data.found, data.code, data.context.as_ref());
@@ -27,10 +38,16 @@ impl ErrorFormatter {
             LugliError::UndefinedVariable(data) => {
                 self.format_undefined_variable(&mut output, &data.name, data.context.as_ref(), data.suggestion.as_deref());
             }
-            LugliError::DivisionByZero { context } => {
+            LugliError::DivisionByZero {
+                context,
+            } => {
                 self.format_division_by_zero(&mut output, context.as_ref());
             }
-            LugliError::IndexOutOfBounds { index, length, context } => {
+            LugliError::IndexOutOfBounds {
+                index,
+                length,
+                context,
+            } => {
                 self.format_index_error(&mut output, *index, *length, context.as_ref());
             }
             _ => {
@@ -48,15 +65,10 @@ impl ErrorFormatter {
         code: ErrorCode,
         context: Option<&SourceContext>,
         suggestion: Option<&str>,
-        stack_trace: &str
+        stack_trace: &str,
     ) {
         let header = if self.use_colors {
-            format!("{} [{}]: {}: {}",
-                "Error".red().bold(),
-                code.as_str().yellow(),
-                "Runtime Error".red(),
-                message
-            )
+            format!("{} [{}]: {}: {}", "Error".red().bold(), code.as_str().yellow(), "Runtime Error".red(), message)
         } else {
             format!("Error [{}]: Runtime Error: {}", code.as_str(), message)
         };
@@ -83,16 +95,10 @@ impl ErrorFormatter {
         }
     }
 
-    fn format_type_error(
-        &self,
-        output: &mut String,
-        expected: &str,
-        found: &str,
-        code: ErrorCode,
-        context: Option<&SourceContext>
-    ) {
+    fn format_type_error(&self, output: &mut String, expected: &str, found: &str, code: ErrorCode, context: Option<&SourceContext>) {
         let header = if self.use_colors {
-            format!("{} [{}]: {}: expected {}, found {}",
+            format!(
+                "{} [{}]: {}: expected {}, found {}",
                 "Error".red().bold(),
                 code.as_str().yellow(),
                 "Type Error".red(),
@@ -111,20 +117,9 @@ impl ErrorFormatter {
         }
     }
 
-    fn format_undefined_variable(
-        &self,
-        output: &mut String,
-        name: &str,
-        context: Option<&SourceContext>,
-        suggestion: Option<&str>
-    ) {
+    fn format_undefined_variable(&self, output: &mut String, name: &str, context: Option<&SourceContext>, suggestion: Option<&str>) {
         let header = if self.use_colors {
-            format!("{} [{}]: {}: Undefined variable '{}'",
-                "Error".red().bold(),
-                "E003".yellow(),
-                "Runtime Error".red(),
-                name.cyan()
-            )
+            format!("{} [{}]: {}: Undefined variable '{}'", "Error".red().bold(), "E003".yellow(), "Runtime Error".red(), name.cyan())
         } else {
             format!("Error [E003]: Runtime Error: Undefined variable '{}'", name)
         };
@@ -149,11 +144,7 @@ impl ErrorFormatter {
 
     fn format_division_by_zero(&self, output: &mut String, context: Option<&SourceContext>) {
         let header = if self.use_colors {
-            format!("{} [{}]: {}: Division by zero",
-                "Error".red().bold(),
-                "E004".yellow(),
-                "Runtime Error".red()
-            )
+            format!("{} [{}]: {}: Division by zero", "Error".red().bold(), "E004".yellow(), "Runtime Error".red())
         } else {
             "Error [E004]: Runtime Error: Division by zero".to_string()
         };
@@ -174,15 +165,10 @@ impl ErrorFormatter {
         output.push('\n');
     }
 
-    fn format_index_error(
-        &self,
-        output: &mut String,
-        index: i64,
-        length: usize,
-        context: Option<&SourceContext>
-    ) {
+    fn format_index_error(&self, output: &mut String, index: i64, length: usize, context: Option<&SourceContext>) {
         let header = if self.use_colors {
-            format!("{} [{}]: {}: Index {} out of bounds (length: {})",
+            format!(
+                "{} [{}]: {}: Index {} out of bounds (length: {})",
                 "Error".red().bold(),
                 "E005".yellow(),
                 "Runtime Error".red(),
@@ -202,13 +188,15 @@ impl ErrorFormatter {
 
         output.push('\n');
         if self.use_colors {
-            output.push_str(&format!("{}: Valid indices are 0 to {} (or -{} to -1 for negative indexing)",
+            output.push_str(&format!(
+                "{}: Valid indices are 0 to {} (or -{} to -1 for negative indexing)",
                 "Help".cyan().bold(),
                 if length > 0 { length - 1 } else { 0 },
                 length
             ));
         } else {
-            output.push_str(&format!("Help: Valid indices are 0 to {} (or -{} to -1 for negative indexing)",
+            output.push_str(&format!(
+                "Help: Valid indices are 0 to {} (or -{} to -1 for negative indexing)",
                 if length > 0 { length - 1 } else { 0 },
                 length
             ));
@@ -218,12 +206,7 @@ impl ErrorFormatter {
 
     fn format_source_context(&self, output: &mut String, context: &SourceContext) {
         let location = if self.use_colors {
-            format!("  {} {}:{}:{}",
-                "-->".blue().bold(),
-                context.file_path,
-                context.line,
-                context.column
-            )
+            format!("  {} {}:{}:{}", "-->".blue().bold(), context.file_path, context.line, context.column)
         } else {
             format!("  --> {}:{}:{}", context.file_path, context.line, context.column)
         };
@@ -277,9 +260,7 @@ impl ErrorFormatter {
 }
 
 impl Default for ErrorFormatter {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 pub fn suggest_similar_name(name: &str, available: &[&str]) -> Option<String> {
@@ -311,8 +292,12 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     let a_len = a_chars.len();
     let b_len = b_chars.len();
 
-    if a_len == 0 { return b_len; }
-    if b_len == 0 { return a_len; }
+    if a_len == 0 {
+        return b_len;
+    }
+    if b_len == 0 {
+        return a_len;
+    }
 
     let mut matrix = vec![vec![0; b_len + 1]; a_len + 1];
 
@@ -326,9 +311,7 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     for i in 1..=a_len {
         for j in 1..=b_len {
             let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
-            matrix[i][j] = (matrix[i - 1][j] + 1)
-                .min(matrix[i][j - 1] + 1)
-                .min(matrix[i - 1][j - 1] + cost);
+            matrix[i][j] = (matrix[i - 1][j] + 1).min(matrix[i][j - 1] + 1).min(matrix[i - 1][j - 1] + cost);
         }
     }
 
@@ -377,18 +360,9 @@ mod tests {
     #[test]
     fn test_format_with_context() {
         let formatter = ErrorFormatter::without_colors();
-        let context = SourceContext::new(
-            "test.lg".to_string(),
-            5,
-            10,
-            Span::new(45, 48)
-        ).with_source("    let x = foo + 1".to_string());
+        let context = SourceContext::new("test.lg".to_string(), 5, 10, Span::new(45, 48)).with_source("    let x = foo + 1".to_string());
 
-        let error = LugliError::undefined_variable_with_context(
-            "foo",
-            context,
-            Some("Did you mean 'for'?".to_string())
-        );
+        let error = LugliError::undefined_variable_with_context("foo", context, Some("Did you mean 'for'?".to_string()));
 
         let formatted = formatter.format(&error);
         assert!(formatted.contains("test.lg:5:10"));

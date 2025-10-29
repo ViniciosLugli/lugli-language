@@ -1,16 +1,42 @@
-use lugli_common::{Value, LugliError};
-use lugli_ast::Stmt;
-use crate::{Bytecode, Instruction};
+use crate::{Bytecode, Instruction, SourceLocation};
 use hashbrown::HashMap;
+use lugli_ast::Stmt;
+use lugli_common::{LugliError, Span, Value};
 
+mod control_flow;
 mod expressions;
 mod statements;
-mod control_flow;
+
+pub struct CompilerDebug {
+    pub trace_emit: bool,
+    pub trace_locals: bool,
+    pub trace_constants: bool,
+    pub instruction_count: usize,
+}
+
+impl Default for CompilerDebug {
+    fn default() -> Self {
+        Self {
+            trace_emit: std::env::var("LUGLI_TRACE_COMPILE").is_ok(),
+            trace_locals: std::env::var("LUGLI_TRACE_LOCALS").is_ok(),
+            trace_constants: std::env::var("LUGLI_TRACE_CONSTANTS").is_ok(),
+            instruction_count: 0,
+        }
+    }
+}
 
 pub struct Compiler {
     bytecode: Bytecode,
     locals: HashMap<String, usize>,
     local_count: usize,
+    debug: CompilerDebug,
+    loop_stack: Vec<(usize, usize, Vec<usize>, Vec<usize>)>, // (loop_start, continue_target, continue_jumps, break_jumps)
+    loop_depth: usize,                                       // For unique loop variable names
+    scope_depth: usize,                                      // 0 = global scope, >0 = function/local scope
+    upvalues: HashMap<String, usize>,                        // Map of upvalue names to indices (for closures)
+    upvalue_count: usize,                                    // Number of upvalues in current closure
+    file_path: String,                                       // Source file path for error reporting
+    source_code: Option<String>,                             // Source code for error context
 }
 
 impl Compiler {
@@ -19,7 +45,23 @@ impl Compiler {
             bytecode: Bytecode::new(),
             locals: HashMap::new(),
             local_count: 0,
+            debug: CompilerDebug::default(),
+            loop_stack: Vec::new(),
+            loop_depth: 0,
+            scope_depth: 0, // Start at global scope
+            upvalues: HashMap::new(),
+            upvalue_count: 0,
+            file_path: "<unknown>".to_string(),
+            source_code: None,
         }
+    }
+
+    pub fn with_source(file_path: String, source_code: String) -> Self {
+        let mut compiler = Self::new();
+        compiler.file_path = file_path.clone();
+        compiler.source_code = Some(source_code.clone());
+        compiler.bytecode = Bytecode::with_source(source_code);
+        compiler
     }
 
     pub fn compile(&mut self, program: &lugli_ast::Program) -> Result<Bytecode, LugliError> {
@@ -29,26 +71,24 @@ impl Compiler {
             self.compile_stmt(stmt)?;
 
             // Pop intermediate expression results except for the last statement
-            if i < stmt_count - 1 {
-                if matches!(stmt, lugli_ast::Stmt::Expression { .. }) {
-                    self.emit(Instruction::Pop);
-                }
+            if i < stmt_count - 1 && matches!(stmt, lugli_ast::Stmt::Expression { .. }) {
+                self.emit(Instruction::Pop);
             }
         }
 
         // Ensure there's always a return instruction at the end
-        if self.bytecode.instructions.is_empty() ||
-           !matches!(self.bytecode.instructions.last(), Some(Instruction::Return)) {
+        if self.bytecode.instructions.is_empty() || !matches!(self.bytecode.instructions.last(), Some(Instruction::Return)) {
             // If the last statement wasn't an expression or return, add null
-            if stmt_count == 0 || !matches!(program.statements.last(),
-                Some(lugli_ast::Stmt::Expression { .. }) | Some(lugli_ast::Stmt::Return { .. })) {
+            if stmt_count == 0
+                || !matches!(program.statements.last(), Some(lugli_ast::Stmt::Expression { .. }) | Some(lugli_ast::Stmt::Return { .. }))
+            {
                 let null_index = self.add_constant(Value::Null);
                 self.emit(Instruction::Constant(null_index));
             }
             self.emit(Instruction::Return);
         }
 
-        Ok(self.bytecode.clone())
+        Ok(std::mem::take(&mut self.bytecode))
     }
 
     fn compile_stmt(&mut self, stmt: &Stmt) -> Result<(), LugliError> {
@@ -67,24 +107,68 @@ impl Compiler {
     }
 
     // Helper methods used by submodules
-    pub(crate) fn add_constant(&mut self, value: Value) -> usize {
-        self.bytecode.add_constant(value)
-    }
+    pub(crate) fn add_constant(&mut self, value: Value) -> usize { self.bytecode.add_constant(value) }
 
     pub(crate) fn emit(&mut self, instruction: Instruction) {
+        if self.debug.trace_emit {
+            eprintln!("[COMPILE] Emit {:04}: {:?}", self.bytecode.instructions.len(), instruction);
+        }
+        self.debug.instruction_count += 1;
         self.bytecode.emit(instruction);
+    }
+
+    // Reserved for Phase 2: Apply source locations to all emitted instructions
+    #[allow(dead_code)]
+    pub(crate) fn emit_at(&mut self, instruction: Instruction, span: Span) {
+        if self.debug.trace_emit {
+            eprintln!("[COMPILE] Emit {:04}: {:?} at {:?}", self.bytecode.instructions.len(), instruction, span);
+        }
+        self.debug.instruction_count += 1;
+        let location = self.span_to_location(span);
+        self.bytecode.emit_with_location(instruction, location);
+    }
+
+    #[allow(dead_code)]
+    fn span_to_location(&self, span: Span) -> SourceLocation {
+        if let Some(ref source) = self.source_code {
+            let (line, column) = self.calculate_line_column(source, span.start);
+            SourceLocation::new(self.file_path.clone(), span, line, column)
+        } else {
+            SourceLocation::unknown()
+        }
+    }
+
+    #[allow(dead_code)]
+    fn calculate_line_column(&self, source: &str, offset: usize) -> (usize, usize) {
+        let mut line = 1;
+        let mut column = 1;
+
+        for (i, ch) in source.chars().enumerate() {
+            if i >= offset {
+                break;
+            }
+            if ch == '\n' {
+                line += 1;
+                column = 1;
+            } else {
+                column += 1;
+            }
+        }
+
+        (line, column)
     }
 
     pub(crate) fn declare_local(&mut self, name: String) -> usize {
         let index = self.local_count;
+        if self.debug.trace_locals {
+            eprintln!("[COMPILE] Declare local '{}' at index {}", name, index);
+        }
         self.locals.insert(name, index);
         self.local_count += 1;
         index
     }
 
-    pub(crate) fn current_instruction(&self) -> usize {
-        self.bytecode.instructions.len()
-    }
+    pub(crate) fn current_instruction(&self) -> usize { self.bytecode.instructions.len() }
 
     pub(crate) fn emit_jump(&mut self, instruction: Instruction) -> usize {
         let index = self.bytecode.instructions.len();
@@ -92,19 +176,65 @@ impl Compiler {
         index
     }
 
-    pub(crate) fn patch_jump(&mut self, jump_index: usize) {
+    pub(crate) fn patch_jump(&mut self, jump_index: usize) -> Result<(), LugliError> {
         let current_address = self.bytecode.instructions.len();
 
-        match &mut self.bytecode.instructions[jump_index] {
-            Instruction::Jump(addr) => *addr = current_address,
-            Instruction::JumpIfFalse(addr) => *addr = current_address,
-            _ => panic!("Expected jump instruction"),
+        match &mut self.bytecode.instructions.get_mut(jump_index) {
+            Some(Instruction::Jump(addr)) => {
+                *addr = current_address;
+                Ok(())
+            }
+            Some(Instruction::JumpIfFalse(addr)) => {
+                *addr = current_address;
+                Ok(())
+            }
+            Some(_) => Err(LugliError::runtime("Internal compiler error: Expected jump instruction for patching")),
+            None => Err(LugliError::runtime("Internal compiler error: Invalid jump index")),
+        }
+    }
+
+    #[allow(clippy::only_used_in_recursion)]
+    pub(crate) fn try_evaluate_constant(&self, expr: &lugli_ast::Expr) -> Option<Value> {
+        use lugli_ast::{Expr, LiteralValue};
+        match expr {
+            Expr::Literal {
+                value, ..
+            } => Some(match value {
+                LiteralValue::Number(n) => Value::Number(*n),
+                LiteralValue::String(s) => Value::String(s.clone()),
+                LiteralValue::Boolean(b) => Value::Bool(*b),
+                LiteralValue::Null => Value::Null,
+            }),
+            Expr::List {
+                elements, ..
+            } => {
+                let mut const_elements = Vec::new();
+                for elem in elements {
+                    const_elements.push(self.try_evaluate_constant(elem)?);
+                }
+                Some(Value::List(std::rc::Rc::new(std::cell::RefCell::new(const_elements))))
+            }
+            Expr::Dict {
+                pairs, ..
+            } => {
+                let mut const_dict = hashbrown::HashMap::new();
+                for (key_expr, value_expr) in pairs {
+                    if let Expr::Literal {
+                        value: LiteralValue::String(key), ..
+                    } = key_expr
+                    {
+                        const_dict.insert(key.clone(), self.try_evaluate_constant(value_expr)?);
+                    } else {
+                        return None;
+                    }
+                }
+                Some(Value::Dict(std::rc::Rc::new(std::cell::RefCell::new(const_dict))))
+            }
+            _ => None,
         }
     }
 }
 
 impl Default for Compiler {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }

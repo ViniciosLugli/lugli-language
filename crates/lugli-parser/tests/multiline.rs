@@ -11,10 +11,10 @@ fn test_multiline_dict() {
         "active": true
     }"#;
     assert_parse_success(source);
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Failed to parse multiline dict: {:?}", result.err());
-    
+
     let program = result.unwrap();
     assert_eq!(program.statements.len(), 1);
 }
@@ -165,7 +165,7 @@ fn test_empty_multiline_structures() {
         r#"func(
         )"#,
     ];
-    
+
     for source in sources {
         assert_parse_success(source);
     }

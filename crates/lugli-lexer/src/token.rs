@@ -1,7 +1,6 @@
-
 use logos::Logos;
-use std::fmt;
 use lugli_common::Span;
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
@@ -12,14 +11,16 @@ pub struct Token {
 
 impl Token {
     pub fn new(kind: TokenKind, lexeme: String, span: Span) -> Self {
-        Self { kind, lexeme, span }
+        Self {
+            kind,
+            lexeme,
+            span,
+        }
     }
 }
 
 impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}({})", self.kind, self.lexeme)
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{:?}({})", self.kind, self.lexeme) }
 }
 
 #[derive(Logos, Debug, Clone, PartialEq)]

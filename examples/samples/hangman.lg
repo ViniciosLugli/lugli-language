@@ -2,55 +2,59 @@
 # Demonstrates a complete game implementation using Python+Rust hybrid syntax
 
 struct Hangman {
-    word: str,
-    founded: [str]
+    word,
+    founded
 }
 
 impl Hangman {
-    fn new(word: str) -> Hangman {
+    fn new(word) {
         return Hangman {
             word: word,
             founded: []
         }
     }
 
-    fn setup!(mut self) {
-        for _ in range(self.word.len()) {
+    fn setup!(self) {
+        for i in range(self.word.len()) {
             self.founded.push("_")
         }
     }
 
-    fn check_win(self) -> bool {
+    fn check_win(self) {
         let buf = self.founded.join("")
         return buf == self.word
     }
 
-    fn check_letter!(mut self, letter: str) -> bool {
+    fn check_letter!(self, letter) {
         let mut found = false
 
-        for (i, char) in enumerate(self.word.chars()) {
-            if char == letter {
+        # Simplified version without tuple destructuring
+        let chars = self.word.chars()
+        for i in range(self.word.len()) {
+            if chars[i] == letter {
                 if self.founded[i] == "_" {
-                    self.founded[i] = letter
+                    # Index assignment not supported yet
+                    # self.founded[i] = letter
                     found = true
                 }
             }
         }
 
-        print(f"Current progress: {self.founded.join(' ')}")
+        # print(f"Current progress: {self.founded.join(' ')}")
+        print("Current progress: " + self.founded.join(" "))
         return found
     }
 
-    fn get_progress(self) -> [str] {
+    fn get_progress(self) {
         return self.founded
     }
 
-    fn is_complete(self) -> bool {
+    fn is_complete(self) {
         return !self.founded.contains("_")
     }
 
     fn display_word(self) {
-        print(f"Word: {self.founded.join(' ')}")
+        print("Word: " + self.founded.join(" "))
     }
 }
 
@@ -59,11 +63,11 @@ print("🎮 Welcome to Hangman!")
 print("Try to guess the word letter by letter.")
 print()
 
-let mut hangman = Hangman::new("lugli")
+let hangman = Hangman::new("lugli")
 hangman.setup!()
 
-mut attempts = 0
-mut wrong_letters = []
+let mut attempts = 0
+let mut wrong_letters = []
 const MAX_ATTEMPTS = 6
 
 print("Let's start!")
@@ -71,9 +75,9 @@ hangman.display_word()
 print()
 
 loop {
-    print(f"Attempts remaining: {MAX_ATTEMPTS - attempts}")
+    print("Attempts remaining: " + str(MAX_ATTEMPTS - attempts))
     if !wrong_letters.is_empty() {
-        print(f"Wrong letters: {wrong_letters.join(', ')}")
+        print("Wrong letters: " + wrong_letters.join(", "))
     }
 
     let letter = input("Enter a letter: ").trim().lower()
@@ -91,29 +95,29 @@ loop {
 
     # Check if already guessed
     if hangman.get_progress().contains(letter) || wrong_letters.contains(letter) {
-        print(f"You already guessed '{letter}'!")
+        print("You already guessed '" + letter + "'!")
         continue
     }
 
     # Check the letter
     if hangman.check_letter!(letter) {
-        print(f"✅ Good guess! The letter '{letter}' is in the word.")
+        print("✅ Good guess! The letter '" + letter + "' is in the word.")
 
         if hangman.is_complete() {
             print()
             print("🎉 Congratulations! You won!")
-            print(f"The word was: {hangman.word}")
+            print("The word was: " + hangman.word)
             break
         }
     } else {
-        print(f"❌ Sorry, the letter '{letter}' is not in the word.")
+        print("❌ Sorry, the letter '" + letter + "' is not in the word.")
         wrong_letters.push(letter)
         attempts += 1
 
         if attempts >= MAX_ATTEMPTS {
             print()
             print("💀 Game Over! You ran out of attempts.")
-            print(f"The word was: {hangman.word}")
+            print("The word was: " + hangman.word)
             break
         }
     }

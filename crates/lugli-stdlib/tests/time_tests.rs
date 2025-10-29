@@ -8,10 +8,7 @@ mod time_function_tests {
     #[test]
     fn test_now_function() {
         let functions = get_global_functions();
-        let now_fn = functions.iter()
-            .find(|(name, _)| *name == "now")
-            .map(|(_, func)| func)
-            .expect("now function should exist");
+        let now_fn = functions.iter().find(|(name, _)| *name == "now").map(|(_, func)| func).expect("now function should exist");
 
         // Test that now() returns a number (timestamp)
         let result = now_fn(&[]);
@@ -40,10 +37,7 @@ mod time_function_tests {
     #[test]
     fn test_sleep_function() {
         let functions = get_global_functions();
-        let sleep_fn = functions.iter()
-            .find(|(name, _)| *name == "sleep")
-            .map(|(_, func)| func)
-            .expect("sleep function should exist");
+        let sleep_fn = functions.iter().find(|(name, _)| *name == "sleep").map(|(_, func)| func).expect("sleep function should exist");
 
         // Test that sleep with small duration works
         let start = Instant::now();
@@ -70,15 +64,9 @@ mod time_function_tests {
     fn test_time_function_arguments() {
         let functions = get_global_functions();
 
-        let now_fn = functions.iter()
-            .find(|(name, _)| *name == "now")
-            .map(|(_, func)| func)
-            .unwrap();
+        let now_fn = functions.iter().find(|(name, _)| *name == "now").map(|(_, func)| func).unwrap();
 
-        let sleep_fn = functions.iter()
-            .find(|(name, _)| *name == "sleep")
-            .map(|(_, func)| func)
-            .unwrap();
+        let sleep_fn = functions.iter().find(|(name, _)| *name == "sleep").map(|(_, func)| func).unwrap();
 
         // now() should work with any number of arguments (ignores them)
         let result = now_fn(&[Value::Number(42.0)]);
@@ -92,10 +80,7 @@ mod time_function_tests {
     #[test]
     fn test_sleep_with_zero() {
         let functions = get_global_functions();
-        let sleep_fn = functions.iter()
-            .find(|(name, _)| *name == "sleep")
-            .map(|(_, func)| func)
-            .unwrap();
+        let sleep_fn = functions.iter().find(|(name, _)| *name == "sleep").map(|(_, func)| func).unwrap();
 
         // Test sleep with 0 duration
         let result = sleep_fn(&[Value::Number(0.0)]);

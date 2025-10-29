@@ -1,4 +1,4 @@
-use lugli_common::Value;
+use lugli_common::{Span, Value};
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
@@ -9,7 +9,9 @@ pub enum Instruction {
     Subtract,
     Multiply,
     Divide,
+    IntegerDivide,
     Modulo,
+    Power,
     Negate,
     Not,
     Equal,
@@ -22,29 +24,65 @@ pub enum Instruction {
     Or,
     Print,
     Pop,
+    Dup,
     Jump(usize),
     JumpIfFalse(usize),
     Loop(usize),
     Call(u8),
+    CallMethod(usize, u8),
     Return,
-    // Property operations
-    GetProperty(usize),  // property name constant index
-    SetProperty(usize),  // property name constant index
-    // Collection operations
-    MakeList(usize),     // element count
-    MakeDict(usize),     // pair count
-    // Variable operations
-    LoadGlobal(usize),   // variable name constant index
-    StoreGlobal(usize),  // variable name constant index
-    // Function operations
-    DefineFunction(usize), // function value constant index
-    CallFunction(u8),      // argument count
+    GetProperty(usize),
+    SetProperty(usize),
+    MakeList(usize),
+    MakeDict(usize),
+    GetIndex,
+    SetIndex,
+    ToString,
+    LoadGlobal(usize),
+    StoreGlobal(usize),
+    DefineFunction(usize),
+    MakeClosure { function_index: usize, capture_indices: Vec<usize> },
+    LoadUpvalue(usize),
+    StoreUpvalue(usize),
+    // Module system - these store directly in globals, no stack effect
+    ImportModule { module_idx: usize, bind_name: String }, // import X -> binds module to name
+    ImportFrom { module_idx: usize, names: Vec<String> },  // from X import Y -> binds items to names
+}
+
+#[derive(Debug, Clone)]
+pub struct SourceLocation {
+    pub file_path: String,
+    pub span: Span,
+    pub line: usize,
+    pub column: usize,
+}
+
+impl SourceLocation {
+    pub fn new(file_path: String, span: Span, line: usize, column: usize) -> Self {
+        Self {
+            file_path,
+            span,
+            line,
+            column,
+        }
+    }
+
+    pub fn unknown() -> Self {
+        Self {
+            file_path: "<unknown>".to_string(),
+            span: Span::new(0, 0),
+            line: 0,
+            column: 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Bytecode {
     pub instructions: Vec<Instruction>,
     pub constants: Vec<Value>,
+    pub source_map: Vec<SourceLocation>,
+    pub source_code: Option<String>,
 }
 
 impl Bytecode {
@@ -52,6 +90,17 @@ impl Bytecode {
         Self {
             instructions: Vec::new(),
             constants: Vec::new(),
+            source_map: Vec::new(),
+            source_code: None,
+        }
+    }
+
+    pub fn with_source(source_code: String) -> Self {
+        Self {
+            instructions: Vec::new(),
+            constants: Vec::new(),
+            source_map: Vec::new(),
+            source_code: Some(source_code),
         }
     }
 
@@ -62,11 +111,17 @@ impl Bytecode {
 
     pub fn emit(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
+        self.source_map.push(SourceLocation::unknown());
     }
+
+    pub fn emit_with_location(&mut self, instruction: Instruction, location: SourceLocation) {
+        self.instructions.push(instruction);
+        self.source_map.push(location);
+    }
+
+    pub fn get_location(&self, ip: usize) -> Option<&SourceLocation> { self.source_map.get(ip) }
 }
 
 impl Default for Bytecode {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }

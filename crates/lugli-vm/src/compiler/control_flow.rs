@@ -1,12 +1,18 @@
-use lugli_common::LugliError;
-use lugli_ast::Stmt;
-use crate::Instruction;
 use super::Compiler;
+use crate::Instruction;
+use lugli_ast::Stmt;
+use lugli_common::LugliError;
 
 impl Compiler {
     pub(super) fn compile_control_flow_stmt(&mut self, stmt: &Stmt) -> Result<bool, LugliError> {
         match stmt {
-            Stmt::If { condition, then_branch, elif_branches, else_branch, .. } => {
+            Stmt::If {
+                condition,
+                then_branch,
+                elif_branches,
+                else_branch,
+                ..
+            } => {
                 // Compile condition
                 self.compile_expr(condition)?;
 
@@ -18,7 +24,6 @@ impl Compiler {
                     self.compile_stmt(stmt)?;
                 }
 
-                let mut elif_jumps = Vec::new();
                 let mut end_jumps = Vec::new();
 
                 // Jump to end after then branch
@@ -26,7 +31,7 @@ impl Compiler {
                 end_jumps.push(jump_to_end);
 
                 // Patch the else jump to point here (start of elif/else)
-                self.patch_jump(jump_to_else);
+                self.patch_jump(jump_to_else)?;
 
                 // Compile elif branches
                 for (elif_condition, elif_body) in elif_branches {
@@ -39,12 +44,9 @@ impl Compiler {
 
                     let end_jump = self.emit_jump(Instruction::Jump(0));
                     end_jumps.push(end_jump);
-                    elif_jumps.push(elif_jump);
-                }
 
-                // Patch elif jumps to point to next elif or else
-                for jump in elif_jumps {
-                    self.patch_jump(jump);
+                    // Patch elif jump to point to next elif or else
+                    self.patch_jump(elif_jump)?;
                 }
 
                 // Compile else branch if it exists
@@ -56,13 +58,21 @@ impl Compiler {
 
                 // Patch all end jumps to point here
                 for jump in end_jumps {
-                    self.patch_jump(jump);
+                    self.patch_jump(jump)?;
                 }
 
                 Ok(true) // Handled
             }
-            Stmt::While { condition, body, .. } => {
+            Stmt::While {
+                condition,
+                body,
+                ..
+            } => {
                 let loop_start = self.current_instruction();
+
+                // Push loop info onto stack for break/continue
+                // For while loops, continue should re-evaluate condition
+                self.loop_stack.push((loop_start, loop_start, Vec::new(), Vec::new()));
 
                 // Compile condition
                 self.compile_expr(condition)?;
@@ -73,18 +83,195 @@ impl Compiler {
                 // Compile body
                 for stmt in body {
                     self.compile_stmt(stmt)?;
+                    // Pop expression results to avoid stack buildup in loops
+                    if matches!(stmt, Stmt::Expression { .. }) {
+                        self.emit(Instruction::Pop);
+                    }
                 }
 
                 // Jump back to loop start
                 self.emit(Instruction::Loop(loop_start));
 
                 // Patch exit jump
-                self.patch_jump(exit_jump);
+                self.patch_jump(exit_jump)?;
+
+                // Pop loop info and patch continue/break jumps
+                if let Some((_, _, continue_jumps, break_jumps)) = self.loop_stack.pop() {
+                    // For while loops, continue jumps to loop_start (condition check)
+                    for jump in continue_jumps {
+                        self.bytecode.instructions[jump] = Instruction::Jump(loop_start);
+                    }
+                    for jump in break_jumps {
+                        self.patch_jump(jump)?;
+                    }
+                }
 
                 Ok(true) // Handled
             }
-            _ => Ok(false) // Not handled
+            Stmt::Loop {
+                body, ..
+            } => {
+                let loop_start = self.current_instruction();
+
+                // Push loop info onto stack for break/continue
+                // For infinite loops, continue should jump to loop top
+                self.loop_stack.push((loop_start, loop_start, Vec::new(), Vec::new()));
+
+                // Compile body
+                for stmt in body {
+                    self.compile_stmt(stmt)?;
+                    // Pop expression results to avoid stack buildup in loops
+                    if matches!(stmt, Stmt::Expression { .. }) {
+                        self.emit(Instruction::Pop);
+                    }
+                }
+
+                // Jump back to loop start (infinite loop)
+                self.emit(Instruction::Loop(loop_start));
+
+                // Pop loop info and patch continue/break jumps
+                if let Some((_, _, continue_jumps, break_jumps)) = self.loop_stack.pop() {
+                    // For infinite loops, continue jumps to loop_start (top of loop)
+                    for jump in continue_jumps {
+                        self.bytecode.instructions[jump] = Instruction::Jump(loop_start);
+                    }
+                    for jump in break_jumps {
+                        self.patch_jump(jump)?;
+                    }
+                }
+
+                Ok(true) // Handled
+            }
+            Stmt::For {
+                variable,
+                iterable,
+                body,
+                ..
+            } => {
+                // Use unique names for nested loops
+                let depth = self.loop_depth;
+                self.loop_depth += 1;
+
+                // Compile the iterable expression (should result in a list/range)
+                self.compile_expr(iterable)?;
+
+                // Store the iterable
+                let iterable_local = self.declare_local(format!("__iterable_{}", depth));
+                self.emit(Instruction::Store(iterable_local));
+
+                // Initialize index to 0
+                let index_local = self.declare_local(format!("__index_{}", depth));
+                let zero_constant = self.add_constant(lugli_common::Value::Number(0.0));
+                self.emit(Instruction::Constant(zero_constant));
+                self.emit(Instruction::Store(index_local));
+
+                // Declare the loop variable
+                let var_local = self.declare_local(variable.clone());
+
+                let loop_start = self.current_instruction();
+
+                // Push loop info for break/continue
+                self.loop_stack.push((loop_start, 0, Vec::new(), Vec::new()));
+
+                // Check if index < len(iterable)
+                self.emit(Instruction::Load(index_local));
+                self.emit(Instruction::Load(iterable_local));
+                let len_name = self.add_constant(lugli_common::Value::String("len".to_string()));
+                self.emit(Instruction::CallMethod(len_name, 0));
+
+                // Now stack has: [index, length]
+                // Check if index < length
+                self.emit(Instruction::Less);
+                let exit_jump = self.emit_jump(Instruction::JumpIfFalse(0));
+
+                // Get element at current index
+                self.emit(Instruction::Load(iterable_local));
+                self.emit(Instruction::Load(index_local));
+                self.emit(Instruction::GetIndex);
+                self.emit(Instruction::Store(var_local));
+
+                // Compile body
+                for stmt in body {
+                    self.compile_stmt(stmt)?;
+                    // Pop expression results to avoid stack buildup in loops
+                    if matches!(stmt, Stmt::Expression { .. }) {
+                        self.emit(Instruction::Pop);
+                    }
+                }
+
+                // Patch continue jumps to point to increment section
+                let continue_target = self.current_instruction();
+                if let Some((start, _, continue_jumps, breaks)) = self.loop_stack.pop() {
+                    // Patch all continue jumps to jump to increment
+                    for jump in continue_jumps {
+                        self.bytecode.instructions[jump] = Instruction::Jump(continue_target);
+                    }
+                    self.loop_stack.push((start, continue_target, Vec::new(), breaks));
+                }
+
+                // Increment index
+                self.emit(Instruction::Load(index_local));
+                let one_constant = self.add_constant(lugli_common::Value::Number(1.0));
+                self.emit(Instruction::Constant(one_constant));
+                self.emit(Instruction::Add);
+                self.emit(Instruction::Store(index_local));
+
+                // Jump back to loop start
+                self.emit(Instruction::Loop(loop_start));
+
+                // Patch exit jump
+                self.patch_jump(exit_jump)?;
+
+                // Pop loop info and patch break jumps
+                if let Some((_, _, _, break_jumps)) = self.loop_stack.pop() {
+                    for jump in break_jumps {
+                        self.patch_jump(jump)?;
+                    }
+                }
+
+                // Restore loop depth
+                self.loop_depth -= 1;
+
+                Ok(true) // Handled
+            }
+            Stmt::Block {
+                statements, ..
+            } => {
+                // Compile all statements in the block
+                for stmt in statements {
+                    self.compile_stmt(stmt)?;
+                }
+                Ok(true) // Handled
+            }
+            Stmt::Break {
+                ..
+            } => {
+                if !self.loop_stack.is_empty() {
+                    // Add this jump to the list of breaks to patch later
+                    let break_jump = self.emit_jump(Instruction::Jump(0));
+                    if let Some((_, _, _, break_jumps)) = self.loop_stack.last_mut() {
+                        break_jumps.push(break_jump);
+                    }
+                    Ok(true)
+                } else {
+                    Err(LugliError::runtime("break statement outside of loop"))
+                }
+            }
+            Stmt::Continue {
+                ..
+            } => {
+                if !self.loop_stack.is_empty() {
+                    // Emit placeholder jump - will be patched to correct target
+                    let continue_jump = self.emit_jump(Instruction::Jump(0));
+                    if let Some((_, _, continue_jumps, _)) = self.loop_stack.last_mut() {
+                        continue_jumps.push(continue_jump);
+                    }
+                    Ok(true)
+                } else {
+                    Err(LugliError::runtime("continue statement outside of loop"))
+                }
+            }
+            _ => Ok(false), // Not handled
         }
     }
-
 }

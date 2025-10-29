@@ -1,0 +1,159 @@
+# 07 - Pattern Matching
+# Demonstrates match expressions with different pattern types
+
+# ============================================
+# LITERAL PATTERNS
+# ============================================
+
+# Match exact values
+let day = 3
+let day_name = match day {
+    1 => "Monday",
+    2 => "Tuesday",
+    3 => "Wednesday",
+    4 => "Thursday",
+    5 => "Friday",
+    6 => "Saturday",
+    7 => "Sunday",
+    _ => "Invalid day"
+}
+# day_name = "Wednesday"
+
+# Match strings
+let command = "start"
+let action = match command {
+    "start" => "Starting system...",
+    "stop" => "Stopping system...",
+    "restart" => "Restarting system...",
+    _ => "Unknown command"
+}
+# action = "Starting system..."
+
+# Match booleans
+let is_valid = true
+let status = match is_valid {
+    true => "Valid",
+    false => "Invalid"
+}
+# status = "Valid"
+
+# ============================================
+# GUARD CLAUSES
+# ============================================
+
+# Guards add conditions to patterns
+let age = 25
+let category = match age {
+    n if n < 0 => "Invalid age",
+    n if n < 13 => "Child",
+    n if n < 18 => "Teenager",
+    n if n < 65 => "Adult",
+    _ => "Senior"
+}
+# category = "Adult"
+
+# Multiple guards on same value
+let score = 85
+let grade = match score {
+    s if s >= 90 => "A",
+    s if s >= 80 => "B",
+    s if s >= 70 => "C",
+    s if s >= 60 => "D",
+    _ => "F"
+}
+# grade = "B"
+
+# Complex guard conditions
+let temperature = 22
+let weather = match temperature {
+    t if t < 0 => "freezing",
+    t if t >= 0 && t < 10 => "cold",
+    t if t >= 10 && t < 20 => "cool",
+    t if t >= 20 && t < 30 => "warm",
+    _ => "hot"
+}
+# weather = "warm"
+
+# ============================================
+# IDENTIFIER PATTERNS
+# ============================================
+
+# Bind value to variable
+let number = 42
+let result = match number {
+    0 => "zero",
+    n => n * 2  # 'n' captures the value
+}
+# result = 84
+
+# Use bound variable in complex expression
+let value = 7
+let computation = match value {
+    0 => 0,
+    1 => 1,
+    n => n * n + n  # n^2 + n
+}
+# computation = 56 (7*7 + 7)
+
+# ============================================
+# WILDCARD PATTERN
+# ============================================
+
+# Match anything (fallback)
+let error_code = 404
+let message = match error_code {
+    200 => "OK",
+    201 => "Created",
+    400 => "Bad Request",
+    401 => "Unauthorized",
+    404 => "Not Found",
+    500 => "Internal Server Error",
+    _ => "Unknown Error"
+}
+# message = "Not Found"
+
+# ============================================
+# PRACTICAL EXAMPLES
+# ============================================
+
+# HTTP status code handler
+let http_status = 201
+let response = match http_status {
+    s if s >= 200 && s < 300 => "Success",
+    s if s >= 300 && s < 400 => "Redirect",
+    s if s >= 400 && s < 500 => "Client Error",
+    s if s >= 500 => "Server Error",
+    _ => "Invalid Status"
+}
+# response = "Success"
+
+# State machine
+let state = "running"
+let next_state = match state {
+    "idle" => "starting",
+    "starting" => "running",
+    "running" => "stopping",
+    "stopping" => "idle",
+    _ => "error"
+}
+# next_state = "stopping"
+
+# Value categorization
+let count = 100
+let size = match count {
+    0 => "empty",
+    n if n < 10 => "tiny",
+    n if n < 100 => "small",
+    n if n < 1000 => "medium",
+    n if n < 10000 => "large",
+    _ => "huge"
+}
+# size = "medium"
+
+# Null handling
+let optional_value = null
+let unwrapped = match optional_value {
+    null => "No value",
+    v => v
+}
+# unwrapped = "No value"

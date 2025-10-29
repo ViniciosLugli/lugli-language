@@ -1,5 +1,5 @@
-use lugli_common::{Value, LugliError};
-use chrono::{Utc, TimeZone};
+use chrono::{TimeZone, Utc};
+use lugli_common::{LugliError, Value};
 
 pub fn format_datetime(args: &[Value]) -> Result<Value, LugliError> {
     if args.len() != 2 {
@@ -16,8 +16,7 @@ pub fn format_datetime(args: &[Value]) -> Result<Value, LugliError> {
         _ => return Err(LugliError::type_error("string", args[1].type_name())),
     };
 
-    let dt = Utc.timestamp_opt(timestamp, 0).single()
-        .ok_or_else(|| LugliError::runtime("Invalid timestamp"))?;
+    let dt = Utc.timestamp_opt(timestamp, 0).single().ok_or_else(|| LugliError::runtime("Invalid timestamp"))?;
 
     Ok(Value::String(dt.format(format).to_string()))
 }

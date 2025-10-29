@@ -1,23 +1,18 @@
 //! Visitor pattern implementation for AST traversal.
 
-use crate::{Expr, Stmt, Program};
+use crate::{Expr, Program, Stmt};
 
 /// Trait for visiting AST nodes immutably.
-pub trait Visitor<T = ()> where T: Default {
+pub trait Visitor<T = ()>
+where T: Default {
     /// Visit a program node.
-    fn visit_program(&mut self, program: &Program) -> T {
-        self.walk_program(program)
-    }
+    fn visit_program(&mut self, program: &Program) -> T { self.walk_program(program) }
 
     /// Visit a statement node.
-    fn visit_stmt(&mut self, stmt: &Stmt) -> T {
-        self.walk_stmt(stmt)
-    }
+    fn visit_stmt(&mut self, stmt: &Stmt) -> T { self.walk_stmt(stmt) }
 
     /// Visit an expression node.
-    fn visit_expr(&mut self, expr: &Expr) -> T {
-        self.walk_expr(expr)
-    }
+    fn visit_expr(&mut self, expr: &Expr) -> T { self.walk_expr(expr) }
 
     /// Default program traversal.
     fn walk_program(&mut self, program: &Program) -> T {
@@ -30,25 +25,39 @@ pub trait Visitor<T = ()> where T: Default {
     /// Default statement traversal.
     fn walk_stmt(&mut self, stmt: &Stmt) -> T {
         match stmt {
-            Stmt::Expression { expr, .. } => {
+            Stmt::Expression {
+                expr, ..
+            } => {
                 self.visit_expr(expr);
             }
-            Stmt::VarDecl { initializer, .. } => {
+            Stmt::VarDecl {
+                initializer, ..
+            } => {
                 if let Some(init) = initializer {
                     self.visit_expr(init);
                 }
             }
-            Stmt::FnDecl { body, .. } => {
+            Stmt::FnDecl {
+                body, ..
+            } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
             }
-            Stmt::StructDecl { methods, .. } => {
+            Stmt::StructDecl {
+                methods, ..
+            } => {
                 for method in methods {
                     self.visit_stmt(method);
                 }
             }
-            Stmt::If { condition, then_branch, elif_branches, else_branch, .. } => {
+            Stmt::If {
+                condition,
+                then_branch,
+                elif_branches,
+                else_branch,
+                ..
+            } => {
                 self.visit_expr(condition);
                 for stmt in then_branch {
                     self.visit_stmt(stmt);
@@ -65,24 +74,55 @@ pub trait Visitor<T = ()> where T: Default {
                     }
                 }
             }
-            Stmt::While { condition, body, .. } | Stmt::For { iterable: condition, body, .. } => {
+            Stmt::While {
+                condition,
+                body,
+                ..
+            }
+            | Stmt::For {
+                iterable: condition,
+                body,
+                ..
+            } => {
                 self.visit_expr(condition);
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
             }
-            Stmt::Loop { body, .. } | Stmt::Block { statements: body, .. } => {
+            Stmt::Loop {
+                body, ..
+            }
+            | Stmt::Block {
+                statements: body, ..
+            } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
             }
-            Stmt::Return { value, .. } => {
+            Stmt::Return {
+                value, ..
+            } => {
                 if let Some(val) = value {
                     self.visit_expr(val);
                 }
             }
-            Stmt::Break { .. } | Stmt::Continue { .. } => {
+            Stmt::Break {
+                ..
+            }
+            | Stmt::Continue {
+                ..
+            } => {
                 // No children to visit
+            }
+            Stmt::Import {
+                ..
+            } => {
+                // No expression children to visit
+            }
+            Stmt::Export {
+                item, ..
+            } => {
+                self.visit_stmt(item);
             }
         }
         Default::default()
@@ -91,42 +131,113 @@ pub trait Visitor<T = ()> where T: Default {
     /// Default expression traversal.
     fn walk_expr(&mut self, expr: &Expr) -> T {
         match expr {
-            Expr::Binary { left, right, .. } => {
+            Expr::Binary {
+                left,
+                right,
+                ..
+            } => {
                 self.visit_expr(left);
                 self.visit_expr(right);
             }
-            Expr::Unary { operand, .. } => {
+            Expr::Unary {
+                operand, ..
+            } => {
                 self.visit_expr(operand);
             }
-            Expr::Call { callee, arguments, .. } => {
+            Expr::Call {
+                callee,
+                arguments,
+                ..
+            } => {
                 self.visit_expr(callee);
                 for arg in arguments {
                     self.visit_expr(arg);
                 }
             }
-            Expr::Get { object, .. } => {
+            Expr::Get {
+                object, ..
+            } => {
                 self.visit_expr(object);
             }
-            Expr::Set { object, value, .. } => {
+            Expr::Set {
+                object,
+                value,
+                ..
+            } => {
                 self.visit_expr(object);
                 self.visit_expr(value);
             }
-            Expr::List { elements, .. } => {
+            Expr::List {
+                elements, ..
+            } => {
                 for elem in elements {
                     self.visit_expr(elem);
                 }
             }
-            Expr::Dict { pairs, .. } => {
+            Expr::Dict {
+                pairs, ..
+            } => {
                 for (key, value) in pairs {
                     self.visit_expr(key);
                     self.visit_expr(value);
                 }
             }
-            Expr::Index { object, index, .. } => {
+            Expr::Index {
+                object,
+                index,
+                ..
+            } => {
                 self.visit_expr(object);
                 self.visit_expr(index);
             }
-            Expr::Literal { .. } | Expr::Identifier { .. } => {
+            Expr::FString {
+                parts, ..
+            } => {
+                use crate::expr::FStringPart;
+                for part in parts {
+                    if let FStringPart::Expression(expr) = part {
+                        self.visit_expr(expr);
+                    }
+                }
+            }
+            Expr::Function {
+                body, ..
+            } => {
+                for stmt in body {
+                    self.visit_stmt(stmt);
+                }
+            }
+            Expr::ListComprehension {
+                element,
+                iterable,
+                condition,
+                ..
+            } => {
+                self.visit_expr(element);
+                self.visit_expr(iterable);
+                if let Some(cond) = condition {
+                    self.visit_expr(cond);
+                }
+            }
+            Expr::Match {
+                value,
+                arms,
+                ..
+            } => {
+                self.visit_expr(value);
+                for arm in arms {
+                    if let Some(guard) = &arm.guard {
+                        self.visit_expr(guard);
+                    }
+                    self.visit_expr(&arm.body);
+                }
+            }
+            Expr::Literal {
+                ..
+            }
+            | Expr::Identifier {
+                ..
+            } => {
                 // No children to visit
             }
         }
@@ -135,21 +246,16 @@ pub trait Visitor<T = ()> where T: Default {
 }
 
 /// Trait for visiting AST nodes mutably.
-pub trait VisitorMut<T = ()> where T: Default {
+pub trait VisitorMut<T = ()>
+where T: Default {
     /// Visit a program node mutably.
-    fn visit_program_mut(&mut self, program: &mut Program) -> T {
-        self.walk_program_mut(program)
-    }
+    fn visit_program_mut(&mut self, program: &mut Program) -> T { self.walk_program_mut(program) }
 
     /// Visit a statement node mutably.
-    fn visit_stmt_mut(&mut self, stmt: &mut Stmt) -> T {
-        self.walk_stmt_mut(stmt)
-    }
+    fn visit_stmt_mut(&mut self, stmt: &mut Stmt) -> T { self.walk_stmt_mut(stmt) }
 
     /// Visit an expression node mutably.
-    fn visit_expr_mut(&mut self, expr: &mut Expr) -> T {
-        self.walk_expr_mut(expr)
-    }
+    fn visit_expr_mut(&mut self, expr: &mut Expr) -> T { self.walk_expr_mut(expr) }
 
     /// Default mutable program traversal.
     fn walk_program_mut(&mut self, program: &mut Program) -> T {
@@ -162,25 +268,39 @@ pub trait VisitorMut<T = ()> where T: Default {
     /// Default mutable statement traversal.
     fn walk_stmt_mut(&mut self, stmt: &mut Stmt) -> T {
         match stmt {
-            Stmt::Expression { expr, .. } => {
+            Stmt::Expression {
+                expr, ..
+            } => {
                 self.visit_expr_mut(expr);
             }
-            Stmt::VarDecl { initializer, .. } => {
+            Stmt::VarDecl {
+                initializer, ..
+            } => {
                 if let Some(init) = initializer {
                     self.visit_expr_mut(init);
                 }
             }
-            Stmt::FnDecl { body, .. } => {
+            Stmt::FnDecl {
+                body, ..
+            } => {
                 for stmt in body {
                     self.visit_stmt_mut(stmt);
                 }
             }
-            Stmt::StructDecl { methods, .. } => {
+            Stmt::StructDecl {
+                methods, ..
+            } => {
                 for method in methods {
                     self.visit_stmt_mut(method);
                 }
             }
-            Stmt::If { condition, then_branch, elif_branches, else_branch, .. } => {
+            Stmt::If {
+                condition,
+                then_branch,
+                elif_branches,
+                else_branch,
+                ..
+            } => {
                 self.visit_expr_mut(condition);
                 for stmt in then_branch {
                     self.visit_stmt_mut(stmt);
@@ -197,24 +317,55 @@ pub trait VisitorMut<T = ()> where T: Default {
                     }
                 }
             }
-            Stmt::While { condition, body, .. } | Stmt::For { iterable: condition, body, .. } => {
+            Stmt::While {
+                condition,
+                body,
+                ..
+            }
+            | Stmt::For {
+                iterable: condition,
+                body,
+                ..
+            } => {
                 self.visit_expr_mut(condition);
                 for stmt in body {
                     self.visit_stmt_mut(stmt);
                 }
             }
-            Stmt::Loop { body, .. } | Stmt::Block { statements: body, .. } => {
+            Stmt::Loop {
+                body, ..
+            }
+            | Stmt::Block {
+                statements: body, ..
+            } => {
                 for stmt in body {
                     self.visit_stmt_mut(stmt);
                 }
             }
-            Stmt::Return { value, .. } => {
+            Stmt::Return {
+                value, ..
+            } => {
                 if let Some(val) = value {
                     self.visit_expr_mut(val);
                 }
             }
-            Stmt::Break { .. } | Stmt::Continue { .. } => {
+            Stmt::Break {
+                ..
+            }
+            | Stmt::Continue {
+                ..
+            } => {
                 // No children to visit
+            }
+            Stmt::Import {
+                ..
+            } => {
+                // No expression children to visit
+            }
+            Stmt::Export {
+                item, ..
+            } => {
+                self.visit_stmt_mut(item);
             }
         }
         Default::default()
@@ -223,42 +374,113 @@ pub trait VisitorMut<T = ()> where T: Default {
     /// Default mutable expression traversal.
     fn walk_expr_mut(&mut self, expr: &mut Expr) -> T {
         match expr {
-            Expr::Binary { left, right, .. } => {
+            Expr::Binary {
+                left,
+                right,
+                ..
+            } => {
                 self.visit_expr_mut(left);
                 self.visit_expr_mut(right);
             }
-            Expr::Unary { operand, .. } => {
+            Expr::Unary {
+                operand, ..
+            } => {
                 self.visit_expr_mut(operand);
             }
-            Expr::Call { callee, arguments, .. } => {
+            Expr::Call {
+                callee,
+                arguments,
+                ..
+            } => {
                 self.visit_expr_mut(callee);
                 for arg in arguments {
                     self.visit_expr_mut(arg);
                 }
             }
-            Expr::Get { object, .. } => {
+            Expr::Get {
+                object, ..
+            } => {
                 self.visit_expr_mut(object);
             }
-            Expr::Set { object, value, .. } => {
+            Expr::Set {
+                object,
+                value,
+                ..
+            } => {
                 self.visit_expr_mut(object);
                 self.visit_expr_mut(value);
             }
-            Expr::List { elements, .. } => {
+            Expr::List {
+                elements, ..
+            } => {
                 for elem in elements {
                     self.visit_expr_mut(elem);
                 }
             }
-            Expr::Dict { pairs, .. } => {
+            Expr::Dict {
+                pairs, ..
+            } => {
                 for (key, value) in pairs {
                     self.visit_expr_mut(key);
                     self.visit_expr_mut(value);
                 }
             }
-            Expr::Index { object, index, .. } => {
+            Expr::Index {
+                object,
+                index,
+                ..
+            } => {
                 self.visit_expr_mut(object);
                 self.visit_expr_mut(index);
             }
-            Expr::Literal { .. } | Expr::Identifier { .. } => {
+            Expr::FString {
+                parts, ..
+            } => {
+                use crate::expr::FStringPart;
+                for part in parts {
+                    if let FStringPart::Expression(expr) = part {
+                        self.visit_expr_mut(expr);
+                    }
+                }
+            }
+            Expr::Function {
+                body, ..
+            } => {
+                for stmt in body {
+                    self.visit_stmt_mut(stmt);
+                }
+            }
+            Expr::ListComprehension {
+                element,
+                iterable,
+                condition,
+                ..
+            } => {
+                self.visit_expr_mut(element);
+                self.visit_expr_mut(iterable);
+                if let Some(cond) = condition {
+                    self.visit_expr_mut(cond);
+                }
+            }
+            Expr::Match {
+                value,
+                arms,
+                ..
+            } => {
+                self.visit_expr_mut(value);
+                for arm in arms {
+                    if let Some(guard) = &mut arm.guard {
+                        self.visit_expr_mut(guard);
+                    }
+                    self.visit_expr_mut(&mut arm.body);
+                }
+            }
+            Expr::Literal {
+                ..
+            }
+            | Expr::Identifier {
+                ..
+            } => {
                 // No children to visit
             }
         }

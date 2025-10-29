@@ -1,5 +1,5 @@
-use lugli_lexer::{LexError, Token};
 use lugli_common::Span;
+use lugli_lexer::{LexError, Token};
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
