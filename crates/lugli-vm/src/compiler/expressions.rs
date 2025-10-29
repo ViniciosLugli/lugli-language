@@ -159,14 +159,19 @@ impl Compiler {
                 } = object.as_ref()
                     && obj_name == "global"
                 {
-                    // This is a variable assignment - either global or local
+                    // This is a variable assignment - check local, then upvalue, then global
                     self.compile_expr(value)?;
 
                     // Check if it's a local variable first
                     if let Some(&local_index) = self.locals.get(name) {
                         self.emit(Instruction::Store(local_index));
                         self.emit(Instruction::Load(local_index));
+                    } else if let Some(&upvalue_index) = self.upvalues.get(name) {
+                        // It's an upvalue (captured from parent scope)
+                        self.emit(Instruction::StoreUpvalue(upvalue_index));
+                        self.emit(Instruction::LoadUpvalue(upvalue_index));
                     } else {
+                        // It's a global variable
                         let name_index = self.add_constant(Value::String(name.clone()));
                         self.emit(Instruction::StoreGlobal(name_index));
                         self.emit(Instruction::LoadGlobal(name_index));
@@ -598,7 +603,7 @@ impl Compiler {
         }
     }
 
-    fn detect_captures(&self, body: &[lugli_ast::Stmt], outer_locals: &hashbrown::HashMap<String, usize>, params: &[String]) -> Vec<String> {
+    pub(crate) fn detect_captures(&self, body: &[lugli_ast::Stmt], outer_locals: &hashbrown::HashMap<String, usize>, params: &[String]) -> Vec<String> {
         use std::collections::HashSet;
         let mut captures = HashSet::new();
 
@@ -630,12 +635,15 @@ impl Compiler {
                 self.find_captured_identifiers_in_expr(expr, outer_locals, params, captures);
             }
             Stmt::VarDecl {
-                initializer, ..
+                initializer: Some(expr), ..
             } => {
-                if let Some(expr) = initializer {
-                    self.find_captured_identifiers_in_expr(expr, outer_locals, params, captures);
-                }
+                self.find_captured_identifiers_in_expr(expr, outer_locals, params, captures);
                 // Don't capture the variable being declared
+            }
+            Stmt::VarDecl {
+                initializer: None, ..
+            } => {
+                // No initializer, nothing to capture
             }
             Stmt::If {
                 condition,

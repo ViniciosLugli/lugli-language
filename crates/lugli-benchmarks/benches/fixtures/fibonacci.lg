@@ -1,0 +1,27 @@
+# Fibonacci - Recursive
+fn fib_recursive(n) {
+    if n <= 1 {
+        return n
+    }
+    return fib_recursive(n - 1) + fib_recursive(n - 2)
+}
+
+# Fibonacci - Iterative
+fn fib_iterative(n) {
+    if n <= 1 {
+        return n
+    }
+    let a = 0
+    let b = 1
+    mut i = 2
+    while i <= n {
+        let temp = a + b
+        a = b
+        b = temp
+        i = i + 1
+    }
+    return b
+}
+
+# Benchmark target
+fib_recursive(20)

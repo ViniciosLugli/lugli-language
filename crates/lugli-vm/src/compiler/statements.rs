@@ -133,22 +133,40 @@ impl Compiler {
 
                 let body_start = self.current_instruction();
 
+                // Save compiler state
                 let saved_locals = self.locals.clone();
                 let saved_local_count = self.local_count;
                 let saved_scope_depth = self.scope_depth;
+                let saved_upvalues = self.upvalues.clone();
+                let saved_upvalue_count = self.upvalue_count;
 
+                // Detect which variables will be captured from outer scope
+                let captures = self.detect_captures(body, &saved_locals, params);
+
+                // Enter function scope
                 self.locals.clear();
                 self.local_count = 0;
-                self.scope_depth += 1; // Enter function scope
+                self.scope_depth += 1;
 
+                // Set up upvalues for captured variables
+                self.upvalues.clear();
+                self.upvalue_count = 0;
+                for capture_name in &captures {
+                    self.upvalues.insert(capture_name.clone(), self.upvalue_count);
+                    self.upvalue_count += 1;
+                }
+
+                // Declare parameters as local variables
                 for param in params {
                     self.declare_local(param.clone());
                 }
 
+                // Compile function body
                 for stmt in body {
                     self.compile_stmt(stmt)?;
                 }
 
+                // Add implicit return if needed
                 if !matches!(body.last(), Some(Stmt::Return { .. })) {
                     let null_index = self.add_constant(Value::Null);
                     self.emit(Instruction::Constant(null_index));
@@ -157,19 +175,36 @@ impl Compiler {
 
                 self.patch_jump(jump_over_body)?;
 
-                self.locals = saved_locals;
+                // Restore compiler state
+                self.locals = saved_locals.clone();
                 self.local_count = saved_local_count;
-                self.scope_depth = saved_scope_depth; // Restore scope depth
+                self.scope_depth = saved_scope_depth;
+                self.upvalues = saved_upvalues;
+                self.upvalue_count = saved_upvalue_count;
 
+                // Create the function value
                 let function_value = Value::Function {
                     name: name.clone(),
                     params: params.clone(),
                     body_start,
                     bytecode_id: 0, // Main bytecode
                 };
-
                 let function_index = self.add_constant(function_value);
-                self.emit(Instruction::DefineFunction(function_index));
+
+                // If function has captures, emit MakeClosure and store as closure
+                // Otherwise, use regular DefineFunction
+                if captures.is_empty() {
+                    // No captures - regular function
+                    self.emit(Instruction::DefineFunction(function_index));
+                } else {
+                    // Has captures - create closure
+                    let capture_indices: Vec<usize> = captures.iter().filter_map(|name| saved_locals.get(name).copied()).collect();
+
+                    self.emit(Instruction::MakeClosure {
+                        function_index,
+                        capture_indices,
+                    });
+                }
 
                 let name_index = self.add_constant(Value::String(name.clone()));
                 self.emit(Instruction::StoreGlobal(name_index));
@@ -190,7 +225,7 @@ impl Compiler {
                     None => {
                         // import module [as alias]
                         // Determine binding name: alias if provided, else last component of path
-                        let bind_name = alias.as_ref().map(|s| s.clone()).unwrap_or_else(|| module_path.last().unwrap().clone());
+                        let bind_name = alias.clone().unwrap_or_else(|| module_path.last().unwrap().clone());
 
                         // ImportModule stores directly in globals with no stack effect
                         self.emit(Instruction::ImportModule {

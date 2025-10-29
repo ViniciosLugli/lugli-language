@@ -1,0 +1,38 @@
+# Bubble sort implementation
+fn bubble_sort(arr) {
+    let n = arr.len()
+    mut i = 0
+    while i < n {
+        mut j = 0
+        while j < n - i - 1 {
+            if arr[j] > arr[j + 1] {
+                let temp = arr[j]
+                arr[j] = arr[j + 1]
+                arr[j + 1] = temp
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    return arr
+}
+
+# Quicksort implementation with list comprehensions
+fn quicksort(arr) {
+    if arr.len() <= 1 {
+        return arr
+    }
+
+    let pivot = arr[arr.len() / 2]
+    let less = [x for x in arr if x < pivot]
+    let equal = [x for x in arr if x == pivot]
+    let greater = [x for x in arr if x > pivot]
+
+    return quicksort(less) + equal + quicksort(greater)
+}
+
+# Generate test data
+let data = [64, 34, 25, 12, 22, 11, 90, 88, 45, 50, 23, 36, 18, 77, 29]
+
+# Benchmark target - using quicksort
+quicksort(data)

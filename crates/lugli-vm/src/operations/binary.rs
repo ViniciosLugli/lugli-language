@@ -1,5 +1,7 @@
 use lugli_common::{LugliError, Value};
 use lugli_lexer::TokenKind;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub fn apply_binary_op(left: &Value, op: &TokenKind, right: &Value) -> Result<Value, LugliError> {
     match (left, op, right) {
@@ -21,6 +23,12 @@ pub fn apply_binary_op(left: &Value, op: &TokenKind, right: &Value) -> Result<Va
             }
         }
         (Value::String(l), TokenKind::Plus, Value::String(r)) => Ok(Value::String(format!("{}{}", l, r))),
+        // List concatenation
+        (Value::List(l), TokenKind::Plus, Value::List(r)) => {
+            let mut result = l.borrow().clone();
+            result.extend(r.borrow().clone());
+            Ok(Value::List(Rc::new(RefCell::new(result))))
+        }
         // Comparison operators
         (Value::Number(l), TokenKind::Greater, Value::Number(r)) => Ok(Value::Bool(l > r)),
         (Value::Number(l), TokenKind::GreaterEqual, Value::Number(r)) => Ok(Value::Bool(l >= r)),

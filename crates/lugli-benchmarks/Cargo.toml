@@ -1,0 +1,21 @@
+[package]
+name = "lugli-benchmarks"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "User-facing language performance benchmarks for Lugli"
+publish = false
+
+[dependencies]
+lugli-common.workspace = true
+lugli-ast.workspace = true
+lugli-parser.workspace = true
+lugli-vm.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "language_benchmarks"
+harness = false

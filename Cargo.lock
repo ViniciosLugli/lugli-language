@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "lugli"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "clap",
  "colored",
@@ -563,7 +563,7 @@ dependencies = [
 
 [[package]]
 name = "lugli-ast"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "criterion",
  "insta",
@@ -575,8 +575,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lugli-benchmarks"
+version = "0.4.0"
+dependencies = [
+ "criterion",
+ "lugli-ast",
+ "lugli-common",
+ "lugli-parser",
+ "lugli-vm",
+]
+
+[[package]]
 name = "lugli-common"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "criterion",
@@ -588,7 +599,7 @@ dependencies = [
 
 [[package]]
 name = "lugli-lexer"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "criterion",
  "logos",
@@ -600,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "lugli-parser"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "criterion",
  "insta",
@@ -614,7 +625,7 @@ dependencies = [
 
 [[package]]
 name = "lugli-stdlib"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "criterion",
@@ -628,7 +639,7 @@ dependencies = [
 
 [[package]]
 name = "lugli-vm"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "colored",
  "criterion",

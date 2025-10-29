@@ -33,103 +33,100 @@ Lugli combines the best of both worlds:
 
 ## 🌊 Lugli Syntax Guide
 
+> **Note**: This guide is divided into **Current Syntax** (v0.3.2, fully implemented) and **Future Syntax** (v0.4.0+, planned features).
+
+---
+
+## ✅ Current Syntax (v0.3.2 - Fully Implemented)
+
 ### **Variable Declaration**
 
 ```lugli
-# Mutable variables (Python simplicity + Rust clarity)
-let name = "Lugli"          # Mutable by default
-mut counter = 0             # Explicitly mutable when needed
+# Mutable variables
+let name = "Lugli"          # ✅ Works now
+mut counter = 0             # ✅ Works now
+const PI = 3.14             # ✅ Works now
 
-# Immutable values
-const PI = 3.14             # Compile-time constant
+# With type hints (ignored at runtime) ✅
+let score: f64 = 95.5
+let items: List = []
 ```
 
 ### **Comments**
 
 ```lugli
-# Single-line comment (Python-style)
-// Alternative single-line (Rust-style also supported)
-
-"""
-Multi-line docstring
-for functions and modules
-(Python-style)
-"""
+# Single-line comment (Python-style) ✅
+// Alternative single-line (Rust-style also supported) ✅
 ```
 
 ### **String Operations**
 
 ```lugli
-# String concatenation
+# String concatenation ✅
 let greeting = "Hello, " + name
 
-# F-string interpolation (Python-inspired)
+# F-string interpolation ✅
 let message = f"Hello, {name}! You are {age} years old."
 
-# Format macro (Rust-inspired)
+# Format macro ✅
 let formatted = format!("User: {}, ID: {}", name, id)
 ```
 
 ### **Print & Output**
 
 ```lugli
-# Simple print (Python-style)
+# Print function ✅
 print("Hello, World")
 print(f"Name: {name}")
 
-# Debug output (Rust-style)
-dbg!(variable)
-
-# Formatted print macro (optional)
+# Print macro (original syntax) ✅
 println!("Hello, {}", name)
 ```
 
 ### **Functions**
 
 ```lugli
-# Basic function
+# Basic function ✅
 fn greet(name) {
     return f"Hello, {name}"
 }
 
-# With type hints (optional, Python 3.5+ style)
+# Function with type hints (ignored at runtime) ✅
 fn add(a: num, b: num) -> num {
     return a + b
 }
 
-# Default parameters
-fn connect(host="localhost", port=8080) {
-    # Implementation
-}
+# Function with closures ✅
+let add = fn(a, b) { return a + b }
 ```
 
-### **Structs (Classes)**
+### **Structs**
 
 ```lugli
-# Dataclass-style
-@dataclass
-struct Point {
-    x: num = 0
-    y: num = 0
-}
-
-# Standard struct with methods
+# Standard struct with methods ✅
 struct Person {
-    name: str
-    age: num
+    name
+    age
 
     fn greet(self) {
         print(f"Hi, I'm {self.name}")
     }
 }
 
+# Struct with type hints (ignored at runtime) ✅
+struct Point {
+    x: num
+    y: num = 0  # With default value
+}
+
+# Struct instantiation ✅
 let person = Person { name: "Alice", age: 30 }
 ```
 
 ### **Control Flow**
 
 ```lugli
-# If/elif/else (Python-style elif)
+# If/elif/else ✅
 if age >= 18 {
     print("Adult")
 } elif age >= 13 {
@@ -138,7 +135,7 @@ if age >= 18 {
     print("Child")
 }
 
-# Pattern matching (Rust-inspired)
+# Pattern matching ✅
 match status {
     "success" => handle_success(),
     "error" => handle_error(),
@@ -150,15 +147,14 @@ match status {
 ### **Collections**
 
 ```lugli
-# Lists with comprehensions (Python-style)
+# Lists ✅
 let numbers = [1, 2, 3, 4, 5]
+
+# List comprehensions ✅
 let squares = [x * x for x in numbers]
 let evens = [x for x in numbers if x % 2 == 0]
 
-# Functional style (current approach)
-let doubled = numbers.map!(fn(x) { x * 2 })
-
-# Dictionaries
+# Dictionaries ✅
 let person = {
     "name": "Alice",
     "age": 30,
@@ -169,7 +165,7 @@ let person = {
 ### **Loops & Iteration**
 
 ```lugli
-# For loops (Python-style)
+# For loops ✅
 for item in collection {
     print(item)
 }
@@ -178,43 +174,114 @@ for (index, item) in enumerate(collection) {
     print(f"{index}: {item}")
 }
 
-# While loops
+# While loops ✅
 while condition {
     # ...
 }
 
-# Infinite loops
+# Infinite loops ✅
 loop {
     if should_break { break }
+    if should_skip { continue }
 }
 ```
 
-### **Import System**
+### **Import System (Basic)**
 
 ```lugli
-# Python-style imports
-import math
-from stdlib import List, Dict
-from math import pi, sqrt
-
-# Dynamic imports (keep current macro)
+# Dynamic imports ✅
 import!("./module.lg")
 ```
 
 ### **Method Naming Conventions**
 
 ```lugli
-# Query methods (return info)
-len = list.len?()
-is_empty = list.empty?()
+# Parser supports ! and ? suffixes for user-defined methods ✅
+struct Counter {
+    value
 
-# Mutating methods (modify in place)
-list.push!(item)
-list.reverse!()
+    fn increment!(self) {  # Mutating method
+        self.value = self.value + 1
+    }
 
-# Non-mutating methods (return new value)
-upper_string = text.upper()
-new_list = old_list.filter(predicate)
+    fn is_zero?(self) {  # Query method
+        return self.value == 0
+    }
+}
+
+let counter = Counter { value: 0 }
+counter.increment!()
+let check = counter.is_zero?()
+
+# Stdlib methods use plain names (no suffix convention)
+list.push(item)  # ✅ Works
+text.upper()     # ✅ Works
+```
+
+---
+
+## 🔮 Future Syntax (v0.4.0+ - Planned)
+
+### **Advanced Features** ❌ NOT YET IMPLEMENTED
+
+```lugli
+# Multiple assignment
+let x, y = 10, 20
+
+# Destructuring
+let {name, age} = person
+
+# Spread operator
+let [first, ...rest] = numbers
+
+# Impl blocks
+impl Person {
+    fn new(name, age) {
+        return Person { name, age }
+    }
+}
+
+# Generic types
+struct Container<T> {
+    value: T
+}
+
+# Inheritance
+struct Student : Person {
+    grade: num
+}
+
+# Result/Option types
+fn divide(a, b) -> Result<num, str> {
+    if b == 0 {
+        return Err("Division by zero")
+    }
+    return Ok(a / b)
+}
+```
+
+### **File-Based Imports** ⚠️ PARTIALLY IMPLEMENTED
+
+```lugli
+# Python-style imports (parsed but not fully functional)
+import math
+from stdlib import List, Dict
+from math import pi, sqrt
+```
+
+### **Advanced I/O** ❌ NOT YET IMPLEMENTED
+
+```lugli
+# File operations
+let file = open("data.txt", "r")
+let content = file.read()
+file.close()
+
+# HTTP requests
+let response = http.get("https://api.example.com")
+
+# Process spawning
+let result = process.run("ls", ["-la"])
 ```
 
 ---

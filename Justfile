@@ -106,11 +106,36 @@ deps:
 update:
     cargo update
 
-# Run benchmarks
+# Run language performance benchmarks (full suite ~2-3min)
 bench:
-    cargo bench
+    @echo "Running full benchmark suite..."
+    cargo bench --bench language_benchmarks
 
-# Run benchmarks for specific crate
+# Run quick benchmarks (sample_size=10 for CI, ~30s)
+bench-quick:
+    @echo "Running quick benchmarks..."
+    cargo bench --bench language_benchmarks -- --sample-size 10 --warm-up-time 1
+
+# Run specific benchmark group (e.g. algorithms, data_processing)
+bench-group group:
+    cargo bench --bench language_benchmarks -- {{group}}
+
+# Open benchmark HTML report in browser
+bench-report:
+    @echo "Opening benchmark report..."
+    @open target/criterion/report/index.html || xdg-open target/criterion/report/index.html || echo "Report at: target/criterion/report/index.html"
+
+# Save current benchmarks as baseline for comparison
+bench-baseline name:
+    @echo "Saving baseline: {{name}}"
+    cargo bench --bench language_benchmarks -- --save-baseline {{name}}
+
+# Compare against a baseline
+bench-compare baseline:
+    @echo "Comparing against baseline: {{baseline}}"
+    cargo bench --bench language_benchmarks -- --baseline {{baseline}}
+
+# Run benchmarks for specific crate (internal dev benchmarks)
 bench-crate crate:
     cargo bench -p {{crate}}
 
