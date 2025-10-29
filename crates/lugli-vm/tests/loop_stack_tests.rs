@@ -35,7 +35,7 @@ fn test_method_calls_in_loop_return_correct_values() {
 
         for word in words {
             let upper = word.upper()  # This was returning null
-            results.push!(upper)
+            results.push(upper)
         }
 
         if results[0] != "HELLO" {

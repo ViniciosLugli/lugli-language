@@ -28,7 +28,6 @@ impl<'a> Parser<'a> {
         self.previous.as_ref().unwrap_or_else(|| {
             ERROR_TOKEN.get_or_init(|| Token {
                 kind: TokenKind::Eof,
-                lexeme: String::from(""),
                 span: Span {
                     start: 0,
                     end: 0,

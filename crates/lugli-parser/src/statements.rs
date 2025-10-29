@@ -443,7 +443,7 @@ impl<'a> Parser<'a> {
                     }
                 };
 
-                let binary_operator = lugli_lexer::Token::new(binary_op, "".to_string(), operator.span);
+                let binary_operator = lugli_lexer::Token::new(binary_op, operator.span);
                 let span = self.merge_spans(*expr.span(), *value.span());
                 Expr::Binary {
                     left: Box::new(expr.clone()),

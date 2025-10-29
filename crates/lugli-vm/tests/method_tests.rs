@@ -2,7 +2,7 @@
 //
 // Tests string, list, and dict methods including:
 // - String methods: upper, lower, split, join, trim
-// - List methods: push!, pop!, filter, map!, len
+// - List methods: push, pop, filter, map!, len
 // - Dict methods: get, keys, values
 // - Method chaining
 // - Methods in control flow
@@ -35,23 +35,23 @@ fn test_string_methods() {
 fn test_list_mutating_methods() {
     let source = r#"
         let list = [1, 2, 3]
-        list.push!(4)
+        list.push(4)
 
         if list.len() != 4 {
-            let error = 1 / 0  # push! failed
+            let error = 1 / 0  # push failed
         }
 
         if list[3] != 4 {
-            let error = 1 / 0  # push! didn't add element correctly
+            let error = 1 / 0  # push didn't add element correctly
         }
 
-        let popped = list.pop!()
+        let popped = list.pop()
         if popped != 4 {
-            let error = 1 / 0  # pop! returned wrong value
+            let error = 1 / 0  # pop returned wrong value
         }
 
         if list.len() != 3 {
-            let error = 1 / 0  # pop! didn't remove element
+            let error = 1 / 0  # pop didn't remove element
         }
     "#;
 
@@ -142,7 +142,7 @@ fn test_methods_in_control_flow() {
         let i = 0
 
         while i < 5 {
-            list.push!(i)
+            list.push(i)
             i = i + 1
         }
 
@@ -267,14 +267,14 @@ fn test_method_error_handling() {
 
     assert!(run_test_expect_error(source), "Should fail when calling string method on number");
 
-    // Test with wrong number of arguments
+    // Test with wrong type of arguments
     let source2 = r#"
         let text = "hello"
-        # split() requires an argument
-        let parts = text.split()
+        # split() with non-string separator should fail
+        let parts = text.split(42)
     "#;
 
-    assert!(run_test_expect_error(source2), "Should fail with wrong number of arguments");
+    assert!(run_test_expect_error(source2), "Should fail with wrong argument type");
 }
 
 #[test]
@@ -289,9 +289,9 @@ fn test_mutating_vs_non_mutating() {
         }
 
         # Mutating method - original changed
-        original.push!(4)
+        original.push(4)
         if original.len() != 4 {
-            let error = 1 / 0  # Push! didn't mutate original list
+            let error = 1 / 0  # push didn't mutate original list
         }
 
         # Verify original still has all elements

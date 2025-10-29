@@ -365,7 +365,7 @@ fn test_struct_with_list_field() {
             records: []
 
             fn add_record!(self, record) {
-                self.records.push!(record)
+                self.records.push(record)
             }
 
             fn count(self) {

@@ -66,8 +66,8 @@ print!(f"Hello from {name} v{version}!")
 
 # List methods
 let nums = [1, 2, 3]
-nums.push!(4)           # [1, 2, 3, 4]
-nums.pop!()             # 4
+nums.push(4)           # [1, 2, 3, 4]
+nums.pop()             # 4
 nums.len()              # 3
 
 # Dictionary methods

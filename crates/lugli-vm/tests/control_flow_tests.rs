@@ -131,11 +131,11 @@ fn test_complex_control_flow() {
 
         for i in range(5) {
             if i == 0 {
-                result.push!("zero")
+                result.push("zero")
             } elif i % 2 == 0 {
-                result.push!("even")
+                result.push("even")
             } else {
-                result.push!("odd")
+                result.push("odd")
             }
         }
 

@@ -51,14 +51,14 @@ impl<'a> Iterator for Lexer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let kind = self.inner.next()?;
         let span = self.inner.span();
-        let lexeme = self.inner.slice().to_string();
 
         match kind {
             Ok(mut token_kind) => {
-                // Intern strings for String/Identifier/FString tokens
+                // Only allocate string for tokens that need interning
                 match &mut token_kind {
                     TokenKind::String(_) | TokenKind::FString(_) => {
-                        let id = self.pool.intern(&lexeme);
+                        let lexeme = self.inner.slice();
+                        let id = self.pool.intern(lexeme);
                         match &mut token_kind {
                             TokenKind::String(sid) => *sid = id,
                             TokenKind::FString(sid) => *sid = id,
@@ -66,7 +66,8 @@ impl<'a> Iterator for Lexer<'a> {
                         }
                     }
                     TokenKind::Identifier(_) => {
-                        let id = self.pool.intern(&lexeme);
+                        let lexeme = self.inner.slice();
+                        let id = self.pool.intern(lexeme);
                         if let TokenKind::Identifier(sid) = &mut token_kind {
                             *sid = id;
                         }
@@ -74,9 +75,12 @@ impl<'a> Iterator for Lexer<'a> {
                     _ => {}
                 }
 
-                Some(Ok(Token::new(token_kind, lexeme, span.into())))
+                Some(Ok(Token::new(token_kind, span.into())))
             }
-            Err(_) => Some(Err(LexError::UnexpectedChar(lexeme.chars().next().unwrap_or('\0')))),
+            Err(_) => {
+                let lexeme = self.inner.slice();
+                Some(Err(LexError::UnexpectedChar(lexeme.chars().next().unwrap_or('\0'))))
+            }
         }
     }
 }
@@ -126,11 +130,10 @@ mod tests {
             ("await", TokenKind::Await),
         ];
 
-        for (keyword, expected_kind) in keywords {
-            let tokens = tokenize(keyword).unwrap();
+        for (_keyword, expected_kind) in keywords {
+            let tokens = tokenize(_keyword).unwrap();
             assert_eq!(tokens.len(), 1);
             assert_eq!(tokens[0].kind, expected_kind);
-            assert_eq!(tokens[0].lexeme, keyword);
         }
     }
 
@@ -217,12 +220,11 @@ mod tests {
         let source = "fn calculate(x: f64, y: f64) -> f64 { x + y }";
         let (tokens, pool) = tokenize_with_pool(source).unwrap();
 
-        let expected = vec!["fn", "calculate", "(", "x", ":", "f64", ",", "y", ":", "f64", ")", "->", "f64", "{", "x", "+", "y", "}"];
+        // Verify token count and basic structure
+        assert_eq!(tokens.len(), 18);
 
-        assert_eq!(tokens.len(), expected.len());
-        for (token, expected_lexeme) in tokens.iter().zip(expected.iter()) {
-            assert_eq!(token.lexeme, *expected_lexeme);
-        }
+        // Verify first token is fn keyword
+        assert_eq!(tokens[0].kind, TokenKind::Fn);
 
         // Verify identifier tokens
         assert!(matches!(tokens[1].kind, TokenKind::Identifier(_)));
@@ -233,5 +235,32 @@ mod tests {
             }),
             "calculate"
         );
+
+        // Verify some key tokens
+        assert_eq!(tokens[2].kind, TokenKind::LeftParen);
+        assert_eq!(tokens[11].kind, TokenKind::Arrow);
+        assert_eq!(tokens[13].kind, TokenKind::LeftBrace);
+        assert_eq!(tokens[15].kind, TokenKind::Plus);
+        assert_eq!(tokens[17].kind, TokenKind::RightBrace);
+    }
+
+    #[test]
+    fn test_token_size_reduction() {
+        use std::mem::size_of;
+
+        let token_size = size_of::<Token>();
+
+        // Token should be significantly smaller without lexeme field
+        // Original: ~48 bytes (TokenKind discriminant + String 24 bytes + Span 16 bytes + padding)
+        // Actual: 32 bytes (TokenKind discriminant 16 bytes + Span 16 bytes)
+        // This is a 33% reduction in size!
+        assert!(
+            token_size <= 32,
+            "Token size should be <= 32 bytes, got {} bytes",
+            token_size
+        );
+
+        let reduction_percent = ((48.0 - token_size as f64) / 48.0 * 100.0) as u32;
+        println!("✅ Token size: {} bytes (reduced {}% from 48 bytes)", token_size, reduction_percent);
     }
 }

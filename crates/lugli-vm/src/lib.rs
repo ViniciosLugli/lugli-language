@@ -8,7 +8,6 @@ pub mod debug;
 pub mod error_formatter;
 pub mod machine;
 pub mod module;
-pub mod operations;
 
 // Core VM components
 pub use bytecode::{Bytecode, Instruction, SourceLocation};

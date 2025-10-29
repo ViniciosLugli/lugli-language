@@ -10,7 +10,7 @@ fn test_mutating_method_bang_suffix() {
             items: []
 
             fn add!(self, item) {
-                self.items.push!(item)
+                self.items.push(item)
             }
 
             fn clear!(self) {
@@ -129,8 +129,8 @@ fn test_let_mut_declaration() {
 
         # Test mutation
         let mut list = []
-        list.push!(1)
-        list.push!(2)
+        list.push(1)
+        list.push(2)
 
         if list.len() != 2 {
             let error = 1 / 0  # Mutable list operations failed
@@ -231,7 +231,7 @@ fn test_no_stack_pollution_in_loops() {
         let list = []
 
         for i in range(3) {
-            list.push!(i)  # This was leaving values on stack
+            list.push(i)  # This was leaving values on stack
             i * 2  # Expression statement - should not pollute stack
             "test"  # Another expression
         }
@@ -260,7 +260,7 @@ fn test_method_return_values_in_loops() {
 
         for word in words {
             let upper = word.upper()  # This was returning null
-            uppercase.push!(upper)
+            uppercase.push(upper)
         }
 
         if uppercase[0] != "HELLO" {
@@ -333,7 +333,7 @@ fn test_input_chain_in_loop() {
 
         while input.index < input.values.len() {
             let value = input.get_next()
-            results.push!(value)
+            results.push(value)
         }
 
         if results.len() != 3 {
@@ -359,7 +359,7 @@ fn test_nested_loops_with_break() {
                 if i == 1 && j == 1 {
                     break  # Should only break inner loop
                 }
-                result.push!(i * 10 + j)
+                result.push(i * 10 + j)
             }
         }
 
@@ -438,7 +438,7 @@ fn test_list_operations_sequence() {
 
         # Build list
         for i in range(5) {
-            list.push!(i)
+            list.push(i)
         }
 
         # Filter evens

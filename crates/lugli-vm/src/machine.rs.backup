@@ -3,7 +3,7 @@ use crate::{
     module::{ModuleCache, ModuleResolver},
 };
 use hashbrown::HashMap;
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringId, Value};
 use lugli_stdlib::get_global_functions;
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
 
@@ -166,6 +166,14 @@ impl Machine {
         traces
     }
 
+    fn get_method_args(&self, arg_count: usize) -> Result<&[Value], LugliError> {
+        let args_start =
+            self.stack.len().checked_sub(arg_count).ok_or_else(|| {
+                LugliError::runtime(format!("Stack underflow: method expects {} args but stack has {}", arg_count, self.stack.len()))
+            })?;
+        Ok(&self.stack[args_start..])
+    }
+
     fn get_constant<'a>(&self, bytecode: &'a Bytecode, index: usize) -> Result<&'a Value, LugliError> {
         bytecode
             .constants
@@ -190,6 +198,162 @@ impl Machine {
         }
 
         Some(context)
+    }
+
+    fn call_string_method(&mut self, method: &str, s: StringId, arg_count: usize, bytecode: &Bytecode) -> Result<Value, LugliError> {
+        let args = self.get_method_args(arg_count)?;
+        let string = bytecode.string_pool.borrow().resolve(s).to_string();
+
+        match method {
+            "len" => Ok(Value::Number(string.len() as f64)),
+            "trim" => {
+                let trimmed = string.trim();
+                let id = bytecode.string_pool.borrow_mut().intern(trimmed);
+                Ok(Value::String(id))
+            }
+            "lower" => {
+                let lower = string.to_lowercase();
+                let id = bytecode.string_pool.borrow_mut().intern(&lower);
+                Ok(Value::String(id))
+            }
+            "upper" => {
+                let upper = string.to_uppercase();
+                let id = bytecode.string_pool.borrow_mut().intern(&upper);
+                Ok(Value::String(id))
+            }
+            "chars" => {
+                let chars: Vec<Value> = string
+                    .chars()
+                    .map(|c| {
+                        let char_str = c.to_string();
+                        let id = bytecode.string_pool.borrow_mut().intern(&char_str);
+                        Value::String(id)
+                    })
+                    .collect();
+                Ok(Value::List(Rc::new(RefCell::new(chars))))
+            }
+            "split" => {
+                if arg_count != 1 {
+                    return Err(LugliError::runtime("split expects 1 argument (separator)"));
+                }
+                let separator = match &args[0] {
+                    Value::String(sep) => bytecode.string_pool.borrow().resolve(*sep).to_string(),
+                    _ => return Err(LugliError::runtime("split separator must be a string")),
+                };
+                let parts: Vec<Value> = string
+                    .split(&separator)
+                    .map(|part| {
+                        let id = bytecode.string_pool.borrow_mut().intern(part);
+                        Value::String(id)
+                    })
+                    .collect();
+                Ok(Value::List(Rc::new(RefCell::new(parts))))
+            }
+            "is_alphabetic" => Ok(Value::Bool(string.chars().all(|c| c.is_alphabetic()))),
+            "starts_with" => {
+                if arg_count != 1 {
+                    return Err(LugliError::runtime("starts_with expects 1 argument"));
+                }
+                match &args[0] {
+                    Value::String(prefix) => {
+                        let prefix_str = bytecode.string_pool.borrow().resolve(*prefix).to_string();
+                        Ok(Value::Bool(string.starts_with(&prefix_str)))
+                    }
+                    _ => Err(LugliError::runtime("starts_with argument must be a string")),
+                }
+            }
+            "ends_with" => {
+                if arg_count != 1 {
+                    return Err(LugliError::runtime("ends_with expects 1 argument"));
+                }
+                match &args[0] {
+                    Value::String(suffix) => {
+                        let suffix_str = bytecode.string_pool.borrow().resolve(*suffix).to_string();
+                        Ok(Value::Bool(string.ends_with(&suffix_str)))
+                    }
+                    _ => Err(LugliError::runtime("ends_with argument must be a string")),
+                }
+            }
+            "contains" => {
+                if arg_count != 1 {
+                    return Err(LugliError::runtime("contains expects 1 argument"));
+                }
+                match &args[0] {
+                    Value::String(substring) => {
+                        let substring_str = bytecode.string_pool.borrow().resolve(*substring).to_string();
+                        Ok(Value::Bool(string.contains(&substring_str)))
+                    }
+                    _ => Err(LugliError::runtime("contains argument must be a string")),
+                }
+            }
+            _ => Err(LugliError::runtime(format!("String has no method '{}'", method))),
+        }
+    }
+
+    fn call_list_method(&mut self, method: &str, list: Rc<RefCell<Vec<Value>>>, arg_count: usize, bytecode: &Bytecode) -> Result<Value, LugliError> {
+        let args = self.get_method_args(arg_count)?;
+
+        match method {
+            "len" => Ok(Value::Number(list.borrow().len() as f64)),
+            "push" | "push" => {
+                if arg_count != 1 {
+                    return Err(LugliError::runtime("push expects 1 argument"));
+                }
+                list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?.push(args[0].clone());
+                Ok(Value::Null)
+            }
+            "pop" | "pop" => {
+                let val = list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?.pop();
+                Ok(val.unwrap_or(Value::Null))
+            }
+            "join" => {
+                let separator = if arg_count > 0 {
+                    match &args[0] {
+                        Value::String(s) => bytecode.string_pool.borrow().resolve(*s).to_string(),
+                        _ => return Err(LugliError::runtime("join separator must be a string")),
+                    }
+                } else {
+                    "".to_string()
+                };
+                let pool = bytecode.string_pool.borrow();
+                let strings: Vec<String> = list.borrow().iter().map(|v| v.display_with_pool(&pool)).collect();
+                drop(pool);
+                let joined = strings.join(&separator);
+                let id = bytecode.string_pool.borrow_mut().intern(&joined);
+                Ok(Value::String(id))
+            }
+            "contains" => {
+                if arg_count != 1 {
+                    return Err(LugliError::runtime("contains expects 1 argument"));
+                }
+                let contains = list.borrow().iter().any(|v| v.equals(&args[0]));
+                Ok(Value::Bool(contains))
+            }
+            "is_empty" => Ok(Value::Bool(list.borrow().is_empty())),
+            "clear" => {
+                list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?.clear();
+                Ok(Value::Null)
+            }
+            "reverse" => {
+                list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?.reverse();
+                Ok(Value::Null)
+            }
+            "filter" => {
+                if arg_count != 1 {
+                    return Err(LugliError::runtime("filter expects 1 argument (predicate function)"));
+                }
+                // Return error - higher-order functions need bytecode access
+                Err(LugliError::runtime("filter requires bytecode context (use call_list_method_with_bytecode)"))
+            }
+            "map" | "map!" => {
+                if arg_count != 1 {
+                    return Err(LugliError::runtime("map expects 1 argument (mapper function)"));
+                }
+                // Return error - higher-order functions need bytecode access
+                Err(LugliError::runtime("map requires bytecode context (use call_list_method_with_bytecode)"))
+            }
+            _ => Err(LugliError::runtime(format!("List has no method '{}'", method))),
+        }
     }
 
     fn list_filter(&mut self, list: Rc<RefCell<Vec<Value>>>, predicate: &Value, bytecode: &Bytecode) -> Result<Value, LugliError> {
@@ -324,6 +488,54 @@ impl Machine {
             if !continue_execution {
                 return Ok(());
             }
+        }
+    }
+
+    fn call_dict_method(
+        &mut self,
+        method: &str,
+        dict: Rc<RefCell<HashMap<StringId, Value>>>,
+        arg_count: usize,
+        _bytecode: &Bytecode,
+    ) -> Result<Value, LugliError> {
+        let args = self.get_method_args(arg_count)?;
+
+        match method {
+            "len" => Ok(Value::Number(dict.borrow().len() as f64)),
+            "keys" => {
+                let keys: Vec<Value> = dict.borrow().keys().map(|k| Value::String(*k)).collect();
+                Ok(Value::List(Rc::new(RefCell::new(keys))))
+            }
+            "values" => {
+                let values: Vec<Value> = dict.borrow().values().cloned().collect();
+                Ok(Value::List(Rc::new(RefCell::new(values))))
+            }
+            "get" => {
+                if !(1..=2).contains(&arg_count) {
+                    return Err(LugliError::runtime("get expects 1 or 2 arguments"));
+                }
+                match &args[0] {
+                    Value::String(key) => {
+                        let default = if arg_count == 2 { args[1].clone() } else { Value::Null };
+                        Ok(dict.borrow().get(key).cloned().unwrap_or(default))
+                    }
+                    _ => Err(LugliError::runtime("Dictionary key must be a string")),
+                }
+            }
+            "contains" => {
+                if arg_count != 1 {
+                    return Err(LugliError::runtime("contains expects 1 argument"));
+                }
+                match &args[0] {
+                    Value::String(key) => Ok(Value::Bool(dict.borrow().contains_key(key))),
+                    _ => Err(LugliError::runtime("Dictionary key must be a string")),
+                }
+            }
+            "clear" => {
+                dict.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?.clear();
+                Ok(Value::Null)
+            }
+            _ => Err(LugliError::runtime(format!("Dict has no method '{}'", method))),
         }
     }
 

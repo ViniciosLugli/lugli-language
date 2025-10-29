@@ -271,7 +271,6 @@ mod public_api_tests {
 
         if let Some(Ok(token)) = first_token {
             assert_eq!(token.kind, TokenKind::Let);
-            assert_eq!(token.lexeme, "let");
         }
 
         // Continue iterating
