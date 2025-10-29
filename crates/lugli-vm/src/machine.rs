@@ -554,14 +554,14 @@ impl Machine {
 
         match instruction {
             Instruction::Constant(index) => {
-                let value = self.get_constant(bytecode, *index)?.clone();
+                let value = self.get_constant(bytecode, *index)?.clone_for_stack();
                 self.stack.push(value);
             }
             Instruction::Pop => {
                 self.pop()?;
             }
             Instruction::Dup => {
-                let val = self.peek()?.clone();
+                let val = self.peek()?.clone_for_stack();
                 self.stack.push(val);
             }
             Instruction::Add => {
@@ -668,7 +668,7 @@ impl Machine {
             }
             Instruction::Call(arg_count) => {
                 let arg_count = *arg_count as usize;
-                let callee = self.peek_n(0)?.clone(); // Callee is at the top
+                let callee = self.peek_n(0)?.clone_for_stack(); // Callee is at the top
 
                 if self.debug.trace_calls {
                     let func_name = match &callee {
@@ -820,7 +820,7 @@ impl Machine {
                 }
             }
             Instruction::StoreGlobal(name_index) => {
-                let value = self.peek()?.clone(); // Don't pop - leave value on stack like Store does
+                let value = self.peek()?.clone_for_stack(); // Don't pop - leave value on stack like Store does
                 let var_name = self.get_constant(bytecode, *name_index)?;
                 if let Value::String(name) = var_name {
                     self.globals.insert(name.clone(), value);
