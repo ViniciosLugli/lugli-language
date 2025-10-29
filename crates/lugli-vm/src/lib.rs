@@ -4,16 +4,21 @@ use thiserror::Error;
 
 pub mod bytecode;
 pub mod compiler;
+pub mod debug;
+pub mod error_formatter;
 pub mod machine;
+pub mod module;
 pub mod operations;
 
 // Core VM components
-pub use bytecode::{Bytecode, Instruction};
+pub use bytecode::{Bytecode, Instruction, SourceLocation};
 pub use compiler::Compiler;
-pub use machine::VirtualMachine;
+pub use error_formatter::{ErrorFormatter, suggest_similar_name};
+pub use machine::Machine;
+pub use module::{Module, ModuleCache, ModuleResolver};
 
 // Re-export common types for convenience
-pub use lugli_common::{Value, LugliError};
+pub use lugli_common::{ErrorCode, LugliError, SourceContext, Value};
 
 #[derive(Error, Debug)]
 pub enum VmError {
@@ -27,12 +32,16 @@ pub enum VmError {
 
 pub fn compile(program: &lugli_ast::Program) -> Result<Bytecode, VmError> {
     let mut compiler = Compiler::new();
-    compiler.compile(program)
-        .map_err(|e| VmError::CompilationError(e.to_string()))
+    compiler.compile(program).map_err(|e| VmError::CompilationError(e.to_string()))
+}
+
+pub fn compile_with_source(program: &lugli_ast::Program, file_path: &str, source: &str) -> Result<Bytecode, VmError> {
+    let mut compiler = Compiler::with_source(file_path.to_string(), source.to_string());
+    compiler.compile(program).map_err(|e| VmError::CompilationError(e.to_string()))
 }
 
 pub fn run(bytecode: &Bytecode) -> Result<Value, VmError> {
-    let mut vm = VirtualMachine::new();
+    let mut vm = Machine::new();
     vm.run(bytecode).map_err(VmError::RuntimeError)
 }
 
@@ -41,9 +50,12 @@ pub fn compile_and_run(program: &lugli_ast::Program) -> Result<Value, VmError> {
     run(&bytecode)
 }
 
-pub fn run_with_vm(vm: &mut VirtualMachine, bytecode: &Bytecode) -> Result<Value, VmError> {
-    vm.run(bytecode).map_err(VmError::RuntimeError)
+pub fn compile_and_run_with_source(program: &lugli_ast::Program, file_path: &str, source: &str) -> Result<Value, VmError> {
+    let bytecode = compile_with_source(program, file_path, source)?;
+    run(&bytecode)
 }
+
+pub fn run_with_vm(vm: &mut Machine, bytecode: &Bytecode) -> Result<Value, VmError> { vm.run(bytecode).map_err(VmError::RuntimeError) }
 
 pub fn get_bytecode_stats(bytecode: &Bytecode) -> (usize, usize, usize) {
     let instruction_count = bytecode.instructions.len();

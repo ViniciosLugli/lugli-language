@@ -21,6 +21,7 @@ enum Commands {
     Run { file: String },
     Repl,
     Check { file: String },
+    Disassemble { file: String },
     Version,
 }
 
@@ -28,7 +29,7 @@ fn main() {
     let cli = Cli::parse();
 
     match run_command(cli.command) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             eprintln!("{}: {}", "Error".red().bold(), e);
             process::exit(1);
@@ -38,9 +39,16 @@ fn main() {
 
 fn run_command(command: Commands) -> Result<(), CliError> {
     match command {
-        Commands::Run { file } => cli::run_file(&file),
+        Commands::Run {
+            file,
+        } => cli::run_file(&file),
         Commands::Repl => repl::start(),
-        Commands::Check { file } => cli::check_file(&file),
+        Commands::Check {
+            file,
+        } => cli::check_file(&file),
+        Commands::Disassemble {
+            file,
+        } => cli::disassemble_file(&file),
         Commands::Version => {
             println!("Lugli {}", env!("CARGO_PKG_VERSION"));
             Ok(())

@@ -1,0 +1,53 @@
+# Simple Calculator with Structs
+
+struct Calculator {
+    result: 0
+    
+    fn add!(self, value) {
+        self.result = self.result + value
+    }
+    
+    fn subtract!(self, value) {
+        self.result = self.result - value
+    }
+    
+    fn multiply!(self, value) {
+        self.result = self.result * value
+    }
+    
+    fn divide!(self, value) {
+        if value == 0 {
+            print("Error: Division by zero!")
+            return null
+        }
+        self.result = self.result / value
+    }
+    
+    fn clear!(self) {
+        self.result = 0
+    }
+    
+    fn get(self) {
+        return self.result
+    }
+}
+
+# Create calculator
+let calc = Calculator {}
+
+# Perform calculations
+calc.add!(100)
+print(f"After add 100: {calc.get()}")
+
+calc.multiply!(2)
+print(f"After multiply by 2: {calc.get()}")
+
+calc.subtract!(50)
+print(f"After subtract 50: {calc.get()}")
+
+calc.divide!(5)
+print(f"After divide by 5: {calc.get()}")
+
+# Test division by zero
+calc.divide!(0)
+print(f"Final result: {calc.get()}")

@@ -11,9 +11,11 @@ repository.workspace = true
 lugli-common.workspace = true
 lugli-lexer.workspace = true
 lugli-ast.workspace = true
+lugli-parser.workspace = true
 lugli-stdlib.workspace = true
 thiserror.workspace = true
 hashbrown.workspace = true
+colored.workspace = true
 
 [dev-dependencies]
 lugli-parser.workspace = true

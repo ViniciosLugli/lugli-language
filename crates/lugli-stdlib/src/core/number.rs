@@ -1,4 +1,4 @@
-use lugli_common::{Value, LugliError};
+use lugli_common::{LugliError, Value};
 
 pub fn number_abs(args: &[Value]) -> Result<Value, LugliError> {
     if args.len() != 1 {

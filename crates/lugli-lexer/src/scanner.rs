@@ -1,4 +1,3 @@
-
 use crate::{LexError, Lexer, Token, TokenKind};
 
 pub struct Scanner<'a> {
@@ -20,13 +19,9 @@ impl<'a> Scanner<'a> {
         })
     }
 
-    pub fn current(&self) -> Option<&Token> {
-        self.current.as_ref()
-    }
+    pub fn current(&self) -> Option<&Token> { self.current.as_ref() }
 
-    pub fn peek(&self) -> Option<&Token> {
-        self.peek.as_ref()
-    }
+    pub fn peek(&self) -> Option<&Token> { self.peek.as_ref() }
 
     pub fn advance(&mut self) -> Result<Option<Token>, LexError> {
         let previous = self.current.take();
@@ -36,10 +31,7 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn check(&self, kind: &TokenKind) -> bool {
-        self.current
-            .as_ref()
-            .map(|token| std::mem::discriminant(&token.kind) == std::mem::discriminant(kind))
-            .unwrap_or(false)
+        self.current.as_ref().map(|token| std::mem::discriminant(&token.kind) == std::mem::discriminant(kind)).unwrap_or(false)
     }
 
     pub fn match_token(&mut self, kind: &TokenKind) -> Result<bool, LexError> {
@@ -51,10 +43,5 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn is_at_end(&self) -> bool {
-        self.current
-            .as_ref()
-            .map(|token| matches!(token.kind, TokenKind::Eof))
-            .unwrap_or(true)
-    }
+    pub fn is_at_end(&self) -> bool { self.current.as_ref().map(|token| matches!(token.kind, TokenKind::Eof)).unwrap_or(true) }
 }

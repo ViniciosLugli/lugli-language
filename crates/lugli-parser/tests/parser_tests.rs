@@ -1,5 +1,5 @@
-use lugli_parser::parse;
 use lugli_ast::Stmt;
+use lugli_parser::parse;
 
 #[test]
 fn test_basic_parsing() {
@@ -13,14 +13,7 @@ fn test_basic_parsing() {
 
 #[test]
 fn test_variable_declarations() {
-    let test_cases = vec![
-        "let x = 5",
-        "mut y = 10",
-        "const Z = 15",
-        "let name = \"hello\"",
-        "mut flag = true",
-        "const PI = 3.14159",
-    ];
+    let test_cases = vec!["let x = 5", "mut y = 10", "const Z = 15", "let name = \"hello\"", "mut flag = true", "const PI = 3.14159"];
 
     for source in test_cases {
         let result = parse(source);
@@ -30,7 +23,9 @@ fn test_variable_declarations() {
         assert_eq!(program.statements.len(), 1, "Wrong statement count for: {}", source);
 
         match &program.statements[0] {
-            Stmt::VarDecl { .. } => {}, // Success
+            Stmt::VarDecl {
+                ..
+            } => {} // Success
             _ => panic!("Expected VarDecl for: {}", source),
         }
     }
@@ -53,7 +48,9 @@ fn test_function_declarations() {
         assert_eq!(program.statements.len(), 1, "Wrong statement count for: {}", source);
 
         match &program.statements[0] {
-            Stmt::FnDecl { .. } => {}, // Success
+            Stmt::FnDecl {
+                ..
+            } => {} // Success
             _ => panic!("Expected FnDecl for: {}", source),
         }
     }
@@ -143,12 +140,12 @@ fn test_complex_program() {
 #[test]
 fn test_error_handling() {
     let invalid_cases = vec![
-        "let = 5",           // Missing variable name
-        "fn { }",            // Missing function name
-        "if { }",            // Missing condition
-        "let x = ;",         // Missing value
-        "fn test() {",       // Unclosed brace
-        "x + + y",           // Invalid expression
+        "let = 5",     // Missing variable name
+        "fn { }",      // Missing function name
+        "if { }",      // Missing condition
+        "let x = ;",   // Missing value
+        "fn test() {", // Unclosed brace
+        "x + + y",     // Invalid expression
     ];
 
     for source in invalid_cases {
@@ -160,10 +157,10 @@ fn test_error_handling() {
 #[test]
 fn test_modern_syntax_features() {
     let test_cases = vec![
-        "let x = f\"Hello {name}!\"",          // F-strings
-        "mut items = [1, 2, 3]",               // Mutable list
-        "const config = {\"debug\": true}",     // Object literal
-        "let result = await fetch_data()",     // Async/await (parsing only)
+        "let x = f\"Hello {name}!\"",                     // F-strings
+        "mut items = [1, 2, 3]",                          // Mutable list
+        "const config = {\"debug\": true}",               // Object literal
+        "let result = await fetch_data()",                // Async/await (parsing only)
         "try { risky_operation() } catch e { print(e) }", // Try/catch
     ];
 
@@ -217,7 +214,9 @@ fn test_literal_values() {
     // Validate each statement is a VarDecl
     for stmt in &program.statements {
         match stmt {
-            Stmt::VarDecl { .. } => {}, // Success
+            Stmt::VarDecl {
+                ..
+            } => {} // Success
             _ => panic!("Expected all statements to be VarDecl"),
         }
     }

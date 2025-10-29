@@ -11,7 +11,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.1"
 description = "Lugli: High-level programming language with Rust-friendly syntax and Python simplicity"
 authors = ["Vinicios Lugli <vinicioslugli@gmail.com>"]
 edition = "2024"
@@ -25,12 +25,12 @@ thiserror = "2.0.17"
 hashbrown = "0.16.0"
 
 # CLI and utilities
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.5.50", features = ["derive"] }
 colored = "3.0.0"
 
 # Standard library
 chrono = { version = "0.4.42", features = ["serde"] }
-regex = "1.11.3"
+regex = "1.12.2"
 
 # Internal crates
 lugli-common = { path = "crates/lugli-common" }
@@ -42,7 +42,7 @@ lugli-stdlib = { path = "crates/lugli-stdlib" }
 
 # Development dependencies
 criterion = { version = "0.7.0", features = ["html_reports"] }
-proptest = "1.8.0"
+proptest = "1.9.0"
 insta = "1.43.2"
 pretty_assertions = "1.4.1"
 

@@ -1,12 +1,9 @@
+use crate::{Parser, error::ParseError};
+use lugli_ast::{AstNode, Expr};
 use lugli_lexer::TokenKind;
-use lugli_ast::{Expr, AstNode};
-use crate::error::ParseError;
-use crate::Parser;
 
 impl<'a> Parser<'a> {
-    pub(crate) fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.or()
-    }
+    pub(crate) fn expression(&mut self) -> Result<Expr, ParseError> { self.or() }
 
     pub(crate) fn or(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.and()?;
@@ -68,12 +65,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn comparison(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.term()?;
 
-        while self.match_any(&[
-            TokenKind::Greater,
-            TokenKind::GreaterEqual,
-            TokenKind::Less,
-            TokenKind::LessEqual,
-        ]) {
+        while self.match_any(&[TokenKind::Greater, TokenKind::GreaterEqual, TokenKind::Less, TokenKind::LessEqual]) {
             let operator = self.previous().clone();
             self.skip_newlines();
             let right = self.term()?;
@@ -109,12 +101,12 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn factor(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.unary()?;
+        let mut expr = self.power()?;
 
-        while self.match_any(&[TokenKind::Slash, TokenKind::Star, TokenKind::Percent]) {
+        while self.match_any(&[TokenKind::Slash, TokenKind::Star, TokenKind::Percent, TokenKind::IntegerDivision]) {
             let operator = self.previous().clone();
             self.skip_newlines();
-            let right = self.unary()?;
+            let right = self.power()?;
             let span = self.merge_spans(*expr.span(), *right.span());
             expr = Expr::Binary {
                 left: Box::new(expr),
@@ -122,6 +114,26 @@ impl<'a> Parser<'a> {
                 right: Box::new(right),
                 span,
             };
+        }
+
+        Ok(expr)
+    }
+
+    pub(crate) fn power(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.unary()?;
+
+        // Right-associative: 2 ** 3 ** 2 = 2 ** (3 ** 2) = 512
+        if self.match_any(&[TokenKind::Power]) {
+            let operator = self.previous().clone();
+            self.skip_newlines();
+            let right = self.power()?; // Recursive for right-associativity
+            let span = self.merge_spans(*expr.span(), *right.span());
+            return Ok(Expr::Binary {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+                span,
+            });
         }
 
         Ok(expr)
@@ -158,7 +170,14 @@ impl<'a> Parser<'a> {
                     span,
                 };
             } else if self.match_any(&[TokenKind::Dot]) {
-                let name = self.consume_identifier("Expected property name after '.'")?;
+                let mut name = self.consume_identifier("Expected property name after '.'")?;
+
+                // Check for ! suffix (mutating method indicator)
+                if self.check(&TokenKind::Bang) && self.peek_next_kind() == Some(TokenKind::LeftParen) {
+                    self.advance(); // consume !
+                    name.push('!');
+                }
+
                 let span = self.merge_spans(*expr.span(), self.previous_span());
                 expr = Expr::Get {
                     object: Box::new(expr),

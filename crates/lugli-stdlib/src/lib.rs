@@ -1,4 +1,4 @@
-use lugli_common::{Value, LugliError};
+use lugli_common::{LugliError, Value};
 
 pub mod core;
 pub mod io;

@@ -1,15 +1,10 @@
-use lugli_common::{Value, LugliError};
 use crate::NativeFunction;
 use chrono::Utc;
+use lugli_common::{LugliError, Value};
 
 pub mod datetime;
 
-pub fn get_functions() -> Vec<(&'static str, NativeFunction)> {
-    vec![
-        ("now", time_now),
-        ("sleep", time_sleep),
-    ]
-}
+pub fn get_functions() -> Vec<(&'static str, NativeFunction)> { vec![("now", time_now), ("sleep", time_sleep)] }
 
 fn time_now(_args: &[Value]) -> Result<Value, LugliError> {
     let now = Utc::now();
@@ -24,7 +19,7 @@ fn time_sleep(args: &[Value]) -> Result<Value, LugliError> {
         Value::Number(ms) => {
             std::thread::sleep(std::time::Duration::from_millis(*ms as u64));
             Ok(Value::Null)
-        },
+        }
         _ => Err(LugliError::type_error("number", args[0].type_name())),
     }
 }

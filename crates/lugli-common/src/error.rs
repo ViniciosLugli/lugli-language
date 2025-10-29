@@ -1,5 +1,5 @@
-use thiserror::Error;
 use crate::Span;
+use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
@@ -43,7 +43,13 @@ pub struct SourceContext {
 
 impl SourceContext {
     pub fn new(file_path: String, line: usize, column: usize, span: Span) -> Self {
-        Self { file_path, line, column, source_line: None, span }
+        Self {
+            file_path,
+            line,
+            column,
+            source_line: None,
+            span,
+        }
     }
 
     pub fn with_source(mut self, source_line: String) -> Self {
@@ -94,16 +100,10 @@ pub enum LugliError {
     UndefinedVariable(Box<UndefinedVariableData>),
 
     #[error("Division by zero")]
-    DivisionByZero {
-        context: Option<SourceContext>,
-    },
+    DivisionByZero { context: Option<SourceContext> },
 
     #[error("Index out of bounds: {index} (length: {length})")]
-    IndexOutOfBounds {
-        index: i64,
-        length: usize,
-        context: Option<SourceContext>,
-    },
+    IndexOutOfBounds { index: i64, length: usize, context: Option<SourceContext> },
 
     #[error("IO error: {message}")]
     Io { message: String },
@@ -111,11 +111,17 @@ pub enum LugliError {
 
 impl LugliError {
     pub fn lex(message: impl Into<String>, span: Span) -> Self {
-        Self::Lex { message: message.into(), span }
+        Self::Lex {
+            message: message.into(),
+            span,
+        }
     }
 
     pub fn parse(message: impl Into<String>, span: Span) -> Self {
-        Self::Parse { message: message.into(), span }
+        Self::Parse {
+            message: message.into(),
+            span,
+        }
     }
 
     pub fn runtime(message: impl Into<String>) -> Self {
@@ -129,11 +135,7 @@ impl LugliError {
     }
 
     pub fn runtime_with_trace(message: impl Into<String>, trace: Vec<String>) -> Self {
-        let stack_trace = if trace.is_empty() {
-            "".to_string()
-        } else {
-            format!("\nStack trace:\n{}", trace.join("\n"))
-        };
+        let stack_trace = if trace.is_empty() { "".to_string() } else { format!("\nStack trace:\n{}", trace.join("\n")) };
         Self::Runtime(Box::new(RuntimeErrorData {
             message: message.into(),
             stack_trace,
@@ -143,12 +145,7 @@ impl LugliError {
         }))
     }
 
-    pub fn runtime_with_context(
-        message: impl Into<String>,
-        code: ErrorCode,
-        context: SourceContext,
-        suggestion: Option<String>
-    ) -> Self {
+    pub fn runtime_with_context(message: impl Into<String>, code: ErrorCode, context: SourceContext, suggestion: Option<String>) -> Self {
         Self::Runtime(Box::new(RuntimeErrorData {
             message: message.into(),
             stack_trace: "".to_string(),
@@ -163,13 +160,9 @@ impl LugliError {
         code: ErrorCode,
         context: Option<SourceContext>,
         suggestion: Option<String>,
-        trace: Vec<String>
+        trace: Vec<String>,
     ) -> Self {
-        let stack_trace = if trace.is_empty() {
-            "".to_string()
-        } else {
-            format!("\nStack trace:\n{}", trace.join("\n"))
-        };
+        let stack_trace = if trace.is_empty() { "".to_string() } else { format!("\nStack trace:\n{}", trace.join("\n")) };
         Self::Runtime(Box::new(RuntimeErrorData {
             message: message.into(),
             stack_trace,
@@ -188,11 +181,7 @@ impl LugliError {
         }))
     }
 
-    pub fn type_error_with_context(
-        expected: impl Into<String>,
-        found: impl Into<String>,
-        context: SourceContext
-    ) -> Self {
+    pub fn type_error_with_context(expected: impl Into<String>, found: impl Into<String>, context: SourceContext) -> Self {
         Self::Type(Box::new(TypeErrorData {
             expected: expected.into(),
             found: found.into(),
@@ -209,11 +198,7 @@ impl LugliError {
         }))
     }
 
-    pub fn undefined_variable_with_context(
-        name: impl Into<String>,
-        context: SourceContext,
-        suggestion: Option<String>
-    ) -> Self {
+    pub fn undefined_variable_with_context(name: impl Into<String>, context: SourceContext, suggestion: Option<String>) -> Self {
         Self::UndefinedVariable(Box::new(UndefinedVariableData {
             name: name.into(),
             context: Some(context),
@@ -222,11 +207,15 @@ impl LugliError {
     }
 
     pub fn division_by_zero() -> Self {
-        Self::DivisionByZero { context: None }
+        Self::DivisionByZero {
+            context: None,
+        }
     }
 
     pub fn division_by_zero_with_context(context: SourceContext) -> Self {
-        Self::DivisionByZero { context: Some(context) }
+        Self::DivisionByZero {
+            context: Some(context),
+        }
     }
 
     pub fn index_out_of_bounds(index: i64, length: usize) -> Self {
@@ -237,11 +226,7 @@ impl LugliError {
         }
     }
 
-    pub fn index_out_of_bounds_with_context(
-        index: i64,
-        length: usize,
-        context: SourceContext
-    ) -> Self {
+    pub fn index_out_of_bounds_with_context(index: i64, length: usize, context: SourceContext) -> Self {
         Self::IndexOutOfBounds {
             index,
             length,
@@ -254,8 +239,12 @@ impl LugliError {
             LugliError::Runtime(data) => Some(data.code),
             LugliError::Type(data) => Some(data.code),
             LugliError::UndefinedVariable(_) => Some(ErrorCode::E003),
-            LugliError::DivisionByZero { .. } => Some(ErrorCode::E004),
-            LugliError::IndexOutOfBounds { .. } => Some(ErrorCode::E005),
+            LugliError::DivisionByZero {
+                ..
+            } => Some(ErrorCode::E004),
+            LugliError::IndexOutOfBounds {
+                ..
+            } => Some(ErrorCode::E005),
             _ => None,
         }
     }
@@ -265,8 +254,12 @@ impl LugliError {
             LugliError::Runtime(data) => data.context.as_ref(),
             LugliError::Type(data) => data.context.as_ref(),
             LugliError::UndefinedVariable(data) => data.context.as_ref(),
-            LugliError::DivisionByZero { context } => context.as_ref(),
-            LugliError::IndexOutOfBounds { context, .. } => context.as_ref(),
+            LugliError::DivisionByZero {
+                context,
+            } => context.as_ref(),
+            LugliError::IndexOutOfBounds {
+                context, ..
+            } => context.as_ref(),
             _ => None,
         }
     }

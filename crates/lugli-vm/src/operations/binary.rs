@@ -1,4 +1,4 @@
-use lugli_common::{Value, LugliError};
+use lugli_common::{LugliError, Value};
 use lugli_lexer::TokenKind;
 
 pub fn apply_binary_op(left: &Value, op: &TokenKind, right: &Value) -> Result<Value, LugliError> {
@@ -8,21 +8,19 @@ pub fn apply_binary_op(left: &Value, op: &TokenKind, right: &Value) -> Result<Va
         (Value::Number(l), TokenKind::Star, Value::Number(r)) => Ok(Value::Number(l * r)),
         (Value::Number(l), TokenKind::Slash, Value::Number(r)) => {
             if *r == 0.0 {
-                Err(LugliError::DivisionByZero)
+                Err(LugliError::division_by_zero())
             } else {
                 Ok(Value::Number(l / r))
             }
         }
         (Value::Number(l), TokenKind::Percent, Value::Number(r)) => {
             if *r == 0.0 {
-                Err(LugliError::DivisionByZero)
+                Err(LugliError::division_by_zero())
             } else {
                 Ok(Value::Number(l % r))
             }
         }
-        (Value::String(l), TokenKind::Plus, Value::String(r)) => {
-            Ok(Value::String(format!("{}{}", l, r)))
-        }
+        (Value::String(l), TokenKind::Plus, Value::String(r)) => Ok(Value::String(format!("{}{}", l, r))),
         // Comparison operators
         (Value::Number(l), TokenKind::Greater, Value::Number(r)) => Ok(Value::Bool(l > r)),
         (Value::Number(l), TokenKind::GreaterEqual, Value::Number(r)) => Ok(Value::Bool(l >= r)),
@@ -34,11 +32,6 @@ pub fn apply_binary_op(left: &Value, op: &TokenKind, right: &Value) -> Result<Va
         // Logical operators
         (l, TokenKind::And, r) => Ok(Value::Bool(l.is_truthy() && r.is_truthy())),
         (l, TokenKind::Or, r) => Ok(Value::Bool(l.is_truthy() || r.is_truthy())),
-        _ => Err(LugliError::runtime(format!(
-            "Cannot apply {:?} to {} and {}",
-            op,
-            left.type_name(),
-            right.type_name()
-        ))),
+        _ => Err(LugliError::runtime(format!("Cannot apply {:?} to {} and {}", op, left.type_name(), right.type_name()))),
     }
 }

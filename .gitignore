@@ -1,16 +1,24 @@
-debug/
+# Build artifacts
+/debug/
 target/
 
-Cargo.lock
+# IDE and editor files
+.vscode/
+.cargo/
+.idea/
+*.swp
+*.iml
+.DS_Store
 
-.vscode
-.cargo
+# Environment
 .env
-rustfmt.toml
 
+# Backup files
 **/*.rs.bk
 *.pdb
 
-.env
+# Debug Lugli files in root
+/*.lg
 
+# Internal AI assistant directory
 .claude

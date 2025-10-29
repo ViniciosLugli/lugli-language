@@ -1,4 +1,4 @@
-use lugli_lexer::{tokenize, Lexer, TokenKind, LexError};
+use lugli_lexer::{LexError, Lexer, TokenKind, tokenize};
 
 mod integration_scenarios {
     use super::*;
@@ -23,7 +23,8 @@ mod integration_scenarios {
         assert!(!tokens.is_empty());
 
         // Check that we have the expected keywords
-        let keywords_found: Vec<_> = tokens.iter()
+        let keywords_found: Vec<_> = tokens
+            .iter()
             .filter_map(|token| match &token.kind {
                 TokenKind::Fn => Some("fn"),
                 TokenKind::If => Some("if"),
@@ -295,7 +296,7 @@ mod public_api_tests {
 
         // Check specific spans
         assert_eq!(tokens[0].span.start, 0); // "let" starts at position 0
-        assert_eq!(tokens[0].span.end, 3);   // "let" ends at position 3
+        assert_eq!(tokens[0].span.end, 3); // "let" ends at position 3
     }
 
     #[test]
@@ -332,7 +333,6 @@ mod public_api_tests {
         // Test with whitespace only
         let whitespace_tokens = tokenize("   \n\t  ").unwrap();
         // Should either be empty or contain only whitespace tokens
-        assert!(whitespace_tokens.is_empty() ||
-               whitespace_tokens.iter().all(|t| matches!(t.kind, TokenKind::Newline)));
+        assert!(whitespace_tokens.is_empty() || whitespace_tokens.iter().all(|t| matches!(t.kind, TokenKind::Newline)));
     }
 }

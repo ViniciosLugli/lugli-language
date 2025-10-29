@@ -2,7 +2,8 @@ use std::io::Write;
 use tempfile::NamedTempFile;
 
 // Since cli module is private, we'll test through the public interface and main functions
-// We can't directly import cli functions, so we'll test error handling and file operations
+// We can't directly import cli functions, so we'll test error handling and file
+// operations
 
 mod cli_error_tests {
     use super::*;
@@ -11,10 +12,8 @@ mod cli_error_tests {
     fn test_run_nonexistent_file() {
         // Test that running a non-existent file produces appropriate error behavior
         // This tests the error handling path of the CLI
-        let result = std::process::Command::new("cargo")
-            .args(&["run", "--bin", "lugli", "--", "run", "nonexistent.lg"])
-            .current_dir("../..")
-            .output();
+        let result =
+            std::process::Command::new("cargo").args(&["run", "--bin", "lugli", "--", "run", "nonexistent.lg"]).current_dir("../..").output();
 
         match result {
             Ok(output) => {
@@ -62,10 +61,7 @@ mod cli_error_tests {
 
     #[test]
     fn test_version_command() {
-        let result = std::process::Command::new("cargo")
-            .args(&["run", "--bin", "lugli", "--", "version"])
-            .current_dir("../..")
-            .output();
+        let result = std::process::Command::new("cargo").args(&["run", "--bin", "lugli", "--", "version"]).current_dir("../..").output();
 
         match result {
             Ok(output) => {
@@ -83,21 +79,18 @@ mod cli_error_tests {
 
     #[test]
     fn test_help_command() {
-        let result = std::process::Command::new("cargo")
-            .args(&["run", "--bin", "lugli", "--", "--help"])
-            .current_dir("../..")
-            .output();
+        let result = std::process::Command::new("cargo").args(&["run", "--bin", "lugli", "--", "--help"]).current_dir("../..").output();
 
         match result {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 // Help should contain basic command information
                 assert!(
-                    stdout.contains("run") ||
-                    stdout.contains("repl") ||
-                    stdout.contains("check") ||
-                    stdout.contains("version") ||
-                    stdout.contains("Usage")
+                    stdout.contains("run")
+                        || stdout.contains("repl")
+                        || stdout.contains("check")
+                        || stdout.contains("version")
+                        || stdout.contains("Usage")
                 );
             }
             Err(_) => {
@@ -108,10 +101,7 @@ mod cli_error_tests {
 
     #[test]
     fn test_invalid_command() {
-        let result = std::process::Command::new("cargo")
-            .args(&["run", "--bin", "lugli", "--", "invalid-command"])
-            .current_dir("../..")
-            .output();
+        let result = std::process::Command::new("cargo").args(&["run", "--bin", "lugli", "--", "invalid-command"]).current_dir("../..").output();
 
         match result {
             Ok(output) => {
@@ -169,13 +159,16 @@ mod file_handling_tests {
                 let stdout = String::from_utf8_lossy(&output.stdout);
 
                 // Should either fail with exit code or contain error message
-                let has_error_message = stderr.contains("Error") || stderr.contains("error") ||
-                                      stdout.contains("Error") || stdout.contains("error");
+                let has_error_message = stderr.contains("Error") || stderr.contains("error") || stdout.contains("Error") || stdout.contains("error");
                 let failed_status = !output.status.success();
 
-                assert!(has_error_message || failed_status,
-                       "Expected error message or failure status. Stderr: '{}', Stdout: '{}', Status: {}",
-                       stderr, stdout, output.status);
+                assert!(
+                    has_error_message || failed_status,
+                    "Expected error message or failure status. Stderr: '{}', Stdout: '{}', Status: {}",
+                    stderr,
+                    stdout,
+                    output.status
+                );
             }
             Err(_) => {
                 // Test may fail in some environments
