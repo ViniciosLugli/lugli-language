@@ -4,8 +4,18 @@ use std::cell::RefCell;
 #[derive(Debug, Clone)]
 pub enum Instruction {
     Constant(usize),
+
+    // Immediate operands for common constants
+    LoadSmallInt(i8),
+    LoadInt(i16),
+    LoadTrue,
+    LoadFalse,
+    LoadNull,
+
     Load(usize),
     Store(usize),
+
+    // Arithmetic operations
     Add,
     Subtract,
     Multiply,
@@ -13,6 +23,12 @@ pub enum Instruction {
     IntegerDivide,
     Modulo,
     Power,
+
+    // Specialized arithmetic with immediate operands
+    AddInt(i8),
+    SubInt(i8),
+    MulInt(i8),
+
     Negate,
     Not,
     Equal,

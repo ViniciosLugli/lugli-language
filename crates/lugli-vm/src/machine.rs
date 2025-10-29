@@ -502,6 +502,21 @@ impl Machine {
                 let value = self.get_constant(bytecode, *index)?.clone_for_stack();
                 self.stack.push(value);
             }
+            Instruction::LoadSmallInt(n) => {
+                self.stack.push(Value::Number(*n as f64));
+            }
+            Instruction::LoadInt(n) => {
+                self.stack.push(Value::Number(*n as f64));
+            }
+            Instruction::LoadTrue => {
+                self.stack.push(Value::Bool(true));
+            }
+            Instruction::LoadFalse => {
+                self.stack.push(Value::Bool(false));
+            }
+            Instruction::LoadNull => {
+                self.stack.push(Value::Null);
+            }
             Instruction::Pop => {
                 self.pop()?;
             }
@@ -550,6 +565,30 @@ impl Machine {
                 let b = self.pop()?;
                 let a = self.pop()?;
                 self.stack.push(a.power(&b)?);
+            }
+            Instruction::AddInt(n) => {
+                let left = self.pop()?;
+                if let Value::Number(a) = left {
+                    self.stack.push(Value::Number(a + (*n as f64)));
+                } else {
+                    return Err(LugliError::type_error("number", left.type_name()));
+                }
+            }
+            Instruction::SubInt(n) => {
+                let left = self.pop()?;
+                if let Value::Number(a) = left {
+                    self.stack.push(Value::Number(a - (*n as f64)));
+                } else {
+                    return Err(LugliError::type_error("number", left.type_name()));
+                }
+            }
+            Instruction::MulInt(n) => {
+                let left = self.pop()?;
+                if let Value::Number(a) = left {
+                    self.stack.push(Value::Number(a * (*n as f64)));
+                } else {
+                    return Err(LugliError::type_error("number", left.type_name()));
+                }
             }
             Instruction::Negate => {
                 let val = self.pop()?;

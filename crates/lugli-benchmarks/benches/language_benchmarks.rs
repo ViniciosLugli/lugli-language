@@ -3,18 +3,20 @@ use std::{fs, hint::black_box, time::Duration};
 
 // Helper function to run a Lugli source file
 fn run_lugli_source(source: &str) -> Result<lugli_common::Value, String> {
-    let program = lugli_parser::parse(source).map_err(|e| e.to_string())?;
-    lugli_vm::compile_and_run(&program).map_err(|e| e.to_string())
+    let (program, span_map) = lugli_parser::parse(source).map_err(|e| e.to_string())?;
+    lugli_vm::compile_and_run(&program, span_map).map_err(|e| e.to_string())
 }
 
 // Helper function to compile Lugli source
 fn compile_lugli_source(source: &str) -> Result<lugli_vm::Bytecode, String> {
-    let program = lugli_parser::parse(source).map_err(|e| e.to_string())?;
-    lugli_vm::compile(&program).map_err(|e| e.to_string())
+    let (program, span_map) = lugli_parser::parse(source).map_err(|e| e.to_string())?;
+    lugli_vm::compile(&program, span_map).map_err(|e| e.to_string())
 }
 
 // Helper function to parse Lugli source
-fn parse_lugli_source(source: &str) -> Result<lugli_ast::Program, String> { lugli_parser::parse(source).map_err(|e| e.to_string()) }
+fn parse_lugli_source(source: &str) -> Result<(lugli_ast::Program, lugli_ast::SpanMap), String> {
+    lugli_parser::parse(source).map_err(|e| e.to_string())
+}
 
 // Helper to load fixture (from crate's benches/fixtures/)
 fn load_fixture(name: &str) -> String {

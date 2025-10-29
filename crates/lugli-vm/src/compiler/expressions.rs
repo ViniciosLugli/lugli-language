@@ -9,8 +9,33 @@ impl Compiler {
             Expr::Literal {
                 value, ..
             } => {
-                let constant_index = self.add_constant(self.literal_to_value(value));
-                self.emit(Instruction::Constant(constant_index));
+                match value {
+                    LiteralValue::Number(n) => {
+                        // Optimize small integers to use immediate instructions
+                        if n.fract() == 0.0 && *n >= -128.0 && *n <= 127.0 {
+                            self.emit(Instruction::LoadSmallInt(*n as i8));
+                        } else if n.fract() == 0.0 && *n >= -32768.0 && *n <= 32767.0 {
+                            self.emit(Instruction::LoadInt(*n as i16));
+                        } else {
+                            let constant_index = self.add_constant(Value::Number(*n));
+                            self.emit(Instruction::Constant(constant_index));
+                        }
+                    }
+                    LiteralValue::Boolean(true) => {
+                        self.emit(Instruction::LoadTrue);
+                    }
+                    LiteralValue::Boolean(false) => {
+                        self.emit(Instruction::LoadFalse);
+                    }
+                    LiteralValue::Null => {
+                        self.emit(Instruction::LoadNull);
+                    }
+                    LiteralValue::String(s) => {
+                        let id = self.bytecode.string_pool.borrow_mut().intern(s);
+                        let constant_index = self.add_constant(Value::String(id));
+                        self.emit(Instruction::Constant(constant_index));
+                    }
+                }
                 Ok(())
             }
             Expr::Identifier {
@@ -36,26 +61,58 @@ impl Compiler {
                 right,
                 ..
             } => {
-                self.compile_expr(left)?;
-                self.compile_expr(right)?;
+                // Try to optimize arithmetic with small constant on the right
+                let optimized = match operator {
+                    lugli_lexer::TokenKind::Plus
+                    | lugli_lexer::TokenKind::Minus
+                    | lugli_lexer::TokenKind::Star => {
+                        if let Expr::Literal {
+                            value: LiteralValue::Number(n),
+                            ..
+                        } = right.as_ref()
+                        {
+                            if n.fract() == 0.0 && *n >= -128.0 && *n <= 127.0 {
+                                self.compile_expr(left)?;
+                                match operator {
+                                    lugli_lexer::TokenKind::Plus => self.emit(Instruction::AddInt(*n as i8)),
+                                    lugli_lexer::TokenKind::Minus => self.emit(Instruction::SubInt(*n as i8)),
+                                    lugli_lexer::TokenKind::Star => self.emit(Instruction::MulInt(*n as i8)),
+                                    _ => unreachable!(),
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    }
+                    _ => false,
+                };
 
-                match operator {
-                    lugli_lexer::TokenKind::Plus => self.emit(Instruction::Add),
-                    lugli_lexer::TokenKind::Minus => self.emit(Instruction::Subtract),
-                    lugli_lexer::TokenKind::Star => self.emit(Instruction::Multiply),
-                    lugli_lexer::TokenKind::Slash => self.emit(Instruction::Divide),
-                    lugli_lexer::TokenKind::IntegerDivision => self.emit(Instruction::IntegerDivide),
-                    lugli_lexer::TokenKind::Percent => self.emit(Instruction::Modulo),
-                    lugli_lexer::TokenKind::Power => self.emit(Instruction::Power),
-                    lugli_lexer::TokenKind::EqualEqual => self.emit(Instruction::Equal),
-                    lugli_lexer::TokenKind::BangEqual => self.emit(Instruction::NotEqual),
-                    lugli_lexer::TokenKind::Greater => self.emit(Instruction::Greater),
-                    lugli_lexer::TokenKind::GreaterEqual => self.emit(Instruction::GreaterEqual),
-                    lugli_lexer::TokenKind::Less => self.emit(Instruction::Less),
-                    lugli_lexer::TokenKind::LessEqual => self.emit(Instruction::LessEqual),
-                    lugli_lexer::TokenKind::And => self.emit(Instruction::And),
-                    lugli_lexer::TokenKind::Or => self.emit(Instruction::Or),
-                    _ => return Err(LugliError::runtime(format!("Unsupported binary operator: {:?}", operator))),
+                if !optimized {
+                    // Fall back to general case
+                    self.compile_expr(left)?;
+                    self.compile_expr(right)?;
+
+                    match operator {
+                        lugli_lexer::TokenKind::Plus => self.emit(Instruction::Add),
+                        lugli_lexer::TokenKind::Minus => self.emit(Instruction::Subtract),
+                        lugli_lexer::TokenKind::Star => self.emit(Instruction::Multiply),
+                        lugli_lexer::TokenKind::Slash => self.emit(Instruction::Divide),
+                        lugli_lexer::TokenKind::IntegerDivision => self.emit(Instruction::IntegerDivide),
+                        lugli_lexer::TokenKind::Percent => self.emit(Instruction::Modulo),
+                        lugli_lexer::TokenKind::Power => self.emit(Instruction::Power),
+                        lugli_lexer::TokenKind::EqualEqual => self.emit(Instruction::Equal),
+                        lugli_lexer::TokenKind::BangEqual => self.emit(Instruction::NotEqual),
+                        lugli_lexer::TokenKind::Greater => self.emit(Instruction::Greater),
+                        lugli_lexer::TokenKind::GreaterEqual => self.emit(Instruction::GreaterEqual),
+                        lugli_lexer::TokenKind::Less => self.emit(Instruction::Less),
+                        lugli_lexer::TokenKind::LessEqual => self.emit(Instruction::LessEqual),
+                        lugli_lexer::TokenKind::And => self.emit(Instruction::And),
+                        lugli_lexer::TokenKind::Or => self.emit(Instruction::Or),
+                        _ => return Err(LugliError::runtime(format!("Unsupported binary operator: {:?}", operator))),
+                    }
                 }
                 Ok(())
             }

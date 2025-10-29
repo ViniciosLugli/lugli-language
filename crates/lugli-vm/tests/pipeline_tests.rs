@@ -75,13 +75,24 @@ fn calculate_complexity_score(bytecode: &Bytecode) -> usize {
     let mut score = 0;
     for instruction in &bytecode.instructions {
         score += match instruction {
-            Instruction::Constant(_) | Instruction::Return | Instruction::Pop | Instruction::Print => 1,
+            Instruction::Constant(_)
+            | Instruction::LoadSmallInt(_)
+            | Instruction::LoadInt(_)
+            | Instruction::LoadTrue
+            | Instruction::LoadFalse
+            | Instruction::LoadNull
+            | Instruction::Return
+            | Instruction::Pop
+            | Instruction::Print => 1,
             Instruction::Add
             | Instruction::Subtract
             | Instruction::Multiply
             | Instruction::Divide
             | Instruction::IntegerDivide
             | Instruction::Modulo
+            | Instruction::AddInt(_)
+            | Instruction::SubInt(_)
+            | Instruction::MulInt(_)
             | Instruction::Equal
             | Instruction::NotEqual
             | Instruction::Less
@@ -722,10 +733,11 @@ mod code_generation_tests {
     #[test]
     fn test_arithmetic_bytecode_efficiency() {
         // Simple arithmetic should generate efficient bytecode
+        // With optimization: LoadSmallInt(10), AddInt(20), Return (super optimized!)
         assert_bytecode_quality(
             "10 + 20",
-            Some(4), // Constant(10), Constant(20), Add, Return
-            Some(2), // Two number constants
+            Some(3), // LoadSmallInt(10), AddInt(20), Return - AddInt fuses load+add!
+            Some(0), // No constants - small integers are inlined!
             "Simple arithmetic bytecode efficiency",
         );
     }
@@ -755,8 +767,8 @@ mod code_generation_tests {
             // Should have reasonable instruction count for the complexity
             assert!(stats.instruction_count < 15, "Complex arithmetic should not generate excessive instructions: {}", stats.instruction_count);
 
-            // Should use appropriate number of constants
-            assert_eq!(stats.constant_count, 4, "Should have exactly 4 numeric constants");
+            // With optimization, small integers are inlined, so no constants needed
+            assert_eq!(stats.constant_count, 0, "Should have 0 numeric constants (all inlined as small ints)");
 
             println!(
                 "✅ Complex expression optimization: {} instructions, {} constants, complexity: {}",
@@ -770,10 +782,11 @@ mod code_generation_tests {
     #[test]
     fn test_dict_creation_bytecode() {
         // Dictionary creation should use MakeDict instruction efficiently
+        // With optimization: "age" value 30 is inlined as LoadSmallInt
         assert_bytecode_quality(
             r#"{"name": "Alice", "age": 30}"#,
-            Some(6), // Constant("name"), Constant("Alice"), Constant("age"), Constant(30), MakeDict(2), Return
-            Some(4), // Four constants: two keys + two values
+            Some(6), // Constant("name"), Constant("Alice"), Constant("age"), LoadSmallInt(30), MakeDict(2), Return
+            Some(3), // Three constants: two string keys + one string value (30 is inlined)
             "Dictionary creation bytecode efficiency",
         );
     }
