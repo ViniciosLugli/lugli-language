@@ -12,33 +12,47 @@
 mod helpers;
 
 use helpers::assert_value_eq;
-use lugli_ast::{Expr, LiteralValue, Program, Stmt};
+use lugli_ast::{CallData, Expr, IfData, LiteralValue, NodeId, Program, SpanMap, Stmt};
 use lugli_common::{Span, Value};
-use lugli_lexer::Token;
+use lugli_lexer::TokenKind;
 use lugli_vm::compile_and_run;
 
 // Helper function for creating spans
 fn dummy_span() -> Span {
-    Span {
-        start: 0,
-        end: 0,
+    Span { start: 0, end: 0 }
+}
+
+// Helper function for creating NodeIds
+fn make_id(n: usize) -> NodeId {
+    NodeId::new(n)
+}
+
+// Helper to create a SpanMap with dummy spans for all nodes
+fn make_span_map(count: usize) -> SpanMap {
+    let mut map = SpanMap::new();
+    for i in 0..count {
+        let id = map.alloc_id();
+        map.insert(id, dummy_span());
+        assert_eq!(id, make_id(i));
     }
+    map
 }
 
 #[test]
 fn test_compiler_literal_expressions() {
     let program = Program {
         statements: vec![Stmt::Expression {
+            id: make_id(0),
             expr: Expr::Literal {
+                id: make_id(1),
                 value: LiteralValue::Number(42.0),
-                span: dummy_span(),
             },
-            span: dummy_span(),
         }],
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
+    let span_map = make_span_map(2);
+    let result = compile_and_run(&program, span_map).unwrap();
     assert_value_eq(&result, &Value::Number(42.0));
 }
 
@@ -47,32 +61,33 @@ fn test_compiler_binary_expressions() {
     // Test: 10 + 20 * 2 (should be 50 due to precedence)
     let program = Program {
         statements: vec![Stmt::Expression {
+            id: make_id(0),
             expr: Expr::Binary {
+                id: make_id(1),
                 left: Box::new(Expr::Literal {
+                    id: make_id(2),
                     value: LiteralValue::Number(10.0),
-                    span: dummy_span(),
                 }),
-                operator: Token::new(lugli_lexer::TokenKind::Plus, dummy_span()),
+                operator: TokenKind::Plus,
                 right: Box::new(Expr::Binary {
+                    id: make_id(3),
                     left: Box::new(Expr::Literal {
+                        id: make_id(4),
                         value: LiteralValue::Number(20.0),
-                        span: dummy_span(),
                     }),
-                    operator: Token::new(lugli_lexer::TokenKind::Star, dummy_span()),
+                    operator: TokenKind::Star,
                     right: Box::new(Expr::Literal {
+                        id: make_id(5),
                         value: LiteralValue::Number(2.0),
-                        span: dummy_span(),
                     }),
-                    span: dummy_span(),
                 }),
-                span: dummy_span(),
             },
-            span: dummy_span(),
         }],
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
+    let span_map = make_span_map(6);
+    let result = compile_and_run(&program, span_map).unwrap();
     assert_value_eq(&result, &Value::Number(50.0));
 }
 
@@ -82,27 +97,28 @@ fn test_compiler_variable_declaration_and_access() {
         statements: vec![
             // let x = 42
             Stmt::VarDecl {
+                id: make_id(0),
                 name: "x".to_string(),
                 initializer: Some(Expr::Literal {
+                    id: make_id(1),
                     value: LiteralValue::Number(42.0),
-                    span: dummy_span(),
                 }),
                 is_const: false,
-                span: dummy_span(),
             },
             // x (access variable)
             Stmt::Expression {
+                id: make_id(2),
                 expr: Expr::Identifier {
+                    id: make_id(3),
                     name: "x".to_string(),
-                    span: dummy_span(),
                 },
-                span: dummy_span(),
             },
         ],
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
+    let span_map = make_span_map(4);
+    let result = compile_and_run(&program, span_map).unwrap();
     assert_value_eq(&result, &Value::Number(42.0));
 }
 
@@ -110,37 +126,38 @@ fn test_compiler_variable_declaration_and_access() {
 fn test_compiler_dictionary_creation() {
     let program = Program {
         statements: vec![Stmt::Expression {
+            id: make_id(0),
             expr: Expr::Dict {
+                id: make_id(1),
                 pairs: vec![
                     (
                         Expr::Literal {
+                            id: make_id(2),
                             value: LiteralValue::String("name".to_string()),
-                            span: dummy_span(),
                         },
                         Expr::Literal {
+                            id: make_id(3),
                             value: LiteralValue::String("Alice".to_string()),
-                            span: dummy_span(),
                         },
                     ),
                     (
                         Expr::Literal {
+                            id: make_id(4),
                             value: LiteralValue::String("age".to_string()),
-                            span: dummy_span(),
                         },
                         Expr::Literal {
+                            id: make_id(5),
                             value: LiteralValue::Number(30.0),
-                            span: dummy_span(),
                         },
                     ),
                 ],
-                span: dummy_span(),
             },
-            span: dummy_span(),
         }],
         span: dummy_span(),
     };
 
-    let bytecode = lugli_vm::compile(&program).unwrap();
+    let span_map = make_span_map(6);
+    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     let result = lugli_vm::run(&bytecode).unwrap();
 
     if let Value::Dict(dict) = result {
@@ -162,29 +179,30 @@ fn test_compiler_dictionary_creation() {
 fn test_compiler_list_creation() {
     let program = Program {
         statements: vec![Stmt::Expression {
+            id: make_id(0),
             expr: Expr::List {
+                id: make_id(1),
                 elements: vec![
                     Expr::Literal {
+                        id: make_id(2),
                         value: LiteralValue::Number(1.0),
-                        span: dummy_span(),
                     },
                     Expr::Literal {
+                        id: make_id(3),
                         value: LiteralValue::Number(2.0),
-                        span: dummy_span(),
                     },
                     Expr::Literal {
+                        id: make_id(4),
                         value: LiteralValue::Number(3.0),
-                        span: dummy_span(),
                     },
                 ],
-                span: dummy_span(),
             },
-            span: dummy_span(),
         }],
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
+    let span_map = make_span_map(5);
+    let result = compile_and_run(&program, span_map).unwrap();
 
     if let Value::List(list) = result {
         let list_ref = list.borrow();
@@ -203,40 +221,41 @@ fn test_compiler_property_access() {
         statements: vec![
             // let person = {"name": "Alice"}
             Stmt::VarDecl {
+                id: make_id(0),
                 name: "person".to_string(),
                 initializer: Some(Expr::Dict {
+                    id: make_id(1),
                     pairs: vec![(
                         Expr::Literal {
+                            id: make_id(2),
                             value: LiteralValue::String("name".to_string()),
-                            span: dummy_span(),
                         },
                         Expr::Literal {
+                            id: make_id(3),
                             value: LiteralValue::String("Alice".to_string()),
-                            span: dummy_span(),
                         },
                     )],
-                    span: dummy_span(),
                 }),
                 is_const: false,
-                span: dummy_span(),
             },
             // person.name
             Stmt::Expression {
+                id: make_id(4),
                 expr: Expr::Get {
+                    id: make_id(5),
                     object: Box::new(Expr::Identifier {
+                        id: make_id(6),
                         name: "person".to_string(),
-                        span: dummy_span(),
                     }),
                     name: "name".to_string(),
-                    span: dummy_span(),
                 },
-                span: dummy_span(),
             },
         ],
         span: dummy_span(),
     };
 
-    let bytecode = lugli_vm::compile(&program).unwrap();
+    let span_map = make_span_map(7);
+    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     let result = lugli_vm::run(&bytecode).unwrap();
     let mut pool = bytecode.string_pool.borrow_mut();
     let alice_id = pool.intern("Alice");
@@ -249,43 +268,44 @@ fn test_compiler_global_variable_assignment() {
         statements: vec![
             // let x = 10
             Stmt::VarDecl {
+                id: make_id(0),
                 name: "x".to_string(),
                 initializer: Some(Expr::Literal {
+                    id: make_id(1),
                     value: LiteralValue::Number(10.0),
-                    span: dummy_span(),
                 }),
                 is_const: false,
-                span: dummy_span(),
             },
             // x = 20 (this assigns to local variable x)
             Stmt::Expression {
+                id: make_id(2),
                 expr: Expr::Set {
+                    id: make_id(3),
                     object: Box::new(Expr::Identifier {
+                        id: make_id(4),
                         name: "global".to_string(),
-                        span: dummy_span(),
                     }),
                     name: "x".to_string(),
                     value: Box::new(Expr::Literal {
+                        id: make_id(5),
                         value: LiteralValue::Number(20.0),
-                        span: dummy_span(),
                     }),
-                    span: dummy_span(),
                 },
-                span: dummy_span(),
             },
             // x (access the local variable)
             Stmt::Expression {
+                id: make_id(6),
                 expr: Expr::Identifier {
+                    id: make_id(7),
                     name: "x".to_string(),
-                    span: dummy_span(),
                 },
-                span: dummy_span(),
             },
         ],
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
+    let span_map = make_span_map(8);
+    let result = compile_and_run(&program, span_map).unwrap();
     assert_value_eq(&result, &Value::Number(20.0));
 }
 
@@ -295,61 +315,66 @@ fn test_compiler_property_assignment() {
         statements: vec![
             // let person = {"name": "Alice"}
             Stmt::VarDecl {
+                id: make_id(0),
                 name: "person".to_string(),
                 initializer: Some(Expr::Dict {
+                    id: make_id(1),
                     pairs: vec![(
                         Expr::Literal {
+                            id: make_id(2),
                             value: LiteralValue::String("name".to_string()),
-                            span: dummy_span(),
                         },
                         Expr::Literal {
+                            id: make_id(3),
                             value: LiteralValue::String("Alice".to_string()),
-                            span: dummy_span(),
                         },
                     )],
-                    span: dummy_span(),
                 }),
                 is_const: false,
-                span: dummy_span(),
             },
             // person.name = "Bob"
             Stmt::Expression {
+                id: make_id(4),
                 expr: Expr::Set {
+                    id: make_id(5),
                     object: Box::new(Expr::Identifier {
+                        id: make_id(6),
                         name: "person".to_string(),
-                        span: dummy_span(),
                     }),
                     name: "name".to_string(),
                     value: Box::new(Expr::Literal {
+                        id: make_id(7),
                         value: LiteralValue::String("Bob".to_string()),
-                        span: dummy_span(),
                     }),
-                    span: dummy_span(),
                 },
-                span: dummy_span(),
             },
             // person.name
             Stmt::Expression {
+                id: make_id(8),
                 expr: Expr::Get {
+                    id: make_id(9),
                     object: Box::new(Expr::Identifier {
+                        id: make_id(10),
                         name: "person".to_string(),
-                        span: dummy_span(),
                     }),
                     name: "name".to_string(),
-                    span: dummy_span(),
                 },
-                span: dummy_span(),
             },
         ],
         span: dummy_span(),
     };
 
-    let bytecode = lugli_vm::compile(&program).unwrap();
+    let span_map = make_span_map(11);
+    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     let result = lugli_vm::run(&bytecode);
 
     if let Err(e) = &result {
         println!("{}", lugli_vm::debug::disassemble(&bytecode, "test_compiler_property_assignment"));
-        panic!("Test failed with error: {}\nBytecode:\n{}", e, lugli_vm::debug::disassemble(&bytecode, "test_compiler_property_assignment"));
+        panic!(
+            "Test failed with error: {}\nBytecode:\n{}",
+            e,
+            lugli_vm::debug::disassemble(&bytecode, "test_compiler_property_assignment")
+        );
     }
 
     let mut pool = bytecode.string_pool.borrow_mut();
@@ -361,16 +386,17 @@ fn test_compiler_property_assignment() {
 fn test_compiler_return_statement() {
     let program = Program {
         statements: vec![Stmt::Return {
+            id: make_id(0),
             value: Some(Expr::Literal {
+                id: make_id(1),
                 value: LiteralValue::String("Hello, World!".to_string()),
-                span: dummy_span(),
             }),
-            span: dummy_span(),
         }],
         span: dummy_span(),
     };
 
-    let bytecode = lugli_vm::compile(&program).unwrap();
+    let span_map = make_span_map(2);
+    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     let result = lugli_vm::run(&bytecode).unwrap();
     let mut pool = bytecode.string_pool.borrow_mut();
     let hello_id = pool.intern("Hello, World!");
@@ -382,47 +408,48 @@ fn test_compiler_complex_nested_structure() {
     // Test: {"data": [1, 2, {"nested": true}]}
     let program = Program {
         statements: vec![Stmt::Expression {
+            id: make_id(0),
             expr: Expr::Dict {
+                id: make_id(1),
                 pairs: vec![(
                     Expr::Literal {
+                        id: make_id(2),
                         value: LiteralValue::String("data".to_string()),
-                        span: dummy_span(),
                     },
                     Expr::List {
+                        id: make_id(3),
                         elements: vec![
                             Expr::Literal {
+                                id: make_id(4),
                                 value: LiteralValue::Number(1.0),
-                                span: dummy_span(),
                             },
                             Expr::Literal {
+                                id: make_id(5),
                                 value: LiteralValue::Number(2.0),
-                                span: dummy_span(),
                             },
                             Expr::Dict {
+                                id: make_id(6),
                                 pairs: vec![(
                                     Expr::Literal {
+                                        id: make_id(7),
                                         value: LiteralValue::String("nested".to_string()),
-                                        span: dummy_span(),
                                     },
                                     Expr::Literal {
+                                        id: make_id(8),
                                         value: LiteralValue::Boolean(true),
-                                        span: dummy_span(),
                                     },
                                 )],
-                                span: dummy_span(),
                             },
                         ],
-                        span: dummy_span(),
                     },
                 )],
-                span: dummy_span(),
             },
-            span: dummy_span(),
         }],
         span: dummy_span(),
     };
 
-    let bytecode = lugli_vm::compile(&program).unwrap();
+    let span_map = make_span_map(9);
+    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     let result = lugli_vm::run(&bytecode).unwrap();
 
     if let Value::Dict(main_dict) = result {
@@ -453,16 +480,17 @@ fn test_compiler_complex_nested_structure() {
 fn test_compiler_error_undefined_variable() {
     let program = Program {
         statements: vec![Stmt::Expression {
+            id: make_id(0),
             expr: Expr::Identifier {
+                id: make_id(1),
                 name: "undefined_var".to_string(),
-                span: dummy_span(),
             },
-            span: dummy_span(),
         }],
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program);
+    let span_map = make_span_map(2);
+    let result = compile_and_run(&program, span_map);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("undefined_var"));
 }
@@ -473,44 +501,45 @@ fn test_compiler_multiple_variable_declarations() {
         statements: vec![
             // let a = 10
             Stmt::VarDecl {
+                id: make_id(0),
                 name: "a".to_string(),
                 initializer: Some(Expr::Literal {
+                    id: make_id(1),
                     value: LiteralValue::Number(10.0),
-                    span: dummy_span(),
                 }),
                 is_const: false,
-                span: dummy_span(),
             },
             // let b = 20
             Stmt::VarDecl {
+                id: make_id(2),
                 name: "b".to_string(),
                 initializer: Some(Expr::Literal {
+                    id: make_id(3),
                     value: LiteralValue::Number(20.0),
-                    span: dummy_span(),
                 }),
                 is_const: false,
-                span: dummy_span(),
             },
             // a + b
             Stmt::Expression {
+                id: make_id(4),
                 expr: Expr::Binary {
+                    id: make_id(5),
                     left: Box::new(Expr::Identifier {
+                        id: make_id(6),
                         name: "a".to_string(),
-                        span: dummy_span(),
                     }),
-                    operator: Token::new(lugli_lexer::TokenKind::Plus, dummy_span()),
+                    operator: TokenKind::Plus,
                     right: Box::new(Expr::Identifier {
+                        id: make_id(7),
                         name: "b".to_string(),
-                        span: dummy_span(),
                     }),
-                    span: dummy_span(),
                 },
-                span: dummy_span(),
             },
         ],
         span: dummy_span(),
     };
 
-    let result = compile_and_run(&program).unwrap();
+    let span_map = make_span_map(8);
+    let result = compile_and_run(&program, span_map).unwrap();
     assert_value_eq(&result, &Value::Number(30.0));
 }
