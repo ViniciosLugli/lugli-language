@@ -7,11 +7,12 @@ members = [
 	"crates/lugli-vm",
 	"crates/lugli-stdlib",
 	"crates/lugli",
+	"crates/lugli-benchmarks",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.3.1"
+version = "0.4.0"
 description = "Lugli: High-level programming language with Rust-friendly syntax and Python simplicity"
 authors = ["Vinicios Lugli <vinicioslugli@gmail.com>"]
 edition = "2024"

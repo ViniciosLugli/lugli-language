@@ -113,8 +113,8 @@ impl ModuleResolver {
         }
 
         // Try relative to current file first
-        if let Some(current_file) = from_file {
-            if let Some(parent) = current_file.parent() {
+        if let Some(current_file) = from_file
+            && let Some(parent) = current_file.parent() {
                 let relative_path = parent.join(&import_path).with_extension("lg");
                 if relative_path.exists() {
                     return relative_path
@@ -122,7 +122,6 @@ impl ModuleResolver {
                         .map_err(|e| LugliError::runtime(format!("Failed to resolve module path '{}': {}", relative_path.display(), e)));
                 }
             }
-        }
 
         // Try search paths
         for search_path in &self.search_paths {
@@ -136,8 +135,8 @@ impl ModuleResolver {
 
         // Try with explicit .lg extension (if user provided it)
         if import_path.ends_with(".lg") {
-            if let Some(current_file) = from_file {
-                if let Some(parent) = current_file.parent() {
+            if let Some(current_file) = from_file
+                && let Some(parent) = current_file.parent() {
                     let relative_path = parent.join(&import_path);
                     if relative_path.exists() {
                         return relative_path
@@ -145,7 +144,6 @@ impl ModuleResolver {
                             .map_err(|e| LugliError::runtime(format!("Failed to resolve module path '{}': {}", relative_path.display(), e)));
                     }
                 }
-            }
 
             for search_path in &self.search_paths {
                 let candidate = search_path.join(&import_path);
@@ -170,14 +168,13 @@ impl ModuleResolver {
         }
 
         // Try relative to executable
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(exe_dir) = exe_path.parent() {
+        if let Ok(exe_path) = std::env::current_exe()
+            && let Some(exe_dir) = exe_path.parent() {
                 let stdlib = exe_dir.join("stdlib");
                 if stdlib.exists() {
                     return Some(stdlib);
                 }
             }
-        }
 
         // Try current directory
         let local_stdlib = PathBuf::from("./stdlib");

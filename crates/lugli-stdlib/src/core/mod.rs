@@ -26,6 +26,14 @@ pub fn get_functions() -> Vec<(&'static str, NativeFunction)> {
         ("max", max_fn as NativeFunction),
         ("sorted", list::list_sorted as NativeFunction),
         ("reversed", list::list_reversed as NativeFunction),
+        // Math functions
+        ("abs", abs_fn as NativeFunction),
+        ("round", round_fn as NativeFunction),
+        ("pow", pow_fn as NativeFunction),
+        // Higher-order functions
+        ("map", map_fn as NativeFunction),
+        ("filter", filter_fn as NativeFunction),
+        ("reduce", reduce_fn as NativeFunction),
     ];
 
     // Add string methods - these will be accessed as regular functions for now
@@ -343,5 +351,118 @@ fn max_fn(args: &[Value]) -> Result<Value, LugliError> {
             }
         }
         _ => Err(LugliError::type_error("list", args[0].type_name())),
+    }
+}
+
+// Math functions
+
+fn abs_fn(args: &[Value]) -> Result<Value, LugliError> {
+    if args.len() != 1 {
+        return Err(LugliError::runtime("abs expects 1 argument"));
+    }
+    match &args[0] {
+        Value::Number(n) => Ok(Value::Number(n.abs())),
+        _ => Err(LugliError::type_error("number", args[0].type_name())),
+    }
+}
+
+fn round_fn(args: &[Value]) -> Result<Value, LugliError> {
+    if args.is_empty() || args.len() > 2 {
+        return Err(LugliError::runtime("round expects 1 or 2 arguments"));
+    }
+
+    let num = match &args[0] {
+        Value::Number(n) => *n,
+        _ => return Err(LugliError::type_error("number", args[0].type_name())),
+    };
+
+    if args.len() == 1 {
+        // Round to nearest integer
+        Ok(Value::Number(num.round()))
+    } else {
+        // Round to n decimal places
+        let places = match &args[1] {
+            Value::Number(n) => *n as i32,
+            _ => return Err(LugliError::type_error("number", args[1].type_name())),
+        };
+
+        let multiplier = 10_f64.powi(places);
+        Ok(Value::Number((num * multiplier).round() / multiplier))
+    }
+}
+
+fn pow_fn(args: &[Value]) -> Result<Value, LugliError> {
+    if args.len() != 2 {
+        return Err(LugliError::runtime("pow expects 2 arguments"));
+    }
+
+    let base = match &args[0] {
+        Value::Number(n) => *n,
+        _ => return Err(LugliError::type_error("number", args[0].type_name())),
+    };
+
+    let exponent = match &args[1] {
+        Value::Number(n) => *n,
+        _ => return Err(LugliError::type_error("number", args[1].type_name())),
+    };
+
+    Ok(Value::Number(base.powf(exponent)))
+}
+
+// Higher-order functions
+
+fn map_fn(args: &[Value]) -> Result<Value, LugliError> {
+    if args.len() != 2 {
+        return Err(LugliError::runtime("map expects 2 arguments"));
+    }
+
+    let _func = match &args[0] {
+        Value::Function { .. } | Value::NativeFunction { .. } | Value::Closure { .. } => &args[0],
+        _ => return Err(LugliError::type_error("function", args[0].type_name())),
+    };
+
+    match &args[1] {
+        Value::List(_list) => {
+            // map/filter/reduce require VM integration to call functions
+            // For now, return helpful error message
+            Err(LugliError::runtime("map is not yet fully implemented - requires VM integration for function calls"))
+        }
+        _ => Err(LugliError::type_error("list", args[1].type_name())),
+    }
+}
+
+fn filter_fn(args: &[Value]) -> Result<Value, LugliError> {
+    if args.len() != 2 {
+        return Err(LugliError::runtime("filter expects 2 arguments"));
+    }
+
+    let _func = match &args[0] {
+        Value::Function { .. } | Value::NativeFunction { .. } | Value::Closure { .. } => &args[0],
+        _ => return Err(LugliError::type_error("function", args[0].type_name())),
+    };
+
+    match &args[1] {
+        Value::List(_list) => {
+            Err(LugliError::runtime("filter is not yet fully implemented - requires VM integration for function calls"))
+        }
+        _ => Err(LugliError::type_error("list", args[1].type_name())),
+    }
+}
+
+fn reduce_fn(args: &[Value]) -> Result<Value, LugliError> {
+    if args.len() < 2 || args.len() > 3 {
+        return Err(LugliError::runtime("reduce expects 2 or 3 arguments"));
+    }
+
+    let _func = match &args[0] {
+        Value::Function { .. } | Value::NativeFunction { .. } | Value::Closure { .. } => &args[0],
+        _ => return Err(LugliError::type_error("function", args[0].type_name())),
+    };
+
+    match &args[1] {
+        Value::List(_list) => {
+            Err(LugliError::runtime("reduce is not yet fully implemented - requires VM integration for function calls"))
+        }
+        _ => Err(LugliError::type_error("list", args[1].type_name())),
     }
 }

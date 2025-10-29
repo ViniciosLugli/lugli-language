@@ -17,7 +17,7 @@ pub enum Value {
     List(Rc<RefCell<Vec<Value>>>),
     Dict(Rc<RefCell<HashMap<String, Value>>>),
     Function { name: String, params: Vec<String>, body_start: usize, bytecode_id: usize },
-    Closure { name: String, params: Vec<String>, body_start: usize, bytecode_id: usize, upvalues: Rc<RefCell<Vec<Value>>> },
+    Closure { name: String, params: Vec<String>, body_start: usize, bytecode_id: usize, upvalues: Vec<Rc<RefCell<Value>>> },
     NativeFunction { name: String, callback: NativeFunction, arity: usize },
     StructInstance { name: String, fields: HashMap<String, Value> },
     DateTime(i64), // Unix timestamp
@@ -62,7 +62,14 @@ impl PartialEq for Value {
                     bytecode_id: id2,
                     upvalues: u2,
                 },
-            ) => n1 == n2 && p1 == p2 && b1 == b2 && id1 == id2 && Rc::ptr_eq(u1, u2),
+            ) => {
+                n1 == n2
+                    && p1 == p2
+                    && b1 == b2
+                    && id1 == id2
+                    && u1.len() == u2.len()
+                    && u1.iter().zip(u2.iter()).all(|(a, b)| Rc::ptr_eq(a, b))
+            }
             (
                 Value::NativeFunction {
                     name: n1, ..
@@ -185,7 +192,7 @@ impl Value {
                 params: params.clone(),
                 body_start: *body_start,
                 bytecode_id: *bytecode_id,
-                upvalues: Rc::clone(upvalues),
+                upvalues: upvalues.iter().map(Rc::clone).collect(),
             },
             // Other types need full clone (String allocates)
             _ => self.clone(),
@@ -287,6 +294,11 @@ impl Value {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
             (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
+            (Value::List(a), Value::List(b)) => {
+                let mut result = a.borrow().clone();
+                result.extend(b.borrow().clone());
+                Ok(Value::List(Rc::new(RefCell::new(result))))
+            }
             _ => Err(LugliError::runtime(format!("Unsupported operand types for +: {} and {}", self.type_name(), other.type_name()))),
         }
     }

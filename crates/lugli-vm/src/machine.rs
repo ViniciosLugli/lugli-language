@@ -17,7 +17,7 @@ struct CallFrame {
     function_name: String,
     return_ip: usize,
     stack_base: usize,
-    closure_upvalues: Option<Rc<RefCell<Vec<Value>>>>, // If this is a closure call, store its upvalues
+    closure_upvalues: Option<Vec<Rc<RefCell<Value>>>>, // If this is a closure call, store its upvalues
 }
 
 impl CallFrame {
@@ -30,7 +30,7 @@ impl CallFrame {
         }
     }
 
-    fn new_closure(function_name: String, return_ip: usize, stack_base: usize, upvalues: Rc<RefCell<Vec<Value>>>) -> Self {
+    fn new_closure(function_name: String, return_ip: usize, stack_base: usize, upvalues: Vec<Rc<RefCell<Value>>>) -> Self {
         Self {
             function_name,
             return_ip,
@@ -76,6 +76,7 @@ pub struct Machine {
     current_file: Option<PathBuf>,
     bytecode_registry: HashMap<usize, Rc<Bytecode>>,
     next_bytecode_id: usize,
+    open_upvalues: HashMap<usize, Rc<RefCell<Value>>>, // Track captured stack slots
 }
 
 impl Machine {
@@ -108,6 +109,7 @@ impl Machine {
             current_file: None,
             bytecode_registry: HashMap::new(),
             next_bytecode_id: 1, // Start at 1, main bytecode uses ID 0
+            open_upvalues: HashMap::new(),
         }
     }
 
@@ -125,6 +127,7 @@ impl Machine {
         self.current_file = None;
         self.bytecode_registry.clear();
         self.next_bytecode_id = 1; // Start at 1, main bytecode uses ID 0
+        self.open_upvalues.clear();
     }
 
     fn peek(&self) -> Result<&Value, LugliError> { self.stack.last().ok_or_else(|| LugliError::runtime("Stack underflow")) }
@@ -495,10 +498,8 @@ impl Machine {
         let resolved_path = self.module_resolver.resolve(module_path, self.current_file.as_deref())?;
 
         // Prevent self-import
-        if let Some(ref current) = self.current_file {
-            if resolved_path == *current {
-                return Err(LugliError::runtime(format!("Module cannot import itself: '{}'", resolved_path.display())));
-            }
+        if let Some(current) = self.current_file.as_ref().filter(|c| resolved_path == **c) {
+            return Err(LugliError::runtime(format!("Module cannot import itself: '{}'", current.display())));
         }
 
         if self.module_cache.is_loading(&resolved_path) {
@@ -902,6 +903,11 @@ impl Machine {
                 let frame = self.call_stack.pop().ok_or_else(|| LugliError::runtime("Call stack underflow"))?;
                 let return_value = self.pop().unwrap_or(Value::Null);
 
+                // Close upvalues for this frame before returning
+                let frame_base = frame.stack_base;
+                let frame_end = self.stack.len();
+                self.open_upvalues.retain(|&index, _| index < frame_base || index >= frame_end);
+
                 if self.call_stack.is_empty() {
                     self.stack.push(return_value);
                     return Ok(false);
@@ -945,12 +951,16 @@ impl Machine {
                 let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
 
                 if let Some(upvalues) = &frame.closure_upvalues {
-                    let upvalues_ref =
-                        upvalues.try_borrow().map_err(|_| LugliError::runtime("Cannot access closure upvalues while they're being modified"))?;
-                    let upvalue = upvalues_ref.get(*index).cloned().ok_or_else(|| {
-                        LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues_ref.len()))
+                    let upvalue_ref = upvalues.get(*index).ok_or_else(|| {
+                        LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len()))
                     })?;
-                    self.stack.push(upvalue);
+
+                    let value = upvalue_ref
+                        .try_borrow()
+                        .map_err(|_| LugliError::runtime("Cannot access upvalue while it's being modified"))?
+                        .clone();
+
+                    self.stack.push(value);
                 } else {
                     return Err(LugliError::runtime("LoadUpvalue used in non-closure context"));
                 }
@@ -960,12 +970,14 @@ impl Machine {
                 let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
 
                 if let Some(upvalues) = &frame.closure_upvalues {
-                    let mut upvalues_mut =
-                        upvalues.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify closure upvalues while they're being used"))?;
-                    if *index >= upvalues_mut.len() {
-                        return Err(LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues_mut.len())));
-                    }
-                    upvalues_mut[*index] = value;
+                    let upvalue_ref = upvalues.get(*index).ok_or_else(|| {
+                        LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len()))
+                    })?;
+
+                    *upvalue_ref
+                        .try_borrow_mut()
+                        .map_err(|_| LugliError::runtime("Cannot modify upvalue while it's being used"))?
+                        = value;
                 } else {
                     return Err(LugliError::runtime("StoreUpvalue used in non-closure context"));
                 }
@@ -1111,22 +1123,34 @@ impl Machine {
                     // Get current stack frame to calculate absolute positions
                     let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty during closure creation"))?;
 
-                    // Capture values from the stack based on local indices
+                    // Capture values from the stack using open upvalues pattern
                     // Convert local indices to absolute stack positions
-                    let upvalues: Vec<Value> = capture_indices
-                        .iter()
-                        .map(|&local_index| {
-                            let absolute_index = frame.stack_base + local_index;
-                            self.stack.get(absolute_index).cloned().ok_or_else(|| {
+                    let mut upvalues: Vec<Rc<RefCell<Value>>> = Vec::new();
+
+                    for &local_index in capture_indices {
+                        let absolute_index = frame.stack_base + local_index;
+
+                        // Check if this stack slot already has a shared reference
+                        let upvalue = if let Some(existing) = self.open_upvalues.get(&absolute_index) {
+                            // Reuse existing shared reference
+                            Rc::clone(existing)
+                        } else {
+                            // Create new shared reference
+                            let value = self.stack.get(absolute_index).cloned().ok_or_else(|| {
                                 LugliError::runtime(format!(
                                     "Invalid upvalue capture: local {} (absolute {}) out of bounds (stack size: {})",
                                     local_index,
                                     absolute_index,
                                     self.stack.len()
                                 ))
-                            })
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
+                            })?;
+                            let shared = Rc::new(RefCell::new(value));
+                            self.open_upvalues.insert(absolute_index, Rc::clone(&shared));
+                            shared
+                        };
+
+                        upvalues.push(upvalue);
+                    }
 
                     // Create closure with captured upvalues
                     let closure = Value::Closure {
@@ -1134,7 +1158,7 @@ impl Machine {
                         params: params.clone(),
                         body_start: *body_start,
                         bytecode_id: *bytecode_id,
-                        upvalues: Rc::new(RefCell::new(upvalues)),
+                        upvalues,
                     };
 
                     self.stack.push(closure);
@@ -1165,6 +1189,7 @@ impl Machine {
                         drop(dict_ref); // Release the borrow before method call
 
                         // If the field exists and is a function, call it (property call)
+                        #[allow(clippy::collapsible_match)]
                         if let Some(func) = field_func {
                             match &func {
                                 Value::Function {
@@ -1400,6 +1425,20 @@ impl Machine {
                             self.stack.push(Value::Null);
                         }
                     }
+                    (Value::Dict(dict), Value::Number(num)) => {
+                        // Convert number to string key
+                        let key = if num.fract() == 0.0 && num.abs() < 1e15 {
+                            format!("{:.0}", num) // Format as integer
+                        } else {
+                            num.to_string()
+                        };
+                        let dict_ref = dict.borrow();
+                        if let Some(value) = dict_ref.get(&key) {
+                            self.stack.push(value.clone());
+                        } else {
+                            self.stack.push(Value::Null);
+                        }
+                    }
                     (Value::String(s), Value::Number(idx)) => {
                         // Validate index is finite and in valid range
                         if !idx.is_finite() {
@@ -1478,6 +1517,18 @@ impl Machine {
                         dict.try_borrow_mut()
                             .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
                             .insert(key.clone(), value.clone());
+                        self.stack.push(value); // Return the assigned value
+                    }
+                    (Value::Dict(dict), Value::Number(num)) => {
+                        // Convert number to string key
+                        let key = if num.fract() == 0.0 && num.abs() < 1e15 {
+                            format!("{:.0}", num) // Format as integer
+                        } else {
+                            num.to_string()
+                        };
+                        dict.try_borrow_mut()
+                            .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
+                            .insert(key, value.clone());
                         self.stack.push(value); // Return the assigned value
                     }
                     _ => {

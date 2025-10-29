@@ -178,6 +178,12 @@ impl<'a> Parser<'a> {
                     name.push('!');
                 }
 
+                // Check for ? suffix (query method indicator)
+                if self.check(&TokenKind::Question) && self.peek_next_kind() == Some(TokenKind::LeftParen) {
+                    self.advance(); // consume ?
+                    name.push('?');
+                }
+
                 let span = self.merge_spans(*expr.span(), self.previous_span());
                 expr = Expr::Get {
                     object: Box::new(expr),

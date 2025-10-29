@@ -61,7 +61,6 @@ fn test_multiple_closures_sharing_upvalue() {
 }
 
 #[test]
-#[ignore = "Nested closure mutations need shared upvalue references - current implementation captures by value"]
 fn test_nested_closure_upvalue_mutation() {
     let source = r#"
         fn make_counter(start) {

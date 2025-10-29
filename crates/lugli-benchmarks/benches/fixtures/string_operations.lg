@@ -1,0 +1,31 @@
+# String operations benchmark
+fn benchmark_strings(iterations) {
+    let base = "hello world"
+    let results = []
+
+    mut i = 0
+    while i < iterations {
+        # String concatenation
+        let greeting = "Hello, " + "Lugli " + "Language!"
+
+        # F-string interpolation
+        let message = f"Iteration {i} of {iterations}"
+
+        # String methods
+        let upper = base.upper()
+        let lower = base.lower()
+        let words = base.split(" ")
+        let trimmed = base.trim()
+
+        # String length
+        let len = greeting.len()
+
+        results.push(len)
+        i = i + 1
+    }
+
+    return results.len()
+}
+
+# Benchmark target
+benchmark_strings(500)

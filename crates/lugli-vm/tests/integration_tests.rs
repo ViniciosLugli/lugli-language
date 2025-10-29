@@ -415,7 +415,6 @@ fn test_matrix_operations() {
 }
 
 #[test]
-#[ignore = "Closures not implemented yet - requires variable capture"]
 fn test_closure_counter() {
     let source = r#"
         fn make_counter(start) {

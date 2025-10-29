@@ -1,0 +1,2 @@
+# Minimal hello world for startup benchmark
+print("Hello, World!")

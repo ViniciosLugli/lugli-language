@@ -1,0 +1,27 @@
+# Pattern matching benchmark
+fn classify_number(n) {
+    match n {
+        0 => "zero",
+        1 => "one",
+        2 => "two",
+        3 => "three",
+        4 => "four",
+        5 => "five",
+        x if x < 0 => "negative",
+        x if x > 100 => "large",
+        _ => "other"
+    }
+}
+
+fn benchmark_pattern_matching(iterations) {
+    mut i = 0
+    let results = []
+    while i < iterations {
+        results.push(classify_number(i % 150 - 10))
+        i = i + 1
+    }
+    return results
+}
+
+# Benchmark target
+benchmark_pattern_matching(1000)

@@ -1,0 +1,34 @@
+# Closure benchmark
+fn create_counter() {
+    mut count = 0
+    return fn() {
+        count = count + 1
+        return count
+    }
+}
+
+fn create_adder(n) {
+    return fn(x) {
+        return x + n
+    }
+}
+
+fn benchmark_closures(iterations) {
+    let counter = create_counter()
+    let add5 = create_adder(5)
+    let add10 = create_adder(10)
+
+    mut sum = 0
+    mut i = 0
+    while i < iterations {
+        sum = sum + counter()
+        sum = sum + add5(i)
+        sum = sum + add10(i)
+        i = i + 1
+    }
+
+    return sum
+}
+
+# Benchmark target
+benchmark_closures(500)

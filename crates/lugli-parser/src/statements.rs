@@ -50,6 +50,14 @@ impl<'a> Parser<'a> {
 
         let name = self.consume_identifier("Expected variable name")?;
 
+        // Skip type hint if present (e.g., let x: num = 5)
+        if self.match_any(&[TokenKind::Colon]) {
+            // Skip type annotation until we hit = or newline/semicolon
+            while !self.check(&TokenKind::Equal) && !self.check(&TokenKind::Newline) && !self.check(&TokenKind::Semicolon) && !self.scanner.is_at_end() {
+                self.advance();
+            }
+        }
+
         let initializer = if self.match_any(&[TokenKind::Equal]) {
             Some(self.expression()?)
         } else if is_const {
@@ -85,6 +93,11 @@ impl<'a> Parser<'a> {
         // Check for ! suffix (mutating method indicator)
         if self.match_any(&[TokenKind::Bang]) {
             name.push('!');
+        }
+
+        // Check for ? suffix (query method indicator)
+        if self.match_any(&[TokenKind::Question]) {
+            name.push('?');
         }
 
         self.consume(&TokenKind::LeftParen, "Expected '(' after function name")?;
@@ -162,10 +175,29 @@ impl<'a> Parser<'a> {
             } else if !self.check(&TokenKind::RightBrace) {
                 let field_name = self.consume_identifier("Expected field name")?;
 
-                // Handle optional type hint or default value after colon
                 let default_value = if self.match_any(&[TokenKind::Colon]) {
-                    // Parse default value expression
-                    self.expression().ok()
+                    // After colon, check if it's a type hint or default value
+                    // Type hint: starts with identifier (e.g., name: Type)
+                    // Default value: starts with literal/expression (e.g., name: "value")
+                    let is_type_hint = matches!(self.peek_kind(), Some(TokenKind::Identifier(_)));
+                    if is_type_hint {
+                        // Skip type annotation until we hit = or terminal
+                        while !self.check(&TokenKind::Equal) && !self.check(&TokenKind::Newline) && !self.check(&TokenKind::Comma) && !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
+                            self.advance();
+                        }
+                        // Now check for optional default value after =
+                        if self.match_any(&[TokenKind::Equal]) {
+                            Some(self.expression()?)
+                        } else {
+                            None
+                        }
+                    } else {
+                        // Old syntax: field: default_value
+                        Some(self.expression()?)
+                    }
+                } else if self.match_any(&[TokenKind::Equal]) {
+                    // New syntax: field = default_value
+                    Some(self.expression()?)
                 } else {
                     None
                 };
@@ -535,6 +567,7 @@ impl<'a> Parser<'a> {
         })
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub(crate) fn from_import_statement(&mut self) -> Result<Stmt, ParseError> {
         let start_span = self.current_span();
         self.consume(&TokenKind::From, "Expected 'from'")?;
