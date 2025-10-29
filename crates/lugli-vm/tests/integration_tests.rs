@@ -23,7 +23,7 @@ fn test_todo_list_app() {
 
             fn add!(self, text) {
                 let item = TodoItem { text: text, done: false }
-                self.items.push!(item)
+                self.items.push(item)
             }
 
             fn complete_item!(self, index) {
@@ -36,7 +36,7 @@ fn test_todo_list_app() {
                 let pending = []
                 for item in self.items {
                     if !item.done {
-                        pending.push!(item.text)
+                        pending.push(item.text)
                     }
                 }
                 return pending
@@ -94,14 +94,14 @@ fn test_calculator_with_history() {
             fn add!(self, value) {
                 self.result = self.result + value
                 let entry = "add " + str(value)
-                self.history.push!(entry)
+                self.history.push(entry)
                 return self
             }
 
             fn multiply!(self, value) {
                 self.result = self.result * value
                 let entry = "multiply " + str(value)
-                self.history.push!(entry)
+                self.history.push(entry)
                 return self
             }
 
@@ -141,7 +141,7 @@ fn test_student_grades_system() {
             grades: []
 
             fn add_grade!(self, grade) {
-                self.grades.push!(grade)
+                self.grades.push(grade)
             }
 
             fn average(self) {
@@ -164,14 +164,14 @@ fn test_student_grades_system() {
             students: []
 
             fn add_student!(self, student) {
-                self.students.push!(student)
+                self.students.push(student)
             }
 
             fn get_passing_students(self) {
                 let passing = []
                 for student in self.students {
                     if student.is_passing() {
-                        passing.push!(student.name)
+                        passing.push(student.name)
                     }
                 }
                 return passing
@@ -312,7 +312,7 @@ fn test_event_system() {
                 if !self.handlers.contains(event_name) {
                     self.handlers[event_name] = []
                 }
-                self.handlers[event_name].push!(handler)
+                self.handlers[event_name].push(handler)
             }
 
             fn emit!(self, event_name, data) {
@@ -331,11 +331,11 @@ fn test_event_system() {
         let results = []
 
         fn handler1(data) {
-            results.push!("handler1: " + data)
+            results.push("handler1: " + data)
         }
 
         fn handler2(data) {
-            results.push!("handler2: " + data)
+            results.push("handler2: " + data)
         }
 
         bus.on!("test", handler1)
@@ -377,7 +377,7 @@ fn test_matrix_operations() {
 
                 # Initialize result data
                 for i in range(self.cols * self.rows) {
-                    result.data.push!(0)
+                    result.data.push(0)
                 }
 
                 for i in range(self.rows) {
@@ -466,7 +466,7 @@ fn test_data_pipeline() {
         let ny_residents = []
         for person in data {
             if person["city"] == "NY" {
-                ny_residents.push!(person)
+                ny_residents.push(person)
             }
         }
 
@@ -478,7 +478,7 @@ fn test_data_pipeline() {
         # Get ages of NY residents
         let ages = []
         for person in ny_residents {
-            ages.push!(person["age"])
+            ages.push(person["age"])
         }
 
         # Calculate average age
@@ -544,7 +544,7 @@ fn test_mini_game_logic() {
             round: 0
 
             fn add_player!(self, player) {
-                self.players.push!(player)
+                self.players.push(player)
             }
 
             fn simulate_round!(self) {

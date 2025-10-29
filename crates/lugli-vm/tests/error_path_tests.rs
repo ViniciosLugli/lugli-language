@@ -185,7 +185,7 @@ fn test_error_in_match_expression() {
 fn test_empty_list_pop() {
     let source = r#"
         let list = []
-        list.pop!()
+        list.pop()
     "#;
 
     let bytecode = compile_source(source);

@@ -25,7 +25,7 @@ mod ast_construction_tests {
                                 name: "n".to_string(),
                                 span: span.clone(),
                             }),
-                            operator: Token::new(TokenKind::LessEqual, "<=".to_string(), span.clone()),
+                            operator: Token::new(TokenKind::LessEqual, span.clone()),
                             right: Box::new(Expr::Literal {
                                 value: LiteralValue::Number(1.0),
                                 span: span.clone(),
@@ -52,7 +52,7 @@ mod ast_construction_tests {
                                             name: "n".to_string(),
                                             span: span.clone(),
                                         }),
-                                        operator: Token::new(TokenKind::Minus, "-".to_string(), span.clone()),
+                                        operator: Token::new(TokenKind::Minus, span.clone()),
                                         right: Box::new(Expr::Literal {
                                             value: LiteralValue::Number(1.0),
                                             span: span.clone(),
@@ -61,7 +61,7 @@ mod ast_construction_tests {
                                     }],
                                     span: span.clone(),
                                 }),
-                                operator: Token::new(TokenKind::Plus, "+".to_string(), span.clone()),
+                                operator: Token::new(TokenKind::Plus, span.clone()),
                                 right: Box::new(Expr::Call {
                                     callee: Box::new(Expr::Identifier {
                                         name: "fibonacci".to_string(),
@@ -72,7 +72,7 @@ mod ast_construction_tests {
                                             name: "n".to_string(),
                                             span: span.clone(),
                                         }),
-                                        operator: Token::new(TokenKind::Minus, "-".to_string(), span.clone()),
+                                        operator: Token::new(TokenKind::Minus, span.clone()),
                                         right: Box::new(Expr::Literal {
                                             value: LiteralValue::Number(2.0),
                                             span: span.clone(),
@@ -173,7 +173,7 @@ mod ast_construction_tests {
                                     value: LiteralValue::Number(3.0),
                                     span: span.clone(),
                                 }),
-                                operator: Token::new(TokenKind::Plus, "+".to_string(), span.clone()),
+                                operator: Token::new(TokenKind::Plus, span.clone()),
                                 right: Box::new(Expr::Literal {
                                     value: LiteralValue::Number(4.0),
                                     span: span.clone(),
@@ -278,7 +278,7 @@ mod ast_construction_tests {
                         name: "item".to_string(),
                         span: span.clone(),
                     }),
-                    operator: Token::new(TokenKind::Greater, ">".to_string(), span.clone()),
+                    operator: Token::new(TokenKind::Greater, span.clone()),
                     right: Box::new(Expr::Literal {
                         value: LiteralValue::Number(10.0),
                         span: span.clone(),
@@ -305,7 +305,7 @@ mod ast_construction_tests {
                             name: "item".to_string(),
                             span: span.clone(),
                         }),
-                        operator: Token::new(TokenKind::Greater, ">".to_string(), span.clone()),
+                        operator: Token::new(TokenKind::Greater, span.clone()),
                         right: Box::new(Expr::Literal {
                             value: LiteralValue::Number(5.0),
                             span: span.clone(),
@@ -440,7 +440,7 @@ mod visitor_pattern_tests {
                         ],
                         span: span.clone(),
                     }),
-                    operator: Token::new(TokenKind::Star, "*".to_string(), span.clone()),
+                    operator: Token::new(TokenKind::Star, span.clone()),
                     right: Box::new(Expr::Identifier {
                         name: "factor".to_string(),
                         span: span.clone(),
@@ -505,13 +505,13 @@ mod visitor_pattern_tests {
                             name: "x".to_string(),
                             span: span.clone(),
                         }),
-                        operator: Token::new(TokenKind::Plus, "+".to_string(), span.clone()),
+                        operator: Token::new(TokenKind::Plus, span.clone()),
                         right: Box::new(Expr::Binary {
                             left: Box::new(Expr::Identifier {
                                 name: "y".to_string(),
                                 span: span.clone(),
                             }),
-                            operator: Token::new(TokenKind::Star, "*".to_string(), span.clone()),
+                            operator: Token::new(TokenKind::Star, span.clone()),
                             right: Box::new(Expr::Identifier {
                                 name: "z".to_string(),
                                 span: span.clone(),
@@ -573,7 +573,7 @@ mod visitor_pattern_tests {
                         name: "old_var".to_string(),
                         span: span.clone(),
                     }),
-                    operator: Token::new(TokenKind::Plus, "+".to_string(), span.clone()),
+                    operator: Token::new(TokenKind::Plus, span.clone()),
                     right: Box::new(Expr::Identifier {
                         name: "old_var".to_string(),
                         span: span.clone(),
@@ -651,7 +651,7 @@ mod span_tracking_tests {
 
         let binary_expr = Expr::Binary {
             left: Box::new(expr1),
-            operator: Token::new(TokenKind::Plus, "+".to_string(), span2.clone()),
+            operator: Token::new(TokenKind::Plus, span2.clone()),
             right: Box::new(expr2),
             span: span3.clone(),
         };
@@ -779,7 +779,7 @@ mod ast_node_interface_tests {
         for i in 2..=depth {
             expr = Expr::Binary {
                 left: Box::new(expr),
-                operator: Token::new(TokenKind::Plus, "+".to_string(), span.clone()),
+                operator: Token::new(TokenKind::Plus, span.clone()),
                 right: Box::new(Expr::Literal {
                     value: LiteralValue::Number(i as f64),
                     span: span.clone(),

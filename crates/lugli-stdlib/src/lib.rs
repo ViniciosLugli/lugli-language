@@ -2,7 +2,10 @@ use lugli_common::{LugliError, StringPool, Value};
 
 pub mod core;
 pub mod io;
+pub mod methods;
 pub mod time;
+
+pub use methods::MethodRegistry;
 
 // Re-export individual functions to avoid ambiguous glob re-exports
 // Main access point is get_global_functions() which combines all modules

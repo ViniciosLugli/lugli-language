@@ -52,13 +52,13 @@ fn test_compiler_binary_expressions() {
                     value: LiteralValue::Number(10.0),
                     span: dummy_span(),
                 }),
-                operator: Token::new(lugli_lexer::TokenKind::Plus, "+".to_string(), dummy_span()),
+                operator: Token::new(lugli_lexer::TokenKind::Plus, dummy_span()),
                 right: Box::new(Expr::Binary {
                     left: Box::new(Expr::Literal {
                         value: LiteralValue::Number(20.0),
                         span: dummy_span(),
                     }),
-                    operator: Token::new(lugli_lexer::TokenKind::Star, "*".to_string(), dummy_span()),
+                    operator: Token::new(lugli_lexer::TokenKind::Star, dummy_span()),
                     right: Box::new(Expr::Literal {
                         value: LiteralValue::Number(2.0),
                         span: dummy_span(),
@@ -498,7 +498,7 @@ fn test_compiler_multiple_variable_declarations() {
                         name: "a".to_string(),
                         span: dummy_span(),
                     }),
-                    operator: Token::new(lugli_lexer::TokenKind::Plus, "+".to_string(), dummy_span()),
+                    operator: Token::new(lugli_lexer::TokenKind::Plus, dummy_span()),
                     right: Box::new(Expr::Identifier {
                         name: "b".to_string(),
                         span: dummy_span(),

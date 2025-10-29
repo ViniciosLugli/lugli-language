@@ -121,7 +121,7 @@ mod tests {
         });
 
         // Create a mock token for the operator
-        let operator = lugli_lexer::Token::new(lugli_lexer::TokenKind::Plus, "+".to_string(), span.clone());
+        let operator = lugli_lexer::Token::new(lugli_lexer::TokenKind::Plus, span.clone());
 
         let binary_expr = Expr::Binary {
             left,
@@ -411,7 +411,7 @@ mod tests {
                             name: "x".to_string(),
                             span: span.clone(),
                         }),
-                        operator: lugli_lexer::Token::new(lugli_lexer::TokenKind::Plus, "+".to_string(), span.clone()),
+                        operator: lugli_lexer::Token::new(lugli_lexer::TokenKind::Plus, span.clone()),
                         right: Box::new(Expr::Literal {
                             value: LiteralValue::Number(1.0),
                             span: span.clone(),

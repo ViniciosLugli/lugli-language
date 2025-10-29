@@ -46,7 +46,7 @@ fn test_parse_both_suffix_types() {
         struct List {
             items
 
-            fn push!(self, item) {
+            fn push(self, item) {
                 self.items.push(item)
             }
 
@@ -56,7 +56,7 @@ fn test_parse_both_suffix_types() {
         }
 
         let list = List { items: [] }
-        list.push!(42)
+        list.push(42)
         let empty = list.is_empty?()
     "#;
 

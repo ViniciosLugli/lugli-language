@@ -463,20 +463,20 @@ impl Compiler {
                     // Append element to result list
                     self.emit(Instruction::Load(result_local));
                     self.compile_expr(element)?;
-                    let push_id = self.bytecode.string_pool.borrow_mut().intern("push!");
+                    let push_id = self.bytecode.string_pool.borrow_mut().intern("push");
                     let push_const = self.add_constant(Value::String(push_id));
                     self.emit(Instruction::CallMethod(push_const, 1));
-                    self.emit(Instruction::Pop); // Pop return value from push!
+                    self.emit(Instruction::Pop); // Pop return value from push
 
                     self.patch_jump(skip_append)?;
                 } else {
                     // No condition - always append
                     self.emit(Instruction::Load(result_local));
                     self.compile_expr(element)?;
-                    let push_id = self.bytecode.string_pool.borrow_mut().intern("push!");
+                    let push_id = self.bytecode.string_pool.borrow_mut().intern("push");
                     let push_const = self.add_constant(Value::String(push_id));
                     self.emit(Instruction::CallMethod(push_const, 1));
-                    self.emit(Instruction::Pop); // Pop return value from push!
+                    self.emit(Instruction::Pop); // Pop return value from push
                 }
 
                 // Increment index

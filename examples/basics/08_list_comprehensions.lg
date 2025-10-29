@@ -169,7 +169,7 @@ let well_stocked = [qty for qty in inventory if qty >= 15]
 # let result = []
 # for x in numbers {
 #     if x > 5 {
-#         result.push!(x * 2)
+#         result.push(x * 2)
 #     }
 # }
 

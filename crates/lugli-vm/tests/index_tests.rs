@@ -201,7 +201,7 @@ fn test_index_in_control_flow() {
 
         for i in [0, 1, 2, 3, 4] {
             if scores[i] >= 80 {
-                passing.push!(scores[i])
+                passing.push(scores[i])
             }
         }
 
@@ -239,7 +239,7 @@ fn test_index_with_method_calls() {
 
         let lengths = []
         for word in words {
-            lengths.push!(word.len())
+            lengths.push(word.len())
         }
 
         if lengths[1] != 5 {
@@ -285,7 +285,7 @@ fn test_slice_operations() {
         # For now, test manual slicing
         let slice = []
         for i in [1, 2] {
-            slice.push!(arr[i])
+            slice.push(arr[i])
         }
 
         if slice.len() != 2 {

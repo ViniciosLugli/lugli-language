@@ -6,7 +6,7 @@ struct TodoList {
     items: []
     
     fn add_task!(self, task) {
-        self.items.push!(task)
+        self.items.push(task)
         print(f"Added: {task}")
     }
     

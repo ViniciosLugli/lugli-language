@@ -258,7 +258,7 @@ fn test_fstring_in_loop() {
         let results = []
         for i in [1, 2, 3] {
             let msg = f"Item {i}"
-            results.push!(msg)
+            results.push(msg)
         }
         results[0]
     "#;
