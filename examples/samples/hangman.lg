@@ -63,7 +63,7 @@ print("🎮 Welcome to Hangman!")
 print("Try to guess the word letter by letter.")
 print()
 
-let hangman = Hangman::new("lugli")
+let hangman = Hangman.new("lugli")
 hangman.setup!()
 
 let mut attempts = 0

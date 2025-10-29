@@ -42,7 +42,8 @@ just bench-compare v0.4.0
 - String manipulations
 
 ### 4. Real Programs
-- **hangman_game_129_lines**: Complete hangman game (from examples/)
+- **pattern_matching_110_lines**: Comprehensive pattern matching examples
+- **list_comprehensions_179_lines**: Advanced list comprehension showcase
 - **calculator**: Full calculator implementation
 - **advanced_features_60_lines**: Advanced language features demo
 
