@@ -1,6 +1,6 @@
 use crate::{Bytecode, Instruction, SourceLocation};
 use hashbrown::HashMap;
-use lugli_ast::Stmt;
+use lugli_ast::{Stmt, SpanMap};
 use lugli_common::{LugliError, Span, Value};
 
 mod control_flow;
@@ -37,6 +37,7 @@ pub struct Compiler {
     upvalue_count: usize,                                    // Number of upvalues in current closure
     file_path: String,                                       // Source file path for error reporting
     source_code: Option<String>,                             // Source code for error context
+    span_map: SpanMap,                                       // Map from NodeId to Span
 }
 
 impl Compiler {
@@ -53,6 +54,7 @@ impl Compiler {
             upvalue_count: 0,
             file_path: "<unknown>".to_string(),
             source_code: None,
+            span_map: SpanMap::new(),
         }
     }
 
@@ -61,10 +63,12 @@ impl Compiler {
         compiler.file_path = file_path.clone();
         compiler.source_code = Some(source_code.clone());
         compiler.bytecode = Bytecode::with_source(source_code);
+        compiler.span_map = SpanMap::new();
         compiler
     }
 
-    pub fn compile(&mut self, program: &lugli_ast::Program) -> Result<Bytecode, LugliError> {
+    pub fn compile(&mut self, program: &lugli_ast::Program, span_map: SpanMap) -> Result<Bytecode, LugliError> {
+        self.span_map = span_map;
         let stmt_count = program.statements.len();
 
         for (i, stmt) in program.statements.iter().enumerate() {

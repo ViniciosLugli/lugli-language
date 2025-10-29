@@ -29,14 +29,14 @@ pub enum VmError {
     VmError(String),
 }
 
-pub fn compile(program: &lugli_ast::Program) -> Result<Bytecode, VmError> {
+pub fn compile(program: &lugli_ast::Program, span_map: lugli_ast::SpanMap) -> Result<Bytecode, VmError> {
     let mut compiler = Compiler::new();
-    compiler.compile(program).map_err(|e| VmError::CompilationError(e.to_string()))
+    compiler.compile(program, span_map).map_err(|e| VmError::CompilationError(e.to_string()))
 }
 
-pub fn compile_with_source(program: &lugli_ast::Program, file_path: &str, source: &str) -> Result<Bytecode, VmError> {
+pub fn compile_with_source(program: &lugli_ast::Program, span_map: lugli_ast::SpanMap, file_path: &str, source: &str) -> Result<Bytecode, VmError> {
     let mut compiler = Compiler::with_source(file_path.to_string(), source.to_string());
-    compiler.compile(program).map_err(|e| VmError::CompilationError(e.to_string()))
+    compiler.compile(program, span_map).map_err(|e| VmError::CompilationError(e.to_string()))
 }
 
 pub fn run(bytecode: &Bytecode) -> Result<Value, VmError> {
@@ -44,13 +44,13 @@ pub fn run(bytecode: &Bytecode) -> Result<Value, VmError> {
     vm.run(bytecode).map_err(VmError::RuntimeError)
 }
 
-pub fn compile_and_run(program: &lugli_ast::Program) -> Result<Value, VmError> {
-    let bytecode = compile(program)?;
+pub fn compile_and_run(program: &lugli_ast::Program, span_map: lugli_ast::SpanMap) -> Result<Value, VmError> {
+    let bytecode = compile(program, span_map)?;
     run(&bytecode)
 }
 
-pub fn compile_and_run_with_source(program: &lugli_ast::Program, file_path: &str, source: &str) -> Result<Value, VmError> {
-    let bytecode = compile_with_source(program, file_path, source)?;
+pub fn compile_and_run_with_source(program: &lugli_ast::Program, span_map: lugli_ast::SpanMap, file_path: &str, source: &str) -> Result<Value, VmError> {
+    let bytecode = compile_with_source(program, span_map, file_path, source)?;
     run(&bytecode)
 }
 

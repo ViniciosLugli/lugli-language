@@ -7,20 +7,17 @@ impl Compiler {
     pub(super) fn compile_control_flow_stmt(&mut self, stmt: &Stmt) -> Result<bool, LugliError> {
         match stmt {
             Stmt::If {
-                condition,
-                then_branch,
-                elif_branches,
-                else_branch,
+                data,
                 ..
             } => {
                 // Compile condition
-                self.compile_expr(condition)?;
+                self.compile_expr(&data.condition)?;
 
                 // Jump to else/end if condition is false
                 let jump_to_else = self.emit_jump(Instruction::JumpIfFalse(0));
 
                 // Compile then branch
-                for stmt in then_branch {
+                for stmt in &data.then_branch {
                     self.compile_stmt(stmt)?;
                 }
 
@@ -34,7 +31,7 @@ impl Compiler {
                 self.patch_jump(jump_to_else)?;
 
                 // Compile elif branches
-                for (elif_condition, elif_body) in elif_branches {
+                for (elif_condition, elif_body) in &data.elif_branches {
                     self.compile_expr(elif_condition)?;
                     let elif_jump = self.emit_jump(Instruction::JumpIfFalse(0));
 
@@ -50,7 +47,7 @@ impl Compiler {
                 }
 
                 // Compile else branch if it exists
-                if let Some(else_body) = else_branch {
+                if let Some(else_body) = &data.else_branch {
                     for stmt in else_body {
                         self.compile_stmt(stmt)?;
                     }

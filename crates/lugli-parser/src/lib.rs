@@ -1,4 +1,4 @@
-use lugli_ast::Program;
+use lugli_ast::{Program, SpanMap};
 use lugli_lexer::LexError;
 use thiserror::Error;
 
@@ -21,7 +21,7 @@ pub enum ParserError {
     Parse(#[from] ParseError),
 }
 
-pub fn parse(source: &str) -> Result<Program, ParserError> {
+pub fn parse(source: &str) -> Result<(Program, SpanMap), ParserError> {
     let mut parser = Parser::new(source)?;
     Ok(parser.parse()?)
 }

@@ -4,7 +4,7 @@ use lugli_parser::parse;
 fn parse_expr(source: &str) -> Expr {
     // Wrap in a variable declaration to get a valid statement
     let wrapped = format!("let x = {}", source);
-    let program = parse(&wrapped).unwrap();
+    let (program, _span_map) = parse(&wrapped).unwrap();
     assert_eq!(program.statements.len(), 1);
 
     match &program.statements[0] {
@@ -98,11 +98,9 @@ fn test_function_literal_in_call() {
     let expr = parse_expr(source);
 
     match expr {
-        Expr::Call {
-            arguments, ..
-        } => {
-            assert_eq!(arguments.len(), 1);
-            match &arguments[0] {
+        Expr::Call { data, .. } => {
+            assert_eq!(data.arguments.len(), 1);
+            match &data.arguments[0] {
                 Expr::Function {
                     params, ..
                 } => {

@@ -16,7 +16,7 @@ fn test_multiline_dict() {
     assert!(result.is_ok(), "Failed to parse multiline dict: {:?}", result.err());
 
     let program = result.unwrap();
-    assert_eq!(program.statements.len(), 1);
+    assert_eq!(program.0.statements.len(), 1);
 }
 
 #[test]

@@ -4,8 +4,8 @@ use lugli_vm::compile_and_run;
 
 fn run_and_get_value(source: &str) -> Value {
     let mut parser = Parser::new(source).unwrap();
-    let ast = parser.parse().unwrap();
-    compile_and_run(&ast).unwrap()
+    let (ast, span_map) = parser.parse().unwrap();
+    compile_and_run(&ast, span_map).unwrap()
 }
 
 #[test]

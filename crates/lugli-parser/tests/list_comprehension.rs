@@ -3,7 +3,7 @@ use lugli_parser::Parser;
 
 fn parse_expr(source: &str) -> Expr {
     let mut parser = Parser::new(source).unwrap();
-    let program = parser.parse().unwrap();
+    let (program, _span_map) = parser.parse().unwrap();
     match &program.statements[0] {
         Stmt::Expression {
             expr, ..
@@ -17,18 +17,11 @@ fn test_basic_list_comprehension() {
     let source = "[x for x in numbers]";
     let expr = parse_expr(source);
 
-    if let Expr::ListComprehension {
-        element,
-        variable,
-        iterable,
-        condition,
-        ..
-    } = expr
-    {
-        assert!(matches!(*element, Expr::Identifier { .. }));
-        assert_eq!(variable, "x");
-        assert!(matches!(*iterable, Expr::Identifier { .. }));
-        assert!(condition.is_none());
+    if let Expr::ListComprehension { data, .. } = expr {
+        assert!(matches!(data.element, Expr::Identifier { .. }));
+        assert_eq!(data.variable, "x");
+        assert!(matches!(data.iterable, Expr::Identifier { .. }));
+        assert!(data.condition.is_none());
     } else {
         panic!("Expected list comprehension, got: {:?}", expr);
     }
@@ -39,18 +32,11 @@ fn test_list_comprehension_with_expression() {
     let source = "[x * 2 for x in numbers]";
     let expr = parse_expr(source);
 
-    if let Expr::ListComprehension {
-        element,
-        variable,
-        iterable,
-        condition,
-        ..
-    } = expr
-    {
-        assert!(matches!(*element, Expr::Binary { .. }));
-        assert_eq!(variable, "x");
-        assert!(matches!(*iterable, Expr::Identifier { .. }));
-        assert!(condition.is_none());
+    if let Expr::ListComprehension { data, .. } = expr {
+        assert!(matches!(data.element, Expr::Binary { .. }));
+        assert_eq!(data.variable, "x");
+        assert!(matches!(data.iterable, Expr::Identifier { .. }));
+        assert!(data.condition.is_none());
     } else {
         panic!("Expected list comprehension, got: {:?}", expr);
     }
@@ -61,19 +47,12 @@ fn test_list_comprehension_with_condition() {
     let source = "[x for x in numbers if x > 0]";
     let expr = parse_expr(source);
 
-    if let Expr::ListComprehension {
-        element,
-        variable,
-        iterable,
-        condition,
-        ..
-    } = expr
-    {
-        assert!(matches!(*element, Expr::Identifier { .. }));
-        assert_eq!(variable, "x");
-        assert!(matches!(*iterable, Expr::Identifier { .. }));
-        assert!(condition.is_some());
-        if let Some(cond) = condition {
+    if let Expr::ListComprehension { data, .. } = expr {
+        assert!(matches!(data.element, Expr::Identifier { .. }));
+        assert_eq!(data.variable, "x");
+        assert!(matches!(data.iterable, Expr::Identifier { .. }));
+        assert!(data.condition.is_some());
+        if let Some(ref cond) = data.condition {
             assert!(matches!(*cond, Expr::Binary { .. }));
         }
     } else {
@@ -86,18 +65,11 @@ fn test_list_comprehension_complex_expression() {
     let source = "[x * x + 1 for x in numbers if x % 2 == 0]";
     let expr = parse_expr(source);
 
-    if let Expr::ListComprehension {
-        element,
-        variable,
-        iterable,
-        condition,
-        ..
-    } = expr
-    {
-        assert!(matches!(*element, Expr::Binary { .. }));
-        assert_eq!(variable, "x");
-        assert!(matches!(*iterable, Expr::Identifier { .. }));
-        assert!(condition.is_some());
+    if let Expr::ListComprehension { data, .. } = expr {
+        assert!(matches!(data.element, Expr::Binary { .. }));
+        assert_eq!(data.variable, "x");
+        assert!(matches!(data.iterable, Expr::Identifier { .. }));
+        assert!(data.condition.is_some());
     } else {
         panic!("Expected list comprehension, got: {:?}", expr);
     }
@@ -108,18 +80,11 @@ fn test_list_comprehension_list_literal() {
     let source = "[x for x in [1, 2, 3]]";
     let expr = parse_expr(source);
 
-    if let Expr::ListComprehension {
-        element,
-        variable,
-        iterable,
-        condition,
-        ..
-    } = expr
-    {
-        assert!(matches!(*element, Expr::Identifier { .. }));
-        assert_eq!(variable, "x");
-        assert!(matches!(*iterable, Expr::List { .. }));
-        assert!(condition.is_none());
+    if let Expr::ListComprehension { data, .. } = expr {
+        assert!(matches!(data.element, Expr::Identifier { .. }));
+        assert_eq!(data.variable, "x");
+        assert!(matches!(data.iterable, Expr::List { .. }));
+        assert!(data.condition.is_none());
     } else {
         panic!("Expected list comprehension, got: {:?}", expr);
     }
@@ -130,18 +95,11 @@ fn test_list_comprehension_method_call() {
     let source = "[x.upper() for x in names if x.len() > 3]";
     let expr = parse_expr(source);
 
-    if let Expr::ListComprehension {
-        element,
-        variable,
-        iterable,
-        condition,
-        ..
-    } = expr
-    {
-        assert!(matches!(*element, Expr::Call { .. }));
-        assert_eq!(variable, "x");
-        assert!(matches!(*iterable, Expr::Identifier { .. }));
-        assert!(condition.is_some());
+    if let Expr::ListComprehension { data, .. } = expr {
+        assert!(matches!(data.element, Expr::Call { .. }));
+        assert_eq!(data.variable, "x");
+        assert!(matches!(data.iterable, Expr::Identifier { .. }));
+        assert!(data.condition.is_some());
     } else {
         panic!("Expected list comprehension, got: {:?}", expr);
     }

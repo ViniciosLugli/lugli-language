@@ -1,9 +1,7 @@
 use crate::{Parser, error::ParseError};
-use lugli_ast::{Expr, LiteralValue};
+use lugli_ast::{Expr, ListComprehensionData, LiteralValue};
 use lugli_lexer::TokenKind;
 
-/// Check if a string is PascalCase (starts with uppercase, has lowercase letters)
-/// This distinguishes struct names (PascalCase) from constants (ALL_CAPS)
 fn is_pascal_case(s: &str) -> bool {
     if s.is_empty() {
         return false;
@@ -14,8 +12,6 @@ fn is_pascal_case(s: &str) -> bool {
         return false;
     }
 
-    // Accept both PascalCase and ALL_CAPS for struct names
-    // Reject camelCase (starts with lowercase)
     true
 }
 
@@ -27,18 +23,26 @@ impl<'a> Parser<'a> {
                 let key = s[1..s.len() - 1].to_string();
                 let span = self.current_span();
                 self.advance();
+
+                let node_id = self.span_map.alloc_id();
+                self.span_map.insert(node_id, span);
+
                 Ok(Expr::Literal {
+                    id: node_id,
                     value: LiteralValue::String(key),
-                    span,
                 })
             }
             Some(TokenKind::Identifier(id)) => {
                 let key = self.scanner.pool().resolve(*id).to_string();
                 let span = self.current_span();
                 self.advance();
+
+                let node_id = self.span_map.alloc_id();
+                self.span_map.insert(node_id, span);
+
                 Ok(Expr::Literal {
+                    id: node_id,
                     value: LiteralValue::String(key),
-                    span,
                 })
             }
             _ => Err(self.expected_error("string or identifier for dictionary key")),
@@ -50,9 +54,13 @@ impl<'a> Parser<'a> {
             let value = *value;
             let span = self.current_span();
             self.advance();
+
+            let id = self.span_map.alloc_id();
+            self.span_map.insert(id, span);
+
             return Ok(Expr::Literal {
+                id,
                 value: LiteralValue::Number(value),
-                span,
             });
         }
 
@@ -61,9 +69,13 @@ impl<'a> Parser<'a> {
             let unquoted_value = s[1..s.len() - 1].to_string();
             let span = self.current_span();
             self.advance();
+
+            let node_id = self.span_map.alloc_id();
+            self.span_map.insert(node_id, span);
+
             return Ok(Expr::Literal {
+                id: node_id,
                 value: LiteralValue::String(unquoted_value),
-                span,
             });
         }
 
@@ -77,9 +89,12 @@ impl<'a> Parser<'a> {
             let content = &value[2..value.len() - 1]; // Remove f" and "
             let parts = self.parse_fstring_content(content)?;
 
+            let node_id = self.span_map.alloc_id();
+            self.span_map.insert(node_id, span);
+
             return Ok(Expr::FString {
-                parts,
-                span,
+                id: node_id,
+                parts: Box::new(parts),
             });
         }
 
@@ -87,9 +102,13 @@ impl<'a> Parser<'a> {
         if self.check(&TokenKind::SelfKeyword) {
             let span = self.current_span();
             self.advance();
+
+            let id = self.span_map.alloc_id();
+            self.span_map.insert(id, span);
+
             return Ok(Expr::Identifier {
+                id,
                 name: "self".to_string(),
-                span,
             });
         }
 
@@ -103,18 +122,18 @@ impl<'a> Parser<'a> {
                 let method_name = self.consume_identifier("Expected method name after '::'")?;
                 let full_span = self.merge_spans(span, self.previous_span());
 
-                // For static methods, we'll look up the function as TypeName_methodName
-                // This matches how impl blocks will store their methods
                 let static_method_name = format!("{}_{}", name, method_name);
 
+                let node_id = self.span_map.alloc_id();
+                self.span_map.insert(node_id, full_span);
+
                 return Ok(Expr::Identifier {
+                    id: node_id,
                     name: static_method_name,
-                    span: full_span,
                 });
             }
 
             // Check for struct literal (Type { field: value, ... })
-            // Only treat as struct literal if the identifier is PascalCase (not ALL_CAPS constants)
             if self.check(&TokenKind::LeftBrace) && is_pascal_case(&name) {
                 let struct_start_span = span;
                 self.advance(); // consume '{'
@@ -124,15 +143,17 @@ impl<'a> Parser<'a> {
 
                 if !self.check(&TokenKind::RightBrace) {
                     loop {
-                        // For struct literals, field names are identifiers
                         let field_name = self.consume_identifier("Expected field name")?;
                         self.consume(&TokenKind::Colon, "Expected ':' after field name")?;
                         let value_expr = self.expression()?;
 
-                        // Convert field name to string literal for dict representation
+                        let field_span = self.current_span();
+                        let key_id = self.span_map.alloc_id();
+                        self.span_map.insert(key_id, field_span);
+
                         let key_expr = Expr::Literal {
+                            id: key_id,
                             value: LiteralValue::String(field_name),
-                            span: self.current_span(),
                         };
 
                         pairs.push((key_expr, value_expr));
@@ -151,29 +172,40 @@ impl<'a> Parser<'a> {
                 self.consume(&TokenKind::RightBrace, "Expected '}' after struct fields")?;
                 let end_span = self.previous_span();
 
-                // For now, represent struct literals as dict construction with type metadata
-                // The struct type name is stored as a special "__type__" field
+                // Create __struct_type__ field
+                let type_key_id = self.span_map.alloc_id();
+                self.span_map.insert(type_key_id, struct_start_span);
+                let type_value_id = self.span_map.alloc_id();
+                self.span_map.insert(type_value_id, struct_start_span);
+
                 let mut struct_pairs = vec![(
                     Expr::Literal {
+                        id: type_key_id,
                         value: LiteralValue::String("__struct_type__".to_string()),
-                        span: struct_start_span,
                     },
                     Expr::Literal {
+                        id: type_value_id,
                         value: LiteralValue::String(name),
-                        span: struct_start_span,
                     },
                 )];
                 struct_pairs.extend(pairs);
 
+                let dict_span = self.merge_spans(struct_start_span, end_span);
+                let dict_id = self.span_map.alloc_id();
+                self.span_map.insert(dict_id, dict_span);
+
                 return Ok(Expr::Dict {
+                    id: dict_id,
                     pairs: struct_pairs,
-                    span: self.merge_spans(struct_start_span, end_span),
                 });
             }
 
+            let node_id = self.span_map.alloc_id();
+            self.span_map.insert(node_id, span);
+
             return Ok(Expr::Identifier {
+                id: node_id,
                 name,
-                span,
             });
         }
 
@@ -186,23 +218,35 @@ impl<'a> Parser<'a> {
         }
 
         if self.match_any(&[TokenKind::True]) {
+            let span = self.previous_span();
+            let id = self.span_map.alloc_id();
+            self.span_map.insert(id, span);
+
             return Ok(Expr::Literal {
+                id,
                 value: LiteralValue::Boolean(true),
-                span: self.previous_span(),
             });
         }
 
         if self.match_any(&[TokenKind::False]) {
+            let span = self.previous_span();
+            let id = self.span_map.alloc_id();
+            self.span_map.insert(id, span);
+
             return Ok(Expr::Literal {
+                id,
                 value: LiteralValue::Boolean(false),
-                span: self.previous_span(),
             });
         }
 
         if self.match_any(&[TokenKind::Null]) {
+            let span = self.previous_span();
+            let id = self.span_map.alloc_id();
+            self.span_map.insert(id, span);
+
             return Ok(Expr::Literal {
+                id,
                 value: LiteralValue::Null,
-                span: self.previous_span(),
             });
         }
 
@@ -231,7 +275,6 @@ impl<'a> Parser<'a> {
         let start_span = self.current_span();
         self.consume(&TokenKind::Match, "Expected 'match'")?;
 
-        // Parse the value to match on
         let value = Box::new(self.expression()?);
 
         self.consume(&TokenKind::LeftBrace, "Expected '{' after match value")?;
@@ -240,7 +283,6 @@ impl<'a> Parser<'a> {
         let mut arms = Vec::new();
 
         while !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
-            // Parse pattern
             let pattern = if let Some(TokenKind::Identifier(id)) = self.peek_kind() {
                 let name = self.scanner.pool().resolve(*id);
                 if name == "_" {
@@ -270,13 +312,10 @@ impl<'a> Parser<'a> {
                 return Err(self.expected_error("pattern"));
             };
 
-            // Optional guard (if condition)
             let guard = if self.match_any(&[TokenKind::If]) { Some(Box::new(self.expression()?)) } else { None };
 
-            // Arrow
             self.consume(&TokenKind::FatArrow, "Expected '=>' after pattern")?;
 
-            // Body expression
             let body = Box::new(self.expression()?);
 
             arms.push(MatchArm {
@@ -285,7 +324,6 @@ impl<'a> Parser<'a> {
                 body,
             });
 
-            // Optional comma
             self.match_any(&[TokenKind::Comma]);
             self.skip_newlines();
         }
@@ -293,10 +331,14 @@ impl<'a> Parser<'a> {
         self.consume(&TokenKind::RightBrace, "Expected '}' after match arms")?;
         let end_span = self.previous_span();
 
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
         Ok(Expr::Match {
+            id,
             value,
             arms,
-            span: self.merge_spans(start_span, end_span),
         })
     }
 
@@ -307,13 +349,16 @@ impl<'a> Parser<'a> {
         if self.check(&TokenKind::RightBracket) {
             self.consume_closing(&TokenKind::RightBracket, "Expected ']'")?;
             let end_span = self.previous_span();
+            let span = self.merge_spans(start_span, end_span);
+            let id = self.span_map.alloc_id();
+            self.span_map.insert(id, span);
+
             return Ok(Expr::List {
+                id,
                 elements: Vec::new(),
-                span: self.merge_spans(start_span, end_span),
             });
         }
 
-        // Parse first element
         let first_element = self.expression()?;
 
         // Check for list comprehension: [expr for var in iterable if condition]
@@ -326,10 +371,9 @@ impl<'a> Parser<'a> {
 
             let iterable = self.expression()?;
 
-            // Optional condition: if condition
             let condition = if self.check(&TokenKind::If) {
                 self.advance(); // consume 'if'
-                Some(Box::new(self.expression()?))
+                Some(self.expression()?)
             } else {
                 None
             };
@@ -337,12 +381,18 @@ impl<'a> Parser<'a> {
             self.consume_closing(&TokenKind::RightBracket, "Expected ']' after list comprehension")?;
             let end_span = self.previous_span();
 
+            let span = self.merge_spans(start_span, end_span);
+            let id = self.span_map.alloc_id();
+            self.span_map.insert(id, span);
+
             return Ok(Expr::ListComprehension {
-                element: Box::new(first_element),
-                variable,
-                iterable: Box::new(iterable),
-                condition,
-                span: self.merge_spans(start_span, end_span),
+                id,
+                data: Box::new(ListComprehensionData {
+                    element: first_element,
+                    variable,
+                    iterable,
+                    condition,
+                }),
             });
         }
 
@@ -350,7 +400,6 @@ impl<'a> Parser<'a> {
         let mut elements = vec![first_element];
 
         while self.match_any_with_newlines(&[TokenKind::Comma]) {
-            // Handle trailing comma - if we see the closing bracket after comma, break
             if self.check(&TokenKind::RightBracket) {
                 break;
             }
@@ -360,9 +409,13 @@ impl<'a> Parser<'a> {
         self.consume_closing(&TokenKind::RightBracket, "Expected ']' after list elements")?;
         let end_span = self.previous_span();
 
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
         Ok(Expr::List {
+            id,
             elements,
-            span: self.merge_spans(start_span, end_span),
         })
     }
 
@@ -385,7 +438,6 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 self.skip_newlines();
-                // Handle trailing comma - if we see the closing brace after comma, break
                 if self.check(&TokenKind::RightBrace) {
                     break;
                 }
@@ -396,9 +448,13 @@ impl<'a> Parser<'a> {
         self.consume(&TokenKind::RightBrace, "Expected '}' after dictionary")?;
         let end_span = self.previous_span();
 
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
         Ok(Expr::Dict {
+            id,
             pairs,
-            span: self.merge_spans(start_span, end_span),
         })
     }
 
@@ -414,7 +470,6 @@ impl<'a> Parser<'a> {
             loop {
                 let param_name = self.consume_identifier("Expected parameter name")?;
 
-                // Skip type hints if present
                 if self.match_any(&[TokenKind::Colon]) {
                     while !self.check(&TokenKind::Comma) && !self.check(&TokenKind::RightParen) {
                         self.advance();
@@ -433,7 +488,6 @@ impl<'a> Parser<'a> {
         self.skip_newlines();
         self.consume(&TokenKind::RightParen, "Expected ')' after parameters")?;
 
-        // Skip return type hint if present
         if self.match_any(&[TokenKind::Arrow]) {
             while !self.check(&TokenKind::LeftBrace) && !self.scanner.is_at_end() {
                 self.advance();
@@ -444,10 +498,14 @@ impl<'a> Parser<'a> {
 
         let end_span = self.previous_span();
 
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
         Ok(Expr::Function {
+            id,
             params,
             body,
-            span: self.merge_spans(start_span, end_span),
         })
     }
 }

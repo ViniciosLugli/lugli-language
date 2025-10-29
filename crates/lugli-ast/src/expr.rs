@@ -1,36 +1,122 @@
-use crate::{AstNode, Stmt};
+use crate::{AstNode, NodeId, Stmt};
 use lugli_common::Span;
-use lugli_lexer::Token;
+use lugli_lexer::TokenKind;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ListComprehensionData {
+    pub element: Expr,
+    pub variable: String,
+    pub iterable: Expr,
+    pub condition: Option<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CallData {
+    pub callee: Expr,
+    pub arguments: Vec<Expr>,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Literal { value: LiteralValue, span: Span },
+    Literal {
+        id: NodeId,
+        value: LiteralValue,
+    },
 
-    Identifier { name: String, span: Span },
+    Identifier {
+        id: NodeId,
+        name: String,
+    },
 
-    Binary { left: Box<Expr>, operator: Token, right: Box<Expr>, span: Span },
+    Binary {
+        id: NodeId,
+        left: Box<Expr>,
+        operator: TokenKind,
+        right: Box<Expr>,
+    },
 
-    Unary { operator: Token, operand: Box<Expr>, span: Span },
+    Unary {
+        id: NodeId,
+        operator: TokenKind,
+        operand: Box<Expr>,
+    },
 
-    Call { callee: Box<Expr>, arguments: Vec<Expr>, span: Span },
+    Call {
+        id: NodeId,
+        data: Box<CallData>,
+    },
 
-    Get { object: Box<Expr>, name: String, span: Span },
+    Get {
+        id: NodeId,
+        object: Box<Expr>,
+        name: String,
+    },
 
-    Set { object: Box<Expr>, name: String, value: Box<Expr>, span: Span },
+    Set {
+        id: NodeId,
+        object: Box<Expr>,
+        name: String,
+        value: Box<Expr>,
+    },
 
-    List { elements: Vec<Expr>, span: Span },
+    List {
+        id: NodeId,
+        elements: Vec<Expr>,
+    },
 
-    Dict { pairs: Vec<(Expr, Expr)>, span: Span },
+    Dict {
+        id: NodeId,
+        pairs: Vec<(Expr, Expr)>,
+    },
 
-    Index { object: Box<Expr>, index: Box<Expr>, span: Span },
+    Index {
+        id: NodeId,
+        object: Box<Expr>,
+        index: Box<Expr>,
+    },
 
-    FString { parts: Vec<FStringPart>, span: Span },
+    FString {
+        id: NodeId,
+        parts: Box<Vec<FStringPart>>,
+    },
 
-    Function { params: Vec<String>, body: Vec<Stmt>, span: Span },
+    Function {
+        id: NodeId,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+    },
 
-    ListComprehension { element: Box<Expr>, variable: String, iterable: Box<Expr>, condition: Option<Box<Expr>>, span: Span },
+    ListComprehension {
+        id: NodeId,
+        data: Box<ListComprehensionData>,
+    },
 
-    Match { value: Box<Expr>, arms: Vec<MatchArm>, span: Span },
+    Match {
+        id: NodeId,
+        value: Box<Expr>,
+        arms: Vec<MatchArm>,
+    },
+}
+
+impl Expr {
+    pub fn id(&self) -> NodeId {
+        match self {
+            Expr::Literal { id, .. } => *id,
+            Expr::Identifier { id, .. } => *id,
+            Expr::Binary { id, .. } => *id,
+            Expr::Unary { id, .. } => *id,
+            Expr::Call { id, .. } => *id,
+            Expr::Get { id, .. } => *id,
+            Expr::Set { id, .. } => *id,
+            Expr::List { id, .. } => *id,
+            Expr::Dict { id, .. } => *id,
+            Expr::Index { id, .. } => *id,
+            Expr::FString { id, .. } => *id,
+            Expr::Function { id, .. } => *id,
+            Expr::ListComprehension { id, .. } => *id,
+            Expr::Match { id, .. } => *id,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -63,49 +149,6 @@ pub enum LiteralValue {
 
 impl AstNode for Expr {
     fn span(&self) -> &Span {
-        match self {
-            Expr::Literal {
-                span, ..
-            } => span,
-            Expr::Identifier {
-                span, ..
-            } => span,
-            Expr::Binary {
-                span, ..
-            } => span,
-            Expr::Unary {
-                span, ..
-            } => span,
-            Expr::Call {
-                span, ..
-            } => span,
-            Expr::Get {
-                span, ..
-            } => span,
-            Expr::Set {
-                span, ..
-            } => span,
-            Expr::List {
-                span, ..
-            } => span,
-            Expr::Dict {
-                span, ..
-            } => span,
-            Expr::Index {
-                span, ..
-            } => span,
-            Expr::FString {
-                span, ..
-            } => span,
-            Expr::Function {
-                span, ..
-            } => span,
-            Expr::ListComprehension {
-                span, ..
-            } => span,
-            Expr::Match {
-                span, ..
-            } => span,
-        }
+        panic!("AstNode::span() called on Expr after NodeId migration. Use SpanMap instead.")
     }
 }

@@ -50,8 +50,8 @@ fn cleanup_test_module(test_name: &str) {
 
 fn run_code(code: &str) -> Result<Value, String> {
     let mut parser = Parser::new(code).map_err(|e| e.to_string())?;
-    let ast = parser.parse().map_err(|e| e.to_string())?;
-    compile_and_run(&ast).map_err(|e| e.to_string())
+    let (ast, span_map) = parser.parse().map_err(|e| e.to_string())?;
+    compile_and_run(&ast, span_map).map_err(|e| e.to_string())
 }
 
 #[test]
@@ -148,10 +148,10 @@ fn test_module_caching() {
 fn debug_simple_expression() {
     let code = "5 + 3";
     let mut parser = Parser::new(code).unwrap();
-    let ast = parser.parse().unwrap();
+    let (ast, span_map) = parser.parse().unwrap();
 
     let mut compiler = lugli_vm::Compiler::new();
-    let bytecode = compiler.compile(&ast).unwrap();
+    let bytecode = compiler.compile(&ast, span_map).unwrap();
 
     let mut machine = lugli_vm::Machine::new();
     let result = machine.run(&bytecode).unwrap();
@@ -163,10 +163,10 @@ fn debug_simple_expression() {
 fn debug_vardecl_plus_expression() {
     let code = "let x = 1\n5 + 3";
     let mut parser = Parser::new(code).unwrap();
-    let ast = parser.parse().unwrap();
+    let (ast, span_map) = parser.parse().unwrap();
 
     let mut compiler = lugli_vm::Compiler::new();
-    let bytecode = compiler.compile(&ast).unwrap();
+    let bytecode = compiler.compile(&ast, span_map).unwrap();
 
     let mut machine = lugli_vm::Machine::new();
     let result = machine.run(&bytecode).unwrap();

@@ -3,8 +3,8 @@ use lugli_vm::{compile, run};
 
 fn run_code(code: &str) -> String {
     let mut parser = Parser::new(code).unwrap();
-    let ast = parser.parse().unwrap();
-    let bytecode = compile(&ast).unwrap();
+    let (ast, span_map) = parser.parse().unwrap();
+    let bytecode = compile(&ast, span_map).unwrap();
     let result = run(&bytecode).unwrap();
     let pool = bytecode.string_pool.borrow();
     result.display_with_pool(&pool)
