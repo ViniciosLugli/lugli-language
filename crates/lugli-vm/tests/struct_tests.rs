@@ -284,9 +284,13 @@ fn test_struct_equality() {
         let p2 = Point { x: 10, y: 20 }
         let p3 = Point { x: 5, y: 15 }
 
-        # Structs should be compared by reference, not value
-        if p1 == p2 {
-            let error = 1 / 0  # Different struct instances shouldn't be equal
+        # Structs are compared by value (name and fields)
+        if p1 != p2 {
+            let error = 1 / 0  # Structs with same fields should be equal
+        }
+
+        if p1 == p3 {
+            let error = 1 / 0  # Structs with different fields shouldn't be equal
         }
 
         let p4 = p1
