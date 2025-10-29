@@ -102,14 +102,20 @@ impl Display for Value {
             Value::String(s) => write!(f, "{}", s),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Null => write!(f, "null"),
-            Value::List(l) => {
-                let items: Vec<String> = l.borrow().iter().map(|v| v.to_string()).collect();
-                write!(f, "[{}]", items.join(", "))
-            }
-            Value::Dict(d) => {
-                let items: Vec<String> = d.borrow().iter().map(|(k, v)| format!("\"{}\": {}", k, v)).collect();
-                write!(f, "{{ {} }}", items.join(", "))
-            }
+            Value::List(l) => match l.try_borrow() {
+                Ok(list_ref) => {
+                    let items: Vec<String> = list_ref.iter().map(|v| v.to_string()).collect();
+                    write!(f, "[{}]", items.join(", "))
+                }
+                Err(_) => write!(f, "[<borrowed list>]"),
+            },
+            Value::Dict(d) => match d.try_borrow() {
+                Ok(dict_ref) => {
+                    let items: Vec<String> = dict_ref.iter().map(|(k, v)| format!("\"{}\": {}", k, v)).collect();
+                    write!(f, "{{ {} }}", items.join(", "))
+                }
+                Err(_) => write!(f, "{{<borrowed dict>}}"),
+            },
             Value::Function {
                 name, ..
             } => write!(f, "<fn {}>", name),
@@ -134,11 +140,20 @@ impl Debug for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             Value::String(s) => write!(f, "\"{}\"", s),
-            Value::List(l) => write!(f, "[{}]", l.borrow().iter().map(|v| format!("{:?}", v)).collect::<Vec<String>>().join(", ")),
-            Value::Dict(d) => {
-                let items: Vec<String> = d.borrow().iter().map(|(k, v)| format!("\"{}\": {:?}", k, v)).collect();
-                write!(f, "{{ {} }}", items.join(", "))
-            }
+            Value::List(l) => match l.try_borrow() {
+                Ok(list_ref) => {
+                    let items: Vec<String> = list_ref.iter().map(|v| format!("{:?}", v)).collect();
+                    write!(f, "[{}]", items.join(", "))
+                }
+                Err(_) => write!(f, "[<borrowed list>]"),
+            },
+            Value::Dict(d) => match d.try_borrow() {
+                Ok(dict_ref) => {
+                    let items: Vec<String> = dict_ref.iter().map(|(k, v)| format!("\"{}\": {:?}", k, v)).collect();
+                    write!(f, "{{ {} }}", items.join(", "))
+                }
+                Err(_) => write!(f, "{{<borrowed dict>}}"),
+            },
             _ => write!(f, "{}", self),
         }
     }
