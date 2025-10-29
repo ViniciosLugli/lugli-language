@@ -1,5 +1,6 @@
 use lugli_lexer::{Token, TokenKind};
 use lugli_common::Span;
+use lugli_ast::FStringPart;
 use crate::error::ParseError;
 use crate::Parser;
 
@@ -26,7 +27,7 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn previous(&self) -> &Token {
-        self.previous.as_ref().expect("No previous token")
+        self.previous.as_ref().expect("BUG: No previous token (advance() must be called before previous())")
     }
 
     pub(crate) fn previous_span(&self) -> Span {
@@ -56,6 +57,10 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn peek_kind(&self) -> Option<&TokenKind> {
         self.scanner.current().map(|token| &token.kind)
+    }
+
+    pub(crate) fn peek_next_kind(&self) -> Option<TokenKind> {
+        self.scanner.peek().map(|token| token.kind.clone())
     }
 
     pub(crate) fn consume(&mut self, token_type: &TokenKind, message: &str) -> Result<Token, ParseError> {
@@ -172,6 +177,95 @@ impl<'a> Parser<'a> {
         } else {
             false
         }
+    }
+
+    pub(crate) fn parse_fstring_content(&mut self, content: &str) -> Result<Vec<FStringPart>, ParseError> {
+        self.parse_fstring_content_with_depth(content, 0)
+    }
+
+    fn parse_fstring_content_with_depth(&mut self, content: &str, depth: usize) -> Result<Vec<FStringPart>, ParseError> {
+        const MAX_FSTRING_DEPTH: usize = 10;
+
+        if depth > MAX_FSTRING_DEPTH {
+            return Err(ParseError::Custom {
+                message: format!("F-string nesting exceeds maximum depth of {}", MAX_FSTRING_DEPTH),
+                span: self.current_span(),
+            });
+        }
+
+        let mut parts = Vec::new();
+        let mut current_text = String::new();
+        let mut chars = content.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            if ch == '{' {
+                if chars.peek() == Some(&'{') {
+                    // Escaped brace: {{ → {
+                    chars.next();
+                    current_text.push('{');
+                } else {
+                    // Start of interpolation
+                    if !current_text.is_empty() {
+                        parts.push(FStringPart::Text(current_text.clone()));
+                        current_text.clear();
+                    }
+
+                    // Extract expression until }
+                    let mut expr_str = String::new();
+                    let mut brace_depth = 1;
+                    for ch in chars.by_ref() {
+                        if ch == '{' {
+                            brace_depth += 1;
+                            expr_str.push(ch);
+                        } else if ch == '}' {
+                            brace_depth -= 1;
+                            if brace_depth == 0 {
+                                break;
+                            }
+                            expr_str.push(ch);
+                        } else {
+                            expr_str.push(ch);
+                        }
+                    }
+
+                    if brace_depth != 0 {
+                        return Err(ParseError::Custom {
+                            message: "Unterminated expression in f-string".to_string(),
+                            span: self.current_span(),
+                        });
+                    }
+
+                    // Parse the expression by creating a sub-parser
+                    let mut expr_parser = Parser::new(&expr_str)?;
+                    let expr = expr_parser.expression()?;
+                    parts.push(FStringPart::Expression(Box::new(expr)));
+                }
+            } else if ch == '}' {
+                if chars.peek() == Some(&'}') {
+                    // Escaped brace: }} → }
+                    chars.next();
+                    current_text.push('}');
+                } else {
+                    return Err(ParseError::Custom {
+                        message: "Unmatched } in f-string".to_string(),
+                        span: self.current_span(),
+                    });
+                }
+            } else {
+                current_text.push(ch);
+            }
+        }
+
+        if !current_text.is_empty() {
+            parts.push(FStringPart::Text(current_text));
+        }
+
+        // Handle empty f-string
+        if parts.is_empty() {
+            parts.push(FStringPart::Text(String::new()));
+        }
+
+        Ok(parts)
     }
 
 }
