@@ -3,11 +3,13 @@ use lugli_common::Span;
 pub mod expr;
 pub mod span_map;
 pub mod stmt;
+pub mod type_hint;
 pub mod visitor;
 
 pub use expr::{CallData, Expr, FStringPart, ListComprehensionData, LiteralValue, MatchArm, Pattern};
 pub use span_map::{NodeId, SpanMap};
-pub use stmt::{IfData, Stmt, StructDeclData};
+pub use stmt::{IfData, Stmt, StructDeclData, StructField};
+pub use type_hint::TypeHint;
 pub use visitor::{Visitor, VisitorMut};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -222,6 +224,7 @@ mod tests {
         let var_decl = Stmt::VarDecl {
             id: make_id(1),
             name: "x".to_string(),
+            type_hint: None,
             initializer,
             is_const: false,
         };
@@ -240,7 +243,7 @@ mod tests {
 
     #[test]
     fn test_function_declaration_statement() {
-        let params = vec!["x".to_string(), "y".to_string()];
+        let params = vec![("x".to_string(), None), ("y".to_string(), None)];
         let body = vec![Stmt::Return {
             id: make_id(0),
             value: Some(Expr::Identifier {
@@ -253,6 +256,7 @@ mod tests {
             id: make_id(2),
             name: "add".to_string(),
             params,
+            return_type: None,
             body,
         };
 
@@ -335,6 +339,7 @@ mod tests {
                 Stmt::VarDecl {
                     id: make_id(0),
                     name: "x".to_string(),
+                    type_hint: None,
                     initializer: Some(Expr::Literal {
                         id: make_id(1),
                         value: LiteralValue::Number(42.0),

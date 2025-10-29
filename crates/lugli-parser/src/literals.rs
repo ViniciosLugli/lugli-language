@@ -399,11 +399,12 @@ impl<'a> Parser<'a> {
         // Regular list literal
         let mut elements = vec![first_element];
 
-        while self.match_any_with_newlines(&[TokenKind::Comma]) {
-            if self.check(&TokenKind::RightBracket) {
-                break;
+        if self.match_any(&[TokenKind::Comma]) {
+            self.skip_newlines();
+            if !self.check(&TokenKind::RightBracket) {
+                let rest = self.parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| p.expression())?;
+                elements.extend(rest);
             }
-            elements.push(self.expression()?);
         }
 
         self.consume_closing(&TokenKind::RightBracket, "Expected ']' after list elements")?;
@@ -424,25 +425,12 @@ impl<'a> Parser<'a> {
         self.consume(&TokenKind::LeftBrace, "Expected '{'")?;
         self.skip_newlines();
 
-        let mut pairs = Vec::new();
-
-        if !self.check(&TokenKind::RightBrace) {
-            loop {
-                let key_expr = self.parse_dict_key()?;
-                self.consume(&TokenKind::Colon, "Expected ':' after dictionary key")?;
-                let value_expr = self.expression()?;
-
-                pairs.push((key_expr, value_expr));
-
-                if !self.match_any(&[TokenKind::Comma]) {
-                    break;
-                }
-                self.skip_newlines();
-                if self.check(&TokenKind::RightBrace) {
-                    break;
-                }
-            }
-        }
+        let pairs = self.parse_delimited(&TokenKind::RightBrace, &TokenKind::Comma, |p| {
+            let key_expr = p.parse_dict_key()?;
+            p.consume(&TokenKind::Colon, "Expected ':' after dictionary key")?;
+            let value_expr = p.expression()?;
+            Ok((key_expr, value_expr))
+        })?;
 
         self.skip_newlines();
         self.consume(&TokenKind::RightBrace, "Expected '}' after dictionary")?;
@@ -465,25 +453,8 @@ impl<'a> Parser<'a> {
         self.consume(&TokenKind::LeftParen, "Expected '(' after 'fn'")?;
         self.skip_newlines();
 
-        let mut params = Vec::new();
-        if !self.check(&TokenKind::RightParen) {
-            loop {
-                let param_name = self.consume_identifier("Expected parameter name")?;
-
-                if self.match_any(&[TokenKind::Colon]) {
-                    while !self.check(&TokenKind::Comma) && !self.check(&TokenKind::RightParen) {
-                        self.advance();
-                    }
-                }
-
-                params.push(param_name);
-
-                if !self.match_any(&[TokenKind::Comma]) {
-                    break;
-                }
-                self.skip_newlines();
-            }
-        }
+        let parsed_params = self.parse_params()?;
+        let params: Vec<String> = parsed_params.iter().map(|p| p.name.clone()).collect();
 
         self.skip_newlines();
         self.consume(&TokenKind::RightParen, "Expected ')' after parameters")?;

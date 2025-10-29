@@ -1,10 +1,17 @@
-use crate::{AstNode, Expr, NodeId};
+use crate::{AstNode, Expr, NodeId, TypeHint};
 use lugli_common::Span;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructField {
+    pub name: String,
+    pub type_hint: Option<TypeHint>,
+    pub default: Option<Expr>,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructDeclData {
     pub name: String,
-    pub fields: Vec<(String, Option<Expr>)>,
+    pub fields: Vec<StructField>,
     pub methods: Vec<Stmt>,
 }
 
@@ -26,6 +33,7 @@ pub enum Stmt {
     VarDecl {
         id: NodeId,
         name: String,
+        type_hint: Option<TypeHint>,
         initializer: Option<Expr>,
         is_const: bool,
     },
@@ -33,7 +41,8 @@ pub enum Stmt {
     FnDecl {
         id: NodeId,
         name: String,
-        params: Vec<String>,
+        params: Vec<(String, Option<TypeHint>)>,
+        return_type: Option<TypeHint>,
         body: Vec<Stmt>,
     },
 
