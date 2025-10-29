@@ -1,5 +1,5 @@
 use crate::NativeFunction;
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringPool, Value};
 use std::{cell::RefCell, rc::Rc};
 
 pub mod dict;
@@ -36,8 +36,7 @@ pub fn get_functions() -> Vec<(&'static str, NativeFunction)> {
         ("reduce", reduce_fn as NativeFunction),
     ];
 
-    // Add string methods - these will be accessed as regular functions for now
-    // In the future, we'll handle method syntax (obj.method())
+    // Add string methods
     functions.extend(vec![
         ("str_len", string::string_length as NativeFunction),
         ("str_trim", string::string_trim as NativeFunction),
@@ -70,29 +69,29 @@ pub fn get_functions() -> Vec<(&'static str, NativeFunction)> {
     functions
 }
 
-fn type_of(args: &[Value]) -> Result<Value, LugliError> {
+fn type_of(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("type expects 1 argument"));
     }
-    Ok(Value::String(args[0].type_name().to_string()))
+    let type_name = args[0].type_name();
+    Ok(Value::String(pool.intern(type_name)))
 }
 
-fn len_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn len_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("len expects 1 argument"));
     }
     match &args[0] {
-        Value::String(s) => Ok(Value::Number(s.len() as f64)),
+        Value::String(id) => Ok(Value::Number(pool.resolve(*id).len() as f64)),
         Value::List(l) => Ok(Value::Number(l.borrow().len() as f64)),
         Value::Dict(d) => Ok(Value::Number(d.borrow().len() as f64)),
         _ => Err(LugliError::runtime(format!("Object of type {} has no len()", args[0].type_name()))),
     }
 }
 
-fn range_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn range_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     let (start, stop, step) = match args.len() {
         1 => {
-            // range(n) -> range from 0 to n-1
             if let Value::Number(n) = args[0] {
                 (0.0, n, 1.0)
             } else {
@@ -100,7 +99,6 @@ fn range_fn(args: &[Value]) -> Result<Value, LugliError> {
             }
         }
         2 => {
-            // range(start, stop) -> range from start to stop-1
             if let (Value::Number(s), Value::Number(e)) = (&args[0], &args[1]) {
                 (*s, *e, 1.0)
             } else {
@@ -108,7 +106,6 @@ fn range_fn(args: &[Value]) -> Result<Value, LugliError> {
             }
         }
         3 => {
-            // range(start, stop, step)
             if let (Value::Number(s), Value::Number(e), Value::Number(st)) = (&args[0], &args[1], &args[2]) {
                 (*s, *e, *st)
             } else {
@@ -142,7 +139,7 @@ fn range_fn(args: &[Value]) -> Result<Value, LugliError> {
     Ok(Value::List(Rc::new(RefCell::new(result))))
 }
 
-fn enumerate_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn enumerate_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("enumerate expects 1 argument"));
     }
@@ -159,11 +156,13 @@ fn enumerate_fn(args: &[Value]) -> Result<Value, LugliError> {
 
             Ok(Value::List(Rc::new(RefCell::new(result))))
         }
-        Value::String(s) => {
+        Value::String(id) => {
+            let s = pool.resolve(*id).to_string();
             let mut result = Vec::new();
 
             for (i, ch) in s.chars().enumerate() {
-                let tuple = vec![Value::Number(i as f64), Value::String(ch.to_string())];
+                let ch_id = pool.intern(&ch.to_string());
+                let tuple = vec![Value::Number(i as f64), Value::String(ch_id)];
                 result.push(Value::List(Rc::new(RefCell::new(tuple))));
             }
 
@@ -173,58 +172,62 @@ fn enumerate_fn(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-fn str_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn str_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("str expects 1 argument"));
     }
-    Ok(Value::String(args[0].to_string()))
+    let s = args[0].display_with_pool(pool);
+    Ok(Value::String(pool.intern(&s)))
 }
 
-fn int_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn int_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("int expects 1 argument"));
     }
     match &args[0] {
         Value::Number(n) => Ok(Value::Number(n.floor())),
-        Value::String(s) => match s.trim().parse::<f64>() {
-            Ok(n) => Ok(Value::Number(n.floor())),
-            Err(_) => Err(LugliError::runtime(format!("Cannot convert '{}' to integer", s))),
-        },
+        Value::String(id) => {
+            let s = pool.resolve(*id);
+            match s.trim().parse::<f64>() {
+                Ok(n) => Ok(Value::Number(n.floor())),
+                Err(_) => Err(LugliError::runtime(format!("Cannot convert '{}' to integer", s))),
+            }
+        }
         Value::Bool(b) => Ok(Value::Number(if *b { 1.0 } else { 0.0 })),
         _ => Err(LugliError::runtime(format!("Cannot convert {} to integer", args[0].type_name()))),
     }
 }
 
-fn float_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn float_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("float expects 1 argument"));
     }
     match &args[0] {
         Value::Number(n) => Ok(Value::Number(*n)),
-        Value::String(s) => match s.trim().parse::<f64>() {
-            Ok(n) => Ok(Value::Number(n)),
-            Err(_) => Err(LugliError::runtime(format!("Cannot convert '{}' to float", s))),
-        },
+        Value::String(id) => {
+            let s = pool.resolve(*id);
+            match s.trim().parse::<f64>() {
+                Ok(n) => Ok(Value::Number(n)),
+                Err(_) => Err(LugliError::runtime(format!("Cannot convert '{}' to float", s))),
+            }
+        }
         Value::Bool(b) => Ok(Value::Number(if *b { 1.0 } else { 0.0 })),
         _ => Err(LugliError::runtime(format!("Cannot convert {} to float", args[0].type_name()))),
     }
 }
 
-fn bool_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn bool_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("bool expects 1 argument"));
     }
     Ok(Value::Bool(args[0].is_truthy()))
 }
 
-// Collection utility functions
-
-fn zip_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn zip_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() < 2 {
         return Err(LugliError::runtime("zip expects at least 2 arguments"));
     }
 
-    // First, validate all args are lists and collect their lengths
     let mut lists: Vec<Vec<Value>> = Vec::new();
     for arg in args {
         match arg {
@@ -244,7 +247,7 @@ fn zip_fn(args: &[Value]) -> Result<Value, LugliError> {
     Ok(Value::List(Rc::new(RefCell::new(result))))
 }
 
-fn all_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn all_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("all expects 1 argument"));
     }
@@ -258,7 +261,7 @@ fn all_fn(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-fn any_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn any_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("any expects 1 argument"));
     }
@@ -272,7 +275,7 @@ fn any_fn(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-fn sum_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn sum_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.is_empty() || args.len() > 2 {
         return Err(LugliError::runtime("sum expects 1 or 2 arguments"));
     }
@@ -298,7 +301,7 @@ fn sum_fn(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-fn min_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn min_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("min expects 1 argument"));
     }
@@ -313,7 +316,11 @@ fn min_fn(args: &[Value]) -> Result<Value, LugliError> {
             let min = borrowed.iter().try_fold(None, |acc: Option<&Value>, v| match (acc, v) {
                 (None, _) => Ok(Some(v)),
                 (Some(prev @ Value::Number(a)), Value::Number(b)) => Ok(Some(if a < b { prev } else { v })),
-                (Some(prev @ Value::String(a)), Value::String(b)) => Ok(Some(if a < b { prev } else { v })),
+                (Some(prev @ Value::String(a)), Value::String(b)) => {
+                    let a_str = pool.resolve(*a);
+                    let b_str = pool.resolve(*b);
+                    Ok(Some(if a_str < b_str { prev } else { v }))
+                }
                 _ => Err(LugliError::runtime("min() expects comparable values")),
             })?;
 
@@ -326,7 +333,7 @@ fn min_fn(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-fn max_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn max_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("max expects 1 argument"));
     }
@@ -341,7 +348,11 @@ fn max_fn(args: &[Value]) -> Result<Value, LugliError> {
             let max = borrowed.iter().try_fold(None, |acc: Option<&Value>, v| match (acc, v) {
                 (None, _) => Ok(Some(v)),
                 (Some(prev @ Value::Number(a)), Value::Number(b)) => Ok(Some(if a > b { prev } else { v })),
-                (Some(prev @ Value::String(a)), Value::String(b)) => Ok(Some(if a > b { prev } else { v })),
+                (Some(prev @ Value::String(a)), Value::String(b)) => {
+                    let a_str = pool.resolve(*a);
+                    let b_str = pool.resolve(*b);
+                    Ok(Some(if a_str > b_str { prev } else { v }))
+                }
                 _ => Err(LugliError::runtime("max() expects comparable values")),
             })?;
 
@@ -354,9 +365,7 @@ fn max_fn(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-// Math functions
-
-fn abs_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn abs_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 1 {
         return Err(LugliError::runtime("abs expects 1 argument"));
     }
@@ -366,7 +375,7 @@ fn abs_fn(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-fn round_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn round_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.is_empty() || args.len() > 2 {
         return Err(LugliError::runtime("round expects 1 or 2 arguments"));
     }
@@ -377,10 +386,8 @@ fn round_fn(args: &[Value]) -> Result<Value, LugliError> {
     };
 
     if args.len() == 1 {
-        // Round to nearest integer
         Ok(Value::Number(num.round()))
     } else {
-        // Round to n decimal places
         let places = match &args[1] {
             Value::Number(n) => *n as i32,
             _ => return Err(LugliError::type_error("number", args[1].type_name())),
@@ -391,7 +398,7 @@ fn round_fn(args: &[Value]) -> Result<Value, LugliError> {
     }
 }
 
-fn pow_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn pow_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 2 {
         return Err(LugliError::runtime("pow expects 2 arguments"));
     }
@@ -409,60 +416,74 @@ fn pow_fn(args: &[Value]) -> Result<Value, LugliError> {
     Ok(Value::Number(base.powf(exponent)))
 }
 
-// Higher-order functions
-
-fn map_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn map_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 2 {
         return Err(LugliError::runtime("map expects 2 arguments"));
     }
 
     let _func = match &args[0] {
-        Value::Function { .. } | Value::NativeFunction { .. } | Value::Closure { .. } => &args[0],
+        Value::Function {
+            ..
+        }
+        | Value::NativeFunction {
+            ..
+        }
+        | Value::Closure {
+            ..
+        } => &args[0],
         _ => return Err(LugliError::type_error("function", args[0].type_name())),
     };
 
     match &args[1] {
-        Value::List(_list) => {
-            // map/filter/reduce require VM integration to call functions
-            // For now, return helpful error message
-            Err(LugliError::runtime("map is not yet fully implemented - requires VM integration for function calls"))
-        }
+        Value::List(_list) => Err(LugliError::runtime("map is not yet fully implemented - requires VM integration for function calls")),
         _ => Err(LugliError::type_error("list", args[1].type_name())),
     }
 }
 
-fn filter_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn filter_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() != 2 {
         return Err(LugliError::runtime("filter expects 2 arguments"));
     }
 
     let _func = match &args[0] {
-        Value::Function { .. } | Value::NativeFunction { .. } | Value::Closure { .. } => &args[0],
+        Value::Function {
+            ..
+        }
+        | Value::NativeFunction {
+            ..
+        }
+        | Value::Closure {
+            ..
+        } => &args[0],
         _ => return Err(LugliError::type_error("function", args[0].type_name())),
     };
 
     match &args[1] {
-        Value::List(_list) => {
-            Err(LugliError::runtime("filter is not yet fully implemented - requires VM integration for function calls"))
-        }
+        Value::List(_list) => Err(LugliError::runtime("filter is not yet fully implemented - requires VM integration for function calls")),
         _ => Err(LugliError::type_error("list", args[1].type_name())),
     }
 }
 
-fn reduce_fn(args: &[Value]) -> Result<Value, LugliError> {
+fn reduce_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     if args.len() < 2 || args.len() > 3 {
         return Err(LugliError::runtime("reduce expects 2 or 3 arguments"));
     }
 
     let _func = match &args[0] {
-        Value::Function { .. } | Value::NativeFunction { .. } | Value::Closure { .. } => &args[0],
+        Value::Function {
+            ..
+        }
+        | Value::NativeFunction {
+            ..
+        }
+        | Value::Closure {
+            ..
+        } => &args[0],
         _ => return Err(LugliError::type_error("function", args[0].type_name())),
     };
 
     match &args[1] {
-        Value::List(_list) => {
-            Err(LugliError::runtime("reduce is not yet fully implemented - requires VM integration for function calls"))
-        }
+        Value::List(_list) => Err(LugliError::runtime("reduce is not yet fully implemented - requires VM integration for function calls")),
         _ => Err(LugliError::type_error("list", args[1].type_name())),
     }
 }

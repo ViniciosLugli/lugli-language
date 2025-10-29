@@ -3,11 +3,9 @@ use crate::{
     module::{ModuleCache, ModuleResolver},
 };
 use hashbrown::HashMap;
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringId, Value};
 use lugli_stdlib::get_global_functions;
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
-
-pub type NativeFunction = fn(&[Value]) -> Result<Value, LugliError>;
 
 const MAX_STACK_SIZE: usize = 10_000;
 const MAX_CALL_DEPTH: usize = 1000;
@@ -200,16 +198,36 @@ impl Machine {
         Some(context)
     }
 
-    fn call_string_method(&mut self, method: &str, s: String, arg_count: usize) -> Result<Value, LugliError> {
+    fn call_string_method(&mut self, method: &str, s: StringId, arg_count: usize, bytecode: &Bytecode) -> Result<Value, LugliError> {
         let args = self.get_method_args(arg_count)?;
+        let string = bytecode.string_pool.borrow().resolve(s).to_string();
 
         match method {
-            "len" => Ok(Value::Number(s.len() as f64)),
-            "trim" => Ok(Value::String(s.trim().to_string())),
-            "lower" => Ok(Value::String(s.to_lowercase())),
-            "upper" => Ok(Value::String(s.to_uppercase())),
+            "len" => Ok(Value::Number(string.len() as f64)),
+            "trim" => {
+                let trimmed = string.trim();
+                let id = bytecode.string_pool.borrow_mut().intern(trimmed);
+                Ok(Value::String(id))
+            }
+            "lower" => {
+                let lower = string.to_lowercase();
+                let id = bytecode.string_pool.borrow_mut().intern(&lower);
+                Ok(Value::String(id))
+            }
+            "upper" => {
+                let upper = string.to_uppercase();
+                let id = bytecode.string_pool.borrow_mut().intern(&upper);
+                Ok(Value::String(id))
+            }
             "chars" => {
-                let chars: Vec<Value> = s.chars().map(|c| Value::String(c.to_string())).collect();
+                let chars: Vec<Value> = string
+                    .chars()
+                    .map(|c| {
+                        let char_str = c.to_string();
+                        let id = bytecode.string_pool.borrow_mut().intern(&char_str);
+                        Value::String(id)
+                    })
+                    .collect();
                 Ok(Value::List(Rc::new(RefCell::new(chars))))
             }
             "split" => {
@@ -217,19 +235,28 @@ impl Machine {
                     return Err(LugliError::runtime("split expects 1 argument (separator)"));
                 }
                 let separator = match &args[0] {
-                    Value::String(sep) => sep.as_str(),
+                    Value::String(sep) => bytecode.string_pool.borrow().resolve(*sep).to_string(),
                     _ => return Err(LugliError::runtime("split separator must be a string")),
                 };
-                let parts: Vec<Value> = s.split(separator).map(|part| Value::String(part.to_string())).collect();
+                let parts: Vec<Value> = string
+                    .split(&separator)
+                    .map(|part| {
+                        let id = bytecode.string_pool.borrow_mut().intern(part);
+                        Value::String(id)
+                    })
+                    .collect();
                 Ok(Value::List(Rc::new(RefCell::new(parts))))
             }
-            "is_alphabetic" => Ok(Value::Bool(s.chars().all(|c| c.is_alphabetic()))),
+            "is_alphabetic" => Ok(Value::Bool(string.chars().all(|c| c.is_alphabetic()))),
             "starts_with" => {
                 if arg_count != 1 {
                     return Err(LugliError::runtime("starts_with expects 1 argument"));
                 }
                 match &args[0] {
-                    Value::String(prefix) => Ok(Value::Bool(s.starts_with(prefix.as_str()))),
+                    Value::String(prefix) => {
+                        let prefix_str = bytecode.string_pool.borrow().resolve(*prefix).to_string();
+                        Ok(Value::Bool(string.starts_with(&prefix_str)))
+                    }
                     _ => Err(LugliError::runtime("starts_with argument must be a string")),
                 }
             }
@@ -238,7 +265,10 @@ impl Machine {
                     return Err(LugliError::runtime("ends_with expects 1 argument"));
                 }
                 match &args[0] {
-                    Value::String(suffix) => Ok(Value::Bool(s.ends_with(suffix.as_str()))),
+                    Value::String(suffix) => {
+                        let suffix_str = bytecode.string_pool.borrow().resolve(*suffix).to_string();
+                        Ok(Value::Bool(string.ends_with(&suffix_str)))
+                    }
                     _ => Err(LugliError::runtime("ends_with argument must be a string")),
                 }
             }
@@ -247,7 +277,10 @@ impl Machine {
                     return Err(LugliError::runtime("contains expects 1 argument"));
                 }
                 match &args[0] {
-                    Value::String(substring) => Ok(Value::Bool(s.contains(substring.as_str()))),
+                    Value::String(substring) => {
+                        let substring_str = bytecode.string_pool.borrow().resolve(*substring).to_string();
+                        Ok(Value::Bool(string.contains(&substring_str)))
+                    }
                     _ => Err(LugliError::runtime("contains argument must be a string")),
                 }
             }
@@ -255,7 +288,7 @@ impl Machine {
         }
     }
 
-    fn call_list_method(&mut self, method: &str, list: Rc<RefCell<Vec<Value>>>, arg_count: usize) -> Result<Value, LugliError> {
+    fn call_list_method(&mut self, method: &str, list: Rc<RefCell<Vec<Value>>>, arg_count: usize, bytecode: &Bytecode) -> Result<Value, LugliError> {
         let args = self.get_method_args(arg_count)?;
 
         match method {
@@ -274,14 +307,18 @@ impl Machine {
             "join" => {
                 let separator = if arg_count > 0 {
                     match &args[0] {
-                        Value::String(s) => s.as_str(),
+                        Value::String(s) => bytecode.string_pool.borrow().resolve(*s).to_string(),
                         _ => return Err(LugliError::runtime("join separator must be a string")),
                     }
                 } else {
-                    ""
+                    "".to_string()
                 };
-                let strings: Vec<String> = list.borrow().iter().map(|v| v.to_string()).collect();
-                Ok(Value::String(strings.join(separator)))
+                let pool = bytecode.string_pool.borrow();
+                let strings: Vec<String> = list.borrow().iter().map(|v| v.display_with_pool(&pool)).collect();
+                drop(pool);
+                let joined = strings.join(&separator);
+                let id = bytecode.string_pool.borrow_mut().intern(&joined);
+                Ok(Value::String(id))
             }
             "contains" => {
                 if arg_count != 1 {
@@ -343,7 +380,7 @@ impl Machine {
         Ok(Value::List(Rc::new(RefCell::new(mapped))))
     }
 
-    fn call_user_function(&mut self, function: &Value, args: &[Value], _bytecode: &Bytecode) -> Result<Value, LugliError> {
+    fn call_user_function(&mut self, function: &Value, args: &[Value], bytecode: &Bytecode) -> Result<Value, LugliError> {
         match function {
             Value::NativeFunction {
                 callback,
@@ -353,7 +390,7 @@ impl Machine {
                 if args.len() != *arity {
                     return Err(LugliError::runtime(format!("Function expects {} arguments, got {}", arity, args.len())));
                 }
-                callback(args)
+                callback(args, &mut bytecode.string_pool.borrow_mut())
             }
             Value::Function {
                 name,
@@ -452,13 +489,19 @@ impl Machine {
         }
     }
 
-    fn call_dict_method(&mut self, method: &str, dict: Rc<RefCell<HashMap<String, Value>>>, arg_count: usize) -> Result<Value, LugliError> {
+    fn call_dict_method(
+        &mut self,
+        method: &str,
+        dict: Rc<RefCell<HashMap<StringId, Value>>>,
+        arg_count: usize,
+        _bytecode: &Bytecode,
+    ) -> Result<Value, LugliError> {
         let args = self.get_method_args(arg_count)?;
 
         match method {
             "len" => Ok(Value::Number(dict.borrow().len() as f64)),
             "keys" => {
-                let keys: Vec<Value> = dict.borrow().keys().map(|k| Value::String(k.clone())).collect();
+                let keys: Vec<Value> = dict.borrow().keys().map(|k| Value::String(*k)).collect();
                 Ok(Value::List(Rc::new(RefCell::new(keys))))
             }
             "values" => {
@@ -669,7 +712,14 @@ impl Machine {
             Instruction::Add => {
                 let b = self.pop()?;
                 let a = self.pop()?;
-                self.stack.push(a.add(&b)?);
+                let result = match (&a, &b) {
+                    (Value::String(_), Value::String(_)) => {
+                        let mut pool = bytecode.string_pool.borrow_mut();
+                        a.add_with_pool(&b, &mut pool)?
+                    }
+                    _ => a.add(&b)?,
+                };
+                self.stack.push(result);
             }
             Instruction::Subtract => {
                 let b = self.pop()?;
@@ -805,7 +855,7 @@ impl Machine {
                                 args_start_index, args_end_index, name
                             ))
                         })?;
-                        let result = callback(args)?;
+                        let result = callback(args, &mut bytecode.string_pool.borrow_mut())?;
                         self.stack.truncate(self.stack.len() - arg_count - 1); // Pop args and function
                         self.stack.push(result);
                     }
@@ -951,14 +1001,11 @@ impl Machine {
                 let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
 
                 if let Some(upvalues) = &frame.closure_upvalues {
-                    let upvalue_ref = upvalues.get(*index).ok_or_else(|| {
-                        LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len()))
-                    })?;
+                    let upvalue_ref = upvalues
+                        .get(*index)
+                        .ok_or_else(|| LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len())))?;
 
-                    let value = upvalue_ref
-                        .try_borrow()
-                        .map_err(|_| LugliError::runtime("Cannot access upvalue while it's being modified"))?
-                        .clone();
+                    let value = upvalue_ref.try_borrow().map_err(|_| LugliError::runtime("Cannot access upvalue while it's being modified"))?.clone();
 
                     self.stack.push(value);
                 } else {
@@ -970,31 +1017,29 @@ impl Machine {
                 let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
 
                 if let Some(upvalues) = &frame.closure_upvalues {
-                    let upvalue_ref = upvalues.get(*index).ok_or_else(|| {
-                        LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len()))
-                    })?;
+                    let upvalue_ref = upvalues
+                        .get(*index)
+                        .ok_or_else(|| LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len())))?;
 
-                    *upvalue_ref
-                        .try_borrow_mut()
-                        .map_err(|_| LugliError::runtime("Cannot modify upvalue while it's being used"))?
-                        = value;
+                    *upvalue_ref.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify upvalue while it's being used"))? = value;
                 } else {
                     return Err(LugliError::runtime("StoreUpvalue used in non-closure context"));
                 }
             }
             Instruction::LoadGlobal(name_index) => {
                 let var_name = self.get_constant(bytecode, *name_index)?;
-                if let Value::String(name) = var_name {
-                    if let Some(value) = self.globals.get(name) {
+                if let Value::String(name_id) = var_name {
+                    let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
+                    if let Some(value) = self.globals.get(&name) {
                         self.stack.push(value.clone());
                     } else {
                         // Generate helpful error with suggestions
                         if let Some(context) = self.get_source_context(bytecode) {
                             let available_names: Vec<&str> = self.globals.keys().map(|s| s.as_str()).collect();
-                            let suggestion = crate::error_formatter::suggest_similar_name(name, &available_names);
-                            return Err(LugliError::undefined_variable_with_context(name.clone(), context, suggestion));
+                            let suggestion = crate::error_formatter::suggest_similar_name(&name, &available_names);
+                            return Err(LugliError::undefined_variable_with_context(name, context, suggestion));
                         } else {
-                            return Err(LugliError::undefined_variable(name.clone()));
+                            return Err(LugliError::undefined_variable(name));
                         }
                     }
                 } else {
@@ -1004,8 +1049,9 @@ impl Machine {
             Instruction::StoreGlobal(name_index) => {
                 let value = self.peek()?.clone_for_stack(); // Don't pop - leave value on stack like Store does
                 let var_name = self.get_constant(bytecode, *name_index)?;
-                if let Value::String(name) = var_name {
-                    self.globals.insert(name.clone(), value);
+                if let Value::String(name_id) = var_name {
+                    let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
+                    self.globals.insert(name, value);
                 } else {
                     return Err(LugliError::runtime("Variable name must be a string"));
                 }
@@ -1013,11 +1059,11 @@ impl Machine {
             Instruction::GetProperty(name_index) => {
                 let object = self.pop()?;
                 let prop_name = self.get_constant(bytecode, *name_index)?;
-                if let Value::String(name) = prop_name {
+                if let Value::String(name_id) = prop_name {
                     match object {
                         Value::Dict(dict_ref) => {
                             let dict = dict_ref.borrow();
-                            if let Some(value) = dict.get(name) {
+                            if let Some(value) = dict.get(name_id) {
                                 self.stack.push(value.clone());
                             } else {
                                 self.stack.push(Value::Null);
@@ -1026,13 +1072,15 @@ impl Machine {
                         Value::Module {
                             exports, ..
                         } => {
-                            if let Some(value) = exports.get(name) {
+                            let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
+                            if let Some(value) = exports.get(&name) {
                                 self.stack.push(value.clone());
                             } else {
                                 return Err(LugliError::runtime(format!("Module has no export '{}'", name)));
                             }
                         }
                         _ => {
+                            let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
                             return Err(LugliError::runtime(format!("Cannot access property '{}' on a value of type {}", name, object.type_name())));
                         }
                     }
@@ -1045,15 +1093,16 @@ impl Machine {
                 let object = self.pop()?;
                 let prop_name = self.get_constant(bytecode, *name_index)?;
 
-                if let Value::String(name) = prop_name {
+                if let Value::String(name_id) = prop_name {
                     if let Value::Dict(dict_ref) = &object {
                         dict_ref
                             .try_borrow_mut()
                             .map_err(|_| LugliError::runtime("Cannot modify struct while it's being used"))?
-                            .insert(name.clone(), value.clone());
+                            .insert(*name_id, value.clone());
                         // Push the value back as the expression result
                         self.stack.push(value);
                     } else {
+                        let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
                         return Err(LugliError::runtime(format!("Cannot set property '{}' on a value of type {}", name, object.type_name())));
                     }
                 } else {
@@ -1081,19 +1130,22 @@ impl Machine {
                 }
 
                 // Check if this is a struct instantiation (has __struct_type__ field)
-                if let Some(Value::String(struct_type)) = dict.get("__struct_type__") {
+                let struct_type_key = bytecode.string_pool.borrow_mut().intern("__struct_type__");
+                if let Some(Value::String(struct_type_id)) = dict.get(&struct_type_key) {
+                    let struct_type = bytecode.string_pool.borrow().resolve(*struct_type_id).to_string();
                     // Look up struct metadata from globals
-                    if let Some(Value::Dict(meta)) = self.globals.get(struct_type) {
+                    if let Some(Value::Dict(meta)) = self.globals.get(&struct_type) {
                         let meta_ref = meta.borrow();
 
                         // Get default values from struct metadata
-                        if let Some(Value::Dict(defaults)) = meta_ref.get("__defaults__") {
+                        let defaults_key = bytecode.string_pool.borrow_mut().intern("__defaults__");
+                        if let Some(Value::Dict(defaults)) = meta_ref.get(&defaults_key) {
                             let defaults_ref = defaults.borrow();
 
                             // Apply defaults for missing fields
                             for (field_name, default_value) in defaults_ref.iter() {
                                 if !dict.contains_key(field_name) {
-                                    dict.insert(field_name.clone(), default_value.clone());
+                                    dict.insert(*field_name, default_value.clone());
                                 }
                             }
                         }
@@ -1168,10 +1220,11 @@ impl Machine {
             }
             Instruction::CallMethod(method_name_index, arg_count) => {
                 let arg_count = *arg_count as usize;
-                let method_name = match self.get_constant(bytecode, *method_name_index)? {
-                    Value::String(name) => name.clone(),
+                let method_name_id = match self.get_constant(bytecode, *method_name_index)? {
+                    Value::String(name_id) => *name_id,
                     _ => return Err(LugliError::runtime("Method name must be a string")),
                 };
+                let method_name = bytecode.string_pool.borrow().resolve(method_name_id).to_string();
 
                 // Get the object (it's below the arguments on the stack)
                 let object_index = self.stack.len() - arg_count - 1;
@@ -1180,12 +1233,14 @@ impl Machine {
                 // Check for struct method calls first
                 if let Value::Dict(d) = object {
                     let dict_ref = d.borrow();
-                    if let Some(Value::String(struct_type)) = dict_ref.get("__struct_type__") {
+                    let struct_type_key = bytecode.string_pool.borrow_mut().intern("__struct_type__");
+                    if let Some(Value::String(struct_type_id)) = dict_ref.get(&struct_type_key) {
                         // Clone the struct type name before dropping the borrow
-                        let struct_type = struct_type.clone();
+                        let struct_type_id = *struct_type_id;
+                        let struct_type = bytecode.string_pool.borrow().resolve(struct_type_id).to_string();
 
                         // Check if the property is a function field
-                        let field_func = dict_ref.get(&method_name).cloned();
+                        let field_func = dict_ref.get(&method_name_id).cloned();
                         drop(dict_ref); // Release the borrow before method call
 
                         // If the field exists and is a function, call it (property call)
@@ -1303,7 +1358,7 @@ impl Machine {
                                     let args = self.stack.get(args_start..).ok_or_else(|| {
                                         LugliError::runtime(format!("Stack corruption: invalid argument start index {} for method call", args_start))
                                     })?;
-                                    let result = callback(args)?;
+                                    let result = callback(args, &mut bytecode.string_pool.borrow_mut())?;
 
                                     // Pop arguments and object, push result
                                     self.stack.truncate(object_index);
@@ -1351,11 +1406,11 @@ impl Machine {
 
                 // Dispatch based on object type for built-in types
                 let result = match object {
-                    Value::String(s) => self.call_string_method(&method_name, s.clone(), arg_count)?,
-                    Value::List(l) => self.call_list_method(&method_name, l.clone(), arg_count)?,
+                    Value::String(s) => self.call_string_method(&method_name, *s, arg_count, bytecode)?,
+                    Value::List(l) => self.call_list_method(&method_name, l.clone(), arg_count, bytecode)?,
                     Value::Dict(d) => {
                         // Regular dict method call (not a struct)
-                        self.call_dict_method(&method_name, d.clone(), arg_count)?
+                        self.call_dict_method(&method_name, d.clone(), arg_count, bytecode)?
                     }
                     Value::Module {
                         exports, ..
@@ -1427,13 +1482,14 @@ impl Machine {
                     }
                     (Value::Dict(dict), Value::Number(num)) => {
                         // Convert number to string key
-                        let key = if num.fract() == 0.0 && num.abs() < 1e15 {
+                        let key_str = if num.fract() == 0.0 && num.abs() < 1e15 {
                             format!("{:.0}", num) // Format as integer
                         } else {
                             num.to_string()
                         };
+                        let key_id = bytecode.string_pool.borrow_mut().intern(&key_str);
                         let dict_ref = dict.borrow();
-                        if let Some(value) = dict_ref.get(&key) {
+                        if let Some(value) = dict_ref.get(&key_id) {
                             self.stack.push(value.clone());
                         } else {
                             self.stack.push(Value::Null);
@@ -1448,7 +1504,8 @@ impl Machine {
                             return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
                         }
 
-                        let chars: Vec<char> = s.chars().collect();
+                        let string = bytecode.string_pool.borrow().resolve(*s).to_string();
+                        let chars: Vec<char> = string.chars().collect();
                         let len = chars.len() as i64;
                         let idx_i64 = *idx as i64;
 
@@ -1468,7 +1525,9 @@ impl Machine {
                             idx_i64 as usize
                         };
 
-                        self.stack.push(Value::String(chars[actual_idx].to_string()));
+                        let char_str = chars[actual_idx].to_string();
+                        let char_id = bytecode.string_pool.borrow_mut().intern(&char_str);
+                        self.stack.push(Value::String(char_id));
                     }
                     _ => {
                         return Err(LugliError::runtime(format!("Cannot index {} with {}", object.type_name(), index.type_name())));
@@ -1521,14 +1580,15 @@ impl Machine {
                     }
                     (Value::Dict(dict), Value::Number(num)) => {
                         // Convert number to string key
-                        let key = if num.fract() == 0.0 && num.abs() < 1e15 {
+                        let key_str = if num.fract() == 0.0 && num.abs() < 1e15 {
                             format!("{:.0}", num) // Format as integer
                         } else {
                             num.to_string()
                         };
+                        let key_id = bytecode.string_pool.borrow_mut().intern(&key_str);
                         dict.try_borrow_mut()
                             .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
-                            .insert(key, value.clone());
+                            .insert(key_id, value.clone());
                         self.stack.push(value); // Return the assigned value
                     }
                     _ => {
@@ -1538,8 +1598,9 @@ impl Machine {
             }
             Instruction::ToString => {
                 let value = self.pop()?;
+                let pool = bytecode.string_pool.borrow();
                 let string_value = match &value {
-                    Value::String(s) => s.clone(),
+                    Value::String(s) => pool.resolve(*s).to_string(),
                     Value::Number(n) => {
                         if n.is_nan() {
                             "NaN".to_string()
@@ -1559,8 +1620,8 @@ impl Machine {
                         let elements: Vec<String> = list_ref
                             .iter()
                             .map(|v| match v {
-                                Value::String(s) => format!("\"{}\"", s),
-                                _ => v.to_string(),
+                                Value::String(s) => format!("\"{}\"", pool.resolve(*s)),
+                                _ => v.display_with_pool(&pool),
                             })
                             .collect();
                         format!("[{}]", elements.join(", "))
@@ -1570,8 +1631,8 @@ impl Machine {
                         let pairs: Vec<String> = dict_ref
                             .iter()
                             .map(|(k, v)| match v {
-                                Value::String(s) => format!("\"{}\": \"{}\"", k, s),
-                                _ => format!("\"{}\": {}", k, v),
+                                Value::String(s) => format!("\"{}\": \"{}\"", pool.resolve(*k), pool.resolve(*s)),
+                                _ => format!("\"{}\": {}", pool.resolve(*k), v.display_with_pool(&pool)),
                             })
                             .collect();
                         format!("{{{}}}", pairs.join(", "))
@@ -1593,21 +1654,23 @@ impl Machine {
                         path, ..
                     } => format!("<module {}>", path),
                 };
-                self.stack.push(Value::String(string_value));
+                drop(pool);
+                let id = bytecode.string_pool.borrow_mut().intern(&string_value);
+                self.stack.push(Value::String(id));
             }
             Instruction::ImportModule {
                 module_idx,
                 bind_name,
             } => {
                 let module_path = match &bytecode.constants[*module_idx] {
-                    Value::String(s) => s.clone(),
+                    Value::String(s) => bytecode.string_pool.borrow().resolve(*s).to_string(),
                     _ => return Err(LugliError::runtime("ImportModule: expected string constant")),
                 };
 
                 let exports = self.load_module(&module_path)?;
 
                 let module_value = Value::Module {
-                    path: module_path.clone(),
+                    path: module_path,
                     exports,
                 };
 
@@ -1619,7 +1682,7 @@ impl Machine {
                 names,
             } => {
                 let module_path = match &bytecode.constants[*module_idx] {
-                    Value::String(s) => s.clone(),
+                    Value::String(s) => bytecode.string_pool.borrow().resolve(*s).to_string(),
                     _ => return Err(LugliError::runtime("ImportFrom: expected string constant")),
                 };
 

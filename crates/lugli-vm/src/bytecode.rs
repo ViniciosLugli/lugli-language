@@ -1,4 +1,5 @@
-use lugli_common::{Span, Value};
+use lugli_common::{Span, StringPool, Value};
+use std::cell::RefCell;
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
@@ -83,6 +84,7 @@ pub struct Bytecode {
     pub constants: Vec<Value>,
     pub source_map: Vec<SourceLocation>,
     pub source_code: Option<String>,
+    pub string_pool: RefCell<StringPool>,
 }
 
 impl Bytecode {
@@ -92,6 +94,7 @@ impl Bytecode {
             constants: Vec::new(),
             source_map: Vec::new(),
             source_code: None,
+            string_pool: RefCell::new(StringPool::new()),
         }
     }
 
@@ -101,6 +104,17 @@ impl Bytecode {
             constants: Vec::new(),
             source_map: Vec::new(),
             source_code: Some(source_code),
+            string_pool: RefCell::new(StringPool::new()),
+        }
+    }
+
+    pub fn with_pool(pool: StringPool) -> Self {
+        Self {
+            instructions: Vec::new(),
+            constants: Vec::new(),
+            source_map: Vec::new(),
+            source_code: None,
+            string_pool: RefCell::new(pool),
         }
     }
 

@@ -1,4 +1,4 @@
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringPool, Value};
 
 pub mod core;
 pub mod io;
@@ -7,7 +7,7 @@ pub mod time;
 // Re-export individual functions to avoid ambiguous glob re-exports
 // Main access point is get_global_functions() which combines all modules
 
-pub type NativeFunction = fn(&[Value]) -> Result<Value, LugliError>;
+pub type NativeFunction = fn(&[Value], &mut StringPool) -> Result<Value, LugliError>;
 
 pub fn get_global_functions() -> Vec<(&'static str, NativeFunction)> {
     let mut functions = Vec::new();

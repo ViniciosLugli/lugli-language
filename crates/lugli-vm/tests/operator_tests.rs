@@ -10,7 +10,7 @@
 
 mod helpers;
 
-use helpers::assert_execution_succeeds;
+use helpers::{assert_execution_succeeds, compile_source};
 use lugli_common::Value;
 
 #[test]
@@ -49,8 +49,15 @@ fn test_unary_operators() {
 
 #[test]
 fn test_string_concatenation() {
-    assert_execution_succeeds(r#""hello" + " " + "world""#, Value::String("hello world".to_string()));
-    assert_execution_succeeds(r#""a" + "b""#, Value::String("ab".to_string()));
+    let (bytecode1, result1) = compile_source(r#""hello" + " " + "world""#);
+    let mut pool1 = bytecode1.string_pool.borrow_mut();
+    let hello_world_id = pool1.intern("hello world");
+    assert!(result1.equals(&Value::String(hello_world_id)));
+
+    let (bytecode2, result2) = compile_source(r#""a" + "b""#);
+    let mut pool2 = bytecode2.string_pool.borrow_mut();
+    let ab_id = pool2.intern("ab");
+    assert!(result2.equals(&Value::String(ab_id)));
 }
 
 #[test]

@@ -24,7 +24,8 @@ impl Compiler {
                     self.emit(Instruction::Load(local_index));
                     Ok(())
                 } else {
-                    let name_index = self.add_constant(Value::String(name.clone()));
+                    let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                    let name_index = self.add_constant(Value::String(name_id));
                     self.emit(Instruction::LoadGlobal(name_index));
                     Ok(())
                 }
@@ -99,7 +100,8 @@ impl Compiler {
                     }
 
                     // Add method name as constant and emit CallMethod instruction
-                    let name_index = self.add_constant(Value::String(name.clone()));
+                    let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                    let name_index = self.add_constant(Value::String(name_id));
                     self.emit(Instruction::CallMethod(name_index, arguments.len() as u8));
                 } else {
                     // Regular function call
@@ -133,7 +135,8 @@ impl Compiler {
                     && obj_name == "global"
                 {
                     // This is a variable access, not property access
-                    let name_index = self.add_constant(Value::String(name.clone()));
+                    let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                    let name_index = self.add_constant(Value::String(name_id));
                     self.emit(Instruction::LoadGlobal(name_index));
                     return Ok(());
                 }
@@ -143,7 +146,8 @@ impl Compiler {
                 self.compile_expr(object)?;
 
                 // Add property name as constant and emit GetProperty instruction
-                let name_index = self.add_constant(Value::String(name.clone()));
+                let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                let name_index = self.add_constant(Value::String(name_id));
                 self.emit(Instruction::GetProperty(name_index));
                 Ok(())
             }
@@ -172,7 +176,8 @@ impl Compiler {
                         self.emit(Instruction::LoadUpvalue(upvalue_index));
                     } else {
                         // It's a global variable
-                        let name_index = self.add_constant(Value::String(name.clone()));
+                        let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                        let name_index = self.add_constant(Value::String(name_id));
                         self.emit(Instruction::StoreGlobal(name_index));
                         self.emit(Instruction::LoadGlobal(name_index));
                     }
@@ -205,7 +210,8 @@ impl Compiler {
                 self.compile_expr(object)?;
                 self.compile_expr(value)?;
 
-                let name_index = self.add_constant(Value::String(name.clone()));
+                let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                let name_index = self.add_constant(Value::String(name_id));
                 self.emit(Instruction::SetProperty(name_index));
 
                 Ok(())
@@ -258,7 +264,8 @@ impl Compiler {
 
                 if parts.is_empty() {
                     // Empty f-string => ""
-                    let empty_str = self.add_constant(Value::String(String::new()));
+                    let empty_id = self.bytecode.string_pool.borrow_mut().intern("");
+                    let empty_str = self.add_constant(Value::String(empty_id));
                     self.emit(Instruction::Constant(empty_str));
                     return Ok(());
                 }
@@ -266,7 +273,8 @@ impl Compiler {
                 // Compile first part
                 match &parts[0] {
                     FStringPart::Text(text) => {
-                        let const_idx = self.add_constant(Value::String(text.clone()));
+                        let text_id = self.bytecode.string_pool.borrow_mut().intern(text);
+                        let const_idx = self.add_constant(Value::String(text_id));
                         self.emit(Instruction::Constant(const_idx));
                     }
                     FStringPart::Expression(expr) => {
@@ -279,7 +287,8 @@ impl Compiler {
                 for part in &parts[1..] {
                     match part {
                         FStringPart::Text(text) => {
-                            let const_idx = self.add_constant(Value::String(text.clone()));
+                            let text_id = self.bytecode.string_pool.borrow_mut().intern(text);
+                            let const_idx = self.add_constant(Value::String(text_id));
                             self.emit(Instruction::Constant(const_idx));
                         }
                         FStringPart::Expression(expr) => {
@@ -434,7 +443,8 @@ impl Compiler {
                 // Check if index < len(iterable)
                 self.emit(Instruction::Load(index_local));
                 self.emit(Instruction::Load(iterable_local));
-                let len_name = self.add_constant(Value::String("len".to_string()));
+                let len_id = self.bytecode.string_pool.borrow_mut().intern("len");
+                let len_name = self.add_constant(Value::String(len_id));
                 self.emit(Instruction::CallMethod(len_name, 0));
                 self.emit(Instruction::Less);
                 let exit_jump = self.emit_jump(Instruction::JumpIfFalse(0));
@@ -453,7 +463,8 @@ impl Compiler {
                     // Append element to result list
                     self.emit(Instruction::Load(result_local));
                     self.compile_expr(element)?;
-                    let push_const = self.add_constant(Value::String("push!".to_string()));
+                    let push_id = self.bytecode.string_pool.borrow_mut().intern("push!");
+                    let push_const = self.add_constant(Value::String(push_id));
                     self.emit(Instruction::CallMethod(push_const, 1));
                     self.emit(Instruction::Pop); // Pop return value from push!
 
@@ -462,7 +473,8 @@ impl Compiler {
                     // No condition - always append
                     self.emit(Instruction::Load(result_local));
                     self.compile_expr(element)?;
-                    let push_const = self.add_constant(Value::String("push!".to_string()));
+                    let push_id = self.bytecode.string_pool.borrow_mut().intern("push!");
+                    let push_const = self.add_constant(Value::String(push_id));
                     self.emit(Instruction::CallMethod(push_const, 1));
                     self.emit(Instruction::Pop); // Pop return value from push!
                 }
@@ -597,13 +609,21 @@ impl Compiler {
     pub(super) fn literal_to_value(&self, literal: &LiteralValue) -> Value {
         match literal {
             LiteralValue::Number(n) => Value::Number(*n),
-            LiteralValue::String(s) => Value::String(s.clone()),
+            LiteralValue::String(s) => {
+                let id = self.bytecode.string_pool.borrow_mut().intern(s);
+                Value::String(id)
+            }
             LiteralValue::Boolean(b) => Value::Bool(*b),
             LiteralValue::Null => Value::Null,
         }
     }
 
-    pub(crate) fn detect_captures(&self, body: &[lugli_ast::Stmt], outer_locals: &hashbrown::HashMap<String, usize>, params: &[String]) -> Vec<String> {
+    pub(crate) fn detect_captures(
+        &self,
+        body: &[lugli_ast::Stmt],
+        outer_locals: &hashbrown::HashMap<String, usize>,
+        params: &[String],
+    ) -> Vec<String> {
         use std::collections::HashSet;
         let mut captures = HashSet::new();
 

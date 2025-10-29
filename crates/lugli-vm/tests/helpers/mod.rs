@@ -2,7 +2,7 @@
 
 use lugli_common::Value;
 use lugli_parser::Parser;
-use lugli_vm::compile_and_run;
+use lugli_vm::{Bytecode, compile, compile_and_run, run};
 
 pub fn run_test(source: &str) {
     let mut parser = Parser::new(source).unwrap();
@@ -25,4 +25,12 @@ pub fn assert_execution_succeeds(source: &str, expected_value: Value) {
     let ast = parser.parse().unwrap();
     let result = compile_and_run(&ast).unwrap();
     assert!(result.equals(&expected_value));
+}
+
+pub fn compile_source(source: &str) -> (Bytecode, Value) {
+    let mut parser = Parser::new(source).unwrap();
+    let ast = parser.parse().unwrap();
+    let bytecode = compile(&ast).unwrap();
+    let result = run(&bytecode).unwrap();
+    (bytecode, result)
 }

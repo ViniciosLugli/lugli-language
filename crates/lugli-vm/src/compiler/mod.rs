@@ -201,7 +201,13 @@ impl Compiler {
                 value, ..
             } => Some(match value {
                 LiteralValue::Number(n) => Value::Number(*n),
-                LiteralValue::String(s) => Value::String(s.clone()),
+                LiteralValue::String(s) => {
+                    let id = {
+                        let mut pool = self.bytecode.string_pool.borrow_mut();
+                        pool.intern(s)
+                    };
+                    Value::String(id)
+                }
                 LiteralValue::Boolean(b) => Value::Bool(*b),
                 LiteralValue::Null => Value::Null,
             }),
@@ -223,7 +229,12 @@ impl Compiler {
                         value: LiteralValue::String(key), ..
                     } = key_expr
                     {
-                        const_dict.insert(key.clone(), self.try_evaluate_constant(value_expr)?);
+                        // Intern the key first, then drop the borrow before recursing
+                        let key_id = {
+                            let mut pool = self.bytecode.string_pool.borrow_mut();
+                            pool.intern(key)
+                        };
+                        const_dict.insert(key_id, self.try_evaluate_constant(value_expr)?);
                     } else {
                         return None;
                     }

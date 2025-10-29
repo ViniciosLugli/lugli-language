@@ -1,11 +1,13 @@
 use lugli_common::Value;
 use lugli_parser::Parser;
-use lugli_vm::compile_and_run;
+use lugli_vm::{Bytecode, compile, run};
 
-fn run_and_get_value(source: &str) -> Value {
+fn run_and_get_value(source: &str) -> (Bytecode, Value) {
     let mut parser = Parser::new(source).unwrap();
     let ast = parser.parse().unwrap();
-    compile_and_run(&ast).unwrap()
+    let bytecode = compile(&ast).unwrap();
+    let result = run(&bytecode).unwrap();
+    (bytecode, result)
 }
 
 #[test]
@@ -20,8 +22,10 @@ fn test_literal_pattern_number() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("answer".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let answer_id = pool.intern("answer");
+    assert_eq!(result, Value::String(answer_id));
 }
 
 #[test]
@@ -35,7 +39,7 @@ fn test_literal_pattern_string() {
         }
     "#;
 
-    let result = run_and_get_value(source);
+    let (_, result) = run_and_get_value(source);
     assert_eq!(result, Value::Number(1.0));
 }
 
@@ -49,8 +53,10 @@ fn test_literal_pattern_boolean() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("yes".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let yes_id = pool.intern("yes");
+    assert_eq!(result, Value::String(yes_id));
 }
 
 #[test]
@@ -63,8 +69,10 @@ fn test_literal_pattern_null() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("nothing".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let nothing_id = pool.intern("nothing");
+    assert_eq!(result, Value::String(nothing_id));
 }
 
 #[test]
@@ -78,8 +86,10 @@ fn test_wildcard_pattern() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("many".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let many_id = pool.intern("many");
+    assert_eq!(result, Value::String(many_id));
 }
 
 #[test]
@@ -92,7 +102,7 @@ fn test_identifier_pattern_binding() {
         }
     "#;
 
-    let result = run_and_get_value(source);
+    let (_, result) = run_and_get_value(source);
     assert_eq!(result, Value::Number(84.0));
 }
 
@@ -108,8 +118,10 @@ fn test_guard_with_literal_pattern() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("small answer".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let small_answer_id = pool.intern("small answer");
+    assert_eq!(result, Value::String(small_answer_id));
 }
 
 #[test]
@@ -123,8 +135,10 @@ fn test_guard_with_identifier_pattern() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("medium".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let medium_id = pool.intern("medium");
+    assert_eq!(result, Value::String(medium_id));
 }
 
 #[test]
@@ -138,8 +152,10 @@ fn test_guard_with_complex_condition() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("odd".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let odd_id = pool.intern("odd");
+    assert_eq!(result, Value::String(odd_id));
 }
 
 #[test]
@@ -153,7 +169,7 @@ fn test_match_returns_different_types() {
         }
     "#;
 
-    let result = run_and_get_value(source);
+    let (_, result) = run_and_get_value(source);
     assert_eq!(result, Value::Number(100.0));
 }
 
@@ -168,8 +184,10 @@ fn test_match_with_expressions() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("ten".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let ten_id = pool.intern("ten");
+    assert_eq!(result, Value::String(ten_id));
 }
 
 #[test]
@@ -186,8 +204,10 @@ fn test_nested_match() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("one-two".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let one_two_id = pool.intern("one-two");
+    assert_eq!(result, Value::String(one_two_id));
 }
 
 #[test]
@@ -202,8 +222,10 @@ fn test_match_in_variable_assignment() {
         result
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("answer".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let answer_id = pool.intern("answer");
+    assert_eq!(result, Value::String(answer_id));
 }
 
 // TODO: Uncomment when parser properly handles `?` in method names
@@ -233,8 +255,10 @@ fn test_match_first_arm_wins() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("first".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let first_id = pool.intern("first");
+    assert_eq!(result, Value::String(first_id));
 }
 
 #[test]
@@ -249,8 +273,10 @@ fn test_match_all_patterns_fail_uses_wildcard() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("fallback".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let fallback_id = pool.intern("fallback");
+    assert_eq!(result, Value::String(fallback_id));
 }
 
 #[test]
@@ -264,7 +290,7 @@ fn test_match_with_arithmetic_in_body() {
         }
     "#;
 
-    let result = run_and_get_value(source);
+    let (_, result) = run_and_get_value(source);
     assert_eq!(result, Value::Number(60.0));
 }
 
@@ -279,6 +305,8 @@ fn test_guard_prevents_match() {
         }
     "#;
 
-    let result = run_and_get_value(source);
-    assert_eq!(result, Value::String("always".to_string()));
+    let (bytecode, result) = run_and_get_value(source);
+    let mut pool = bytecode.string_pool.borrow_mut();
+    let always_id = pool.intern("always");
+    assert_eq!(result, Value::String(always_id));
 }

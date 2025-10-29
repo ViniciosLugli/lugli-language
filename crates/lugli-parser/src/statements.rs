@@ -53,7 +53,11 @@ impl<'a> Parser<'a> {
         // Skip type hint if present (e.g., let x: num = 5)
         if self.match_any(&[TokenKind::Colon]) {
             // Skip type annotation until we hit = or newline/semicolon
-            while !self.check(&TokenKind::Equal) && !self.check(&TokenKind::Newline) && !self.check(&TokenKind::Semicolon) && !self.scanner.is_at_end() {
+            while !self.check(&TokenKind::Equal)
+                && !self.check(&TokenKind::Newline)
+                && !self.check(&TokenKind::Semicolon)
+                && !self.scanner.is_at_end()
+            {
                 self.advance();
             }
         }
@@ -182,15 +186,16 @@ impl<'a> Parser<'a> {
                     let is_type_hint = matches!(self.peek_kind(), Some(TokenKind::Identifier(_)));
                     if is_type_hint {
                         // Skip type annotation until we hit = or terminal
-                        while !self.check(&TokenKind::Equal) && !self.check(&TokenKind::Newline) && !self.check(&TokenKind::Comma) && !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
+                        while !self.check(&TokenKind::Equal)
+                            && !self.check(&TokenKind::Newline)
+                            && !self.check(&TokenKind::Comma)
+                            && !self.check(&TokenKind::RightBrace)
+                            && !self.scanner.is_at_end()
+                        {
                             self.advance();
                         }
                         // Now check for optional default value after =
-                        if self.match_any(&[TokenKind::Equal]) {
-                            Some(self.expression()?)
-                        } else {
-                            None
-                        }
+                        if self.match_any(&[TokenKind::Equal]) { Some(self.expression()?) } else { None }
                     } else {
                         // Old syntax: field: default_value
                         Some(self.expression()?)
@@ -432,12 +437,9 @@ impl<'a> Parser<'a> {
                     TokenKind::PercentEqual => TokenKind::Percent,
                     _ => {
                         return Err(ParseError::Custom {
-                            message: format!(
-                                "Unexpected operator in assignment: {:?}. Expected one of +=, -=, *=, /=, %=",
-                                operator.kind
-                            ),
+                            message: format!("Unexpected operator in assignment: {:?}. Expected one of +=, -=, *=, /=, %=", operator.kind),
                             span: operator.span,
-                        })
+                        });
                     }
                 };
 

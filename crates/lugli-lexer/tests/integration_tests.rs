@@ -1,4 +1,4 @@
-use lugli_lexer::{LexError, Lexer, TokenKind, tokenize};
+use lugli_lexer::{LexError, Lexer, TokenKind, tokenize_with_pool};
 
 mod integration_scenarios {
     use super::*;
@@ -17,7 +17,7 @@ mod integration_scenarios {
             println(f"Result: {result}")
         "#;
 
-        let tokens = tokenize(program).unwrap();
+        let (tokens, _pool) = tokenize_with_pool(program).unwrap();
 
         // Should successfully tokenize without errors
         assert!(!tokens.is_empty());
@@ -61,14 +61,14 @@ mod integration_scenarios {
             }
         "#;
 
-        let tokens = tokenize(program).unwrap();
+        let (tokens, pool) = tokenize_with_pool(program).unwrap();
 
         // Check for modern syntax elements
         let has_struct = tokens.iter().any(|t| matches!(t.kind, TokenKind::Struct));
         let has_impl = tokens.iter().any(|t| matches!(t.kind, TokenKind::Impl));
         let has_match = tokens.iter().any(|t| matches!(t.kind, TokenKind::Match));
         let has_self_keyword = tokens.iter().any(|t| matches!(t.kind, TokenKind::SelfKeyword));
-        let has_self_identifier = tokens.iter().any(|t| matches!(t.kind, TokenKind::Identifier(ref s) if s == "Self"));
+        let has_self_identifier = tokens.iter().any(|t| matches!(&t.kind, TokenKind::Identifier(id) if pool.resolve(*id) == "Self"));
         let has_fat_arrow = tokens.iter().any(|t| matches!(t.kind, TokenKind::FatArrow));
 
         assert!(has_struct, "Should tokenize 'struct' keyword");
@@ -93,7 +93,7 @@ mod integration_scenarios {
             let result = [x * 2 for x in numbers if x % 2 == 0]
         "#;
 
-        let tokens = tokenize(program).unwrap();
+        let (tokens, _pool) = tokenize_with_pool(program).unwrap();
 
         // Check for Python-like elements
         let has_for = tokens.iter().any(|t| matches!(t.kind, TokenKind::For));
@@ -118,7 +118,7 @@ mod integration_scenarios {
             let range = start..end
         "#;
 
-        let tokens = tokenize(program).unwrap();
+        let (tokens, _pool) = tokenize_with_pool(program).unwrap();
 
         // Check for complex operators
         let has_power = tokens.iter().any(|t| matches!(t.kind, TokenKind::Power));
@@ -142,7 +142,7 @@ mod error_handling_tests {
     fn test_unterminated_string_error() {
         let invalid_code = r#"let message = "Hello world"#; // Missing closing quote
 
-        let result = tokenize(invalid_code);
+        let result = tokenize_with_pool(invalid_code);
 
         // Should fail gracefully with appropriate error
         match result {
@@ -164,7 +164,7 @@ mod error_handling_tests {
     fn test_unexpected_character_error() {
         let invalid_code = "let x = 5 @ invalid";
 
-        let result = tokenize(invalid_code);
+        let result = tokenize_with_pool(invalid_code);
 
         // Should handle unexpected characters gracefully
         match result {
@@ -174,9 +174,9 @@ mod error_handling_tests {
             Err(_) => {
                 // Different error handling is acceptable
             }
-            Ok(tokens) => {
+            Ok((_tokens, _pool)) => {
                 // Some lexers might tokenize '@' as a separate token
-                println!("Lexer handled '@' as token: {:?}", tokens);
+                println!("Lexer handled '@' as token");
             }
         }
     }
@@ -187,8 +187,8 @@ mod error_handling_tests {
         let code_with_errors = "let x = 5; @ invalid; let y = 10";
 
         // Even if there are errors, we should be able to get some tokens
-        match tokenize(code_with_errors) {
-            Ok(tokens) => {
+        match tokenize_with_pool(code_with_errors) {
+            Ok((tokens, _pool)) => {
                 // Should have tokenized at least some parts
                 assert!(!tokens.is_empty());
             }
@@ -211,7 +211,7 @@ mod performance_tests {
         }
 
         let start = std::time::Instant::now();
-        let result = tokenize(&large_program);
+        let result = tokenize_with_pool(&large_program);
         let duration = start.elapsed();
 
         // Should complete within reasonable time (adjust threshold as needed)
@@ -219,7 +219,7 @@ mod performance_tests {
 
         // Should successfully tokenize
         match result {
-            Ok(tokens) => {
+            Ok((tokens, _pool)) => {
                 assert!(tokens.len() > 2000); // Should have many tokens
             }
             Err(e) => {
@@ -243,11 +243,11 @@ mod performance_tests {
             nested.push_str("] }");
         }
 
-        let result = tokenize(&nested);
+        let result = tokenize_with_pool(&nested);
 
         // Should handle nesting without issues
         match result {
-            Ok(tokens) => {
+            Ok((tokens, _pool)) => {
                 assert!(tokens.len() > depth * 2); // At least opening and closing brackets
             }
             Err(e) => {
@@ -286,7 +286,7 @@ mod public_api_tests {
     #[test]
     fn test_token_span_information() {
         let source = "let x = 42";
-        let tokens = tokenize(source).unwrap();
+        let (tokens, _pool) = tokenize_with_pool(source).unwrap();
 
         // Check that span information is provided
         for token in &tokens {
@@ -304,16 +304,16 @@ mod public_api_tests {
         let source = "fn test() {}";
 
         // Test the convenience function
-        let result = tokenize(source);
+        let result = tokenize_with_pool(source);
         assert!(result.is_ok());
 
-        let tokens = result.unwrap();
+        let (tokens, pool) = result.unwrap();
         // Check that we have at least the basic tokens we expect
         assert!(tokens.len() >= 4); // Should have at least fn, test, (, ), {, }
 
         // Verify the structure of the tokens
         let has_fn = tokens.iter().any(|t| matches!(t.kind, TokenKind::Fn));
-        let has_identifier = tokens.iter().any(|t| matches!(t.kind, TokenKind::Identifier(ref s) if s == "test"));
+        let has_identifier = tokens.iter().any(|t| matches!(&t.kind, TokenKind::Identifier(id) if pool.resolve(*id) == "test"));
         let has_left_paren = tokens.iter().any(|t| matches!(t.kind, TokenKind::LeftParen));
         let has_right_paren = tokens.iter().any(|t| matches!(t.kind, TokenKind::RightParen));
 
@@ -327,11 +327,11 @@ mod public_api_tests {
     #[test]
     fn test_empty_input_handling() {
         // Test with empty input
-        let empty_tokens = tokenize("").unwrap();
+        let (empty_tokens, _pool) = tokenize_with_pool("").unwrap();
         assert!(empty_tokens.is_empty());
 
         // Test with whitespace only
-        let whitespace_tokens = tokenize("   \n\t  ").unwrap();
+        let (whitespace_tokens, _pool) = tokenize_with_pool("   \n\t  ").unwrap();
         // Should either be empty or contain only whitespace tokens
         assert!(whitespace_tokens.is_empty() || whitespace_tokens.iter().all(|t| matches!(t.kind, TokenKind::Newline)));
     }

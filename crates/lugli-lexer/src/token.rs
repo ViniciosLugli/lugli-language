@@ -1,6 +1,9 @@
 use logos::Logos;
-use lugli_common::Span;
+use lugli_common::{Span, StringId};
 use std::fmt;
+
+// Placeholder StringId used by logos (will be replaced during lexing)
+const PLACEHOLDER_STRING_ID: StringId = unsafe { std::mem::transmute(0u32) };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
@@ -28,11 +31,11 @@ pub enum TokenKind {
     #[regex(r"-?[0-9]+(\.[0-9]+)?", |lex| lex.slice().parse::<f64>().ok())]
     Number(f64),
 
-    #[regex(r#""([^"\\]|\\.)*""#, |lex| lex.slice().to_string())]
-    String(String),
+    #[regex(r#""([^"\\]|\\.)*""#, |_| PLACEHOLDER_STRING_ID)]
+    String(StringId),
 
-    #[regex(r#"f"([^"\\]|\\.)*""#, |lex| lex.slice().to_string())]
-    FString(String),
+    #[regex(r#"f"([^"\\]|\\.)*""#, |_| PLACEHOLDER_STRING_ID)]
+    FString(StringId),
 
     #[token("true")]
     True,
@@ -179,8 +182,8 @@ pub enum TokenKind {
     #[token("Err")]
     Err,
 
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
-    Identifier(String),
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |_| PLACEHOLDER_STRING_ID)]
+    Identifier(StringId),
 
     // Arithmetic operators
     #[token("+")]

@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use lugli_common::Value;
+use lugli_common::{StringPool, Value};
 use std::{cell::RefCell, rc::Rc};
 
 mod basic_tests {
@@ -7,8 +7,9 @@ mod basic_tests {
 
     #[test]
     fn test_value_creation() {
+        let mut pool = StringPool::new();
         let number = Value::Number(42.0);
-        let string = Value::String("hello".to_string());
+        let string = Value::String(pool.intern("hello"));
         let boolean = Value::Bool(true);
         let null = Value::Null;
 
@@ -20,6 +21,7 @@ mod basic_tests {
 
     #[test]
     fn test_value_equality() {
+        let mut pool = StringPool::new();
         let num1 = Value::Number(42.0);
         let num2 = Value::Number(42.0);
         let num3 = Value::Number(43.0);
@@ -27,9 +29,9 @@ mod basic_tests {
         assert!(num1.equals(&num2));
         assert!(!num1.equals(&num3));
 
-        let str1 = Value::String("test".to_string());
-        let str2 = Value::String("test".to_string());
-        let str3 = Value::String("other".to_string());
+        let str1 = Value::String(pool.intern("test"));
+        let str2 = Value::String(pool.intern("test"));
+        let str3 = Value::String(pool.intern("other"));
 
         assert!(str1.equals(&str2));
         assert!(!str1.equals(&str3));
@@ -49,13 +51,14 @@ mod basic_tests {
 
     #[test]
     fn test_value_truthiness() {
+        let mut pool = StringPool::new();
         assert!(Value::Bool(true).is_truthy());
         assert!(!Value::Bool(false).is_truthy());
         assert!(!Value::Null.is_truthy());
         assert!(Value::Number(1.0).is_truthy());
         assert!(!Value::Number(0.0).is_truthy());
-        assert!(Value::String("hello".to_string()).is_truthy());
-        assert!(!Value::String("".to_string()).is_truthy());
+        assert!(Value::String(pool.intern("hello")).is_truthy_with_pool(&pool));
+        assert!(!Value::String(pool.intern("")).is_truthy_with_pool(&pool));
     }
 }
 
@@ -80,9 +83,12 @@ mod collection_tests {
 
     #[test]
     fn test_dict_creation() {
+        let mut pool = StringPool::new();
         let mut dict = HashMap::new();
-        dict.insert("name".to_string(), Value::String("Alice".to_string()));
-        dict.insert("age".to_string(), Value::Number(30.0));
+        let name_key = pool.intern("name");
+        let age_key = pool.intern("age");
+        dict.insert(name_key, Value::String(pool.intern("Alice")));
+        dict.insert(age_key, Value::Number(30.0));
 
         let dict_value = Value::Dict(Rc::new(RefCell::new(dict)));
         assert_eq!(dict_value.type_name(), "dict");
@@ -90,8 +96,8 @@ mod collection_tests {
         if let Value::Dict(dict_ref) = dict_value {
             let borrowed = dict_ref.borrow();
             assert_eq!(borrowed.len(), 2);
-            assert!(borrowed.get("name").unwrap().equals(&Value::String("Alice".to_string())));
-            assert!(borrowed.get("age").unwrap().equals(&Value::Number(30.0)));
+            assert!(borrowed.get(&name_key).unwrap().equals(&Value::String(pool.intern("Alice"))));
+            assert!(borrowed.get(&age_key).unwrap().equals(&Value::Number(30.0)));
         } else {
             panic!("Expected Dict value");
         }
@@ -99,19 +105,21 @@ mod collection_tests {
 
     #[test]
     fn test_dict_equality() {
+        let mut pool = StringPool::new();
+        let key = pool.intern("key");
+
         let mut dict1_map = HashMap::new();
-        dict1_map.insert("key".to_string(), Value::Number(42.0));
+        dict1_map.insert(key, Value::Number(42.0));
         let dict1 = Value::Dict(Rc::new(RefCell::new(dict1_map)));
 
         let mut dict2_map = HashMap::new();
-        dict2_map.insert("key".to_string(), Value::Number(42.0));
+        dict2_map.insert(key, Value::Number(42.0));
         let dict2 = Value::Dict(Rc::new(RefCell::new(dict2_map)));
 
         let mut dict3_map = HashMap::new();
-        dict3_map.insert("key".to_string(), Value::Number(43.0));
+        dict3_map.insert(key, Value::Number(43.0));
         let dict3 = Value::Dict(Rc::new(RefCell::new(dict3_map)));
 
-        // Note: Dict equality is not implemented in Value::equals, returns false
         assert!(!dict1.equals(&dict2));
         assert!(!dict1.equals(&dict3));
     }
@@ -121,7 +129,7 @@ mod function_tests {
     use super::*;
     use lugli_common::LugliError;
 
-    fn test_native_function(_args: &[Value]) -> Result<Value, LugliError> { Ok(Value::String("test result".to_string())) }
+    fn test_native_function(_args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> { Ok(Value::String(pool.intern("test result"))) }
 
     #[test]
     fn test_native_function_creation() {

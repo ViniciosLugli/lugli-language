@@ -39,7 +39,8 @@ impl Compiler {
                     self.emit(Instruction::Store(local_index));
                 } else {
                     // Global scope - store as global variable
-                    let name_index = self.add_constant(Value::String(name.clone()));
+                    let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                    let name_index = self.add_constant(Value::String(name_id));
                     self.emit(Instruction::StoreGlobal(name_index));
                 }
 
@@ -65,27 +66,50 @@ impl Compiler {
             } => {
                 // Store struct metadata with field names and default values
                 let struct_meta = Value::Dict(std::rc::Rc::new(std::cell::RefCell::new({
+                    let mut pool = self.bytecode.string_pool.borrow_mut();
                     let mut meta = hashbrown::HashMap::new();
-                    meta.insert("__type__".to_string(), Value::String("struct".to_string()));
-                    meta.insert("__name__".to_string(), Value::String(name.clone()));
+
+                    let type_key = pool.intern("__type__");
+                    let type_value = pool.intern("struct");
+                    meta.insert(type_key, Value::String(type_value));
+
+                    let name_key = pool.intern("__name__");
+                    let name_value = pool.intern(name);
+                    meta.insert(name_key, Value::String(name_value));
 
                     // Store field names
-                    let field_names: Vec<Value> = fields.iter().map(|(name, _)| Value::String(name.clone())).collect();
+                    let field_names: Vec<Value> = fields
+                        .iter()
+                        .map(|(name, _)| {
+                            let id = pool.intern(name);
+                            Value::String(id)
+                        })
+                        .collect();
                     let fields_list = Value::List(std::rc::Rc::new(std::cell::RefCell::new(field_names)));
-                    meta.insert("__fields__".to_string(), fields_list);
+                    let fields_key = pool.intern("__fields__");
+                    meta.insert(fields_key, fields_list);
 
                     // Store default values as a dict (field_name -> default_expr_as_constant)
                     let mut defaults_dict = hashbrown::HashMap::new();
                     for (field_name, default_expr) in fields {
                         if let Some(expr) = default_expr {
                             // Evaluate constant default expressions at compile time
+                            // Drop pool borrow before recursing
+                            drop(pool);
                             if let Some(const_value) = self.try_evaluate_constant(expr) {
-                                defaults_dict.insert(field_name.clone(), const_value);
+                                pool = self.bytecode.string_pool.borrow_mut();
+                                let field_id = pool.intern(field_name);
+                                defaults_dict.insert(field_id, const_value);
+                            } else {
+                                pool = self.bytecode.string_pool.borrow_mut();
                             }
                         }
                     }
                     let defaults = Value::Dict(std::rc::Rc::new(std::cell::RefCell::new(defaults_dict)));
-                    meta.insert("__defaults__".to_string(), defaults);
+                    let defaults_key = pool.intern("__defaults__");
+                    meta.insert(defaults_key, defaults);
+
+                    drop(pool); // Release borrow before returning
 
                     meta
                 })));
@@ -93,7 +117,8 @@ impl Compiler {
                 let struct_index = self.add_constant(struct_meta);
                 self.emit(Instruction::Constant(struct_index));
 
-                let name_index = self.add_constant(Value::String(name.clone()));
+                let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                let name_index = self.add_constant(Value::String(name_id));
                 self.emit(Instruction::StoreGlobal(name_index));
 
                 // Compile methods as separate functions with TypeName_methodName convention
@@ -206,7 +231,8 @@ impl Compiler {
                     });
                 }
 
-                let name_index = self.add_constant(Value::String(name.clone()));
+                let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                let name_index = self.add_constant(Value::String(name_id));
                 self.emit(Instruction::StoreGlobal(name_index));
 
                 Ok(true) // Handled
@@ -219,7 +245,8 @@ impl Compiler {
             } => {
                 // Convert module path to string (e.g., ["stdlib", "math"] -> "stdlib.math")
                 let module_str = module_path.join(".");
-                let module_idx = self.add_constant(Value::String(module_str.clone()));
+                let module_id = self.bytecode.string_pool.borrow_mut().intern(&module_str);
+                let module_idx = self.add_constant(Value::String(module_id));
 
                 match items {
                     None => {
