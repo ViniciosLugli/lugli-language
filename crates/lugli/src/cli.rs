@@ -11,6 +11,14 @@ pub enum CliError {
     Io(#[from] std::io::Error),
     #[error("Runtime error: {0}")]
     Runtime(String),
+    #[error("REPL error: {0}")]
+    ReplError(String),
+}
+
+impl From<rustyline::error::ReadlineError> for CliError {
+    fn from(err: rustyline::error::ReadlineError) -> Self {
+        CliError::ReplError(err.to_string())
+    }
 }
 
 pub fn run_file(file_path: &str) -> Result<(), CliError> {

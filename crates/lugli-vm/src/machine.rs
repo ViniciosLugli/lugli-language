@@ -130,6 +130,16 @@ impl Machine {
         self.open_upvalues.clear();
     }
 
+    pub fn reset_for_repl(&mut self) {
+        self.stack.clear();
+        self.ip = 0;
+        self.call_stack.clear();
+        self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0));
+        self.bytecode_registry.clear();
+        self.next_bytecode_id = 1;
+        self.open_upvalues.clear();
+    }
+
     fn peek(&self) -> Result<&Value, LugliError> { self.stack.last().ok_or_else(|| LugliError::runtime("Stack underflow")) }
 
     fn peek_n(&self, n: usize) -> Result<&Value, LugliError> {
