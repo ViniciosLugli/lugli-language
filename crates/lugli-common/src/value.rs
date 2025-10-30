@@ -323,6 +323,23 @@ impl Value {
         }
     }
 
+    pub fn type_id(&self) -> usize {
+        match self {
+            Value::Number(_) => 0,
+            Value::String(_) => 1,
+            Value::Bool(_) => 2,
+            Value::Null => 3,
+            Value::List(_) => 4,
+            Value::Dict(_) => 5,
+            Value::Function { .. } => 6,
+            Value::Closure { .. } => 7,
+            Value::NativeFunction { .. } => 8,
+            Value::StructInstance { .. } => 9,
+            Value::DateTime(_) => 10,
+            Value::Module { .. } => 11,
+        }
+    }
+
     pub fn is_truthy(&self) -> bool {
         match self {
             Value::Bool(b) => *b,

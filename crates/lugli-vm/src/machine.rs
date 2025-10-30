@@ -74,8 +74,9 @@ pub struct Machine {
     current_file: Option<PathBuf>,
     bytecode_registry: HashMap<usize, Rc<Bytecode>>,
     next_bytecode_id: usize,
-    open_upvalues: HashMap<usize, Rc<RefCell<Value>>>, // Track captured stack slots
+    open_upvalues: HashMap<usize, Rc<RefCell<Value>>>,
     method_registry: lugli_stdlib::MethodRegistry,
+    method_cache: HashMap<(usize, usize), u32>,
 }
 
 impl Machine {
@@ -107,9 +108,10 @@ impl Machine {
             module_resolver: ModuleResolver::new(),
             current_file: None,
             bytecode_registry: HashMap::new(),
-            next_bytecode_id: 1, // Start at 1, main bytecode uses ID 0
+            next_bytecode_id: 1,
             open_upvalues: HashMap::new(),
             method_registry: lugli_stdlib::MethodRegistry::new(),
+            method_cache: HashMap::new(),
         }
     }
 
@@ -1266,9 +1268,20 @@ impl Machine {
                         let args_end = self.stack.len();
                         let args: Vec<Value> = self.stack[args_start..args_end].to_vec();
 
-                        let type_name = object.type_name();
+                        // Hash-based method lookup with cache
+                        let type_id = object.type_id();
+                        let cache_key = (type_id, *method_name_index);
+
+                        let hash = if let Some(&h) = self.method_cache.get(&cache_key) {
+                            h
+                        } else {
+                            let h = lugli_stdlib::methods::hash_method(object.type_name(), &method_name);
+                            self.method_cache.insert(cache_key, h);
+                            h
+                        };
+
                         let mut pool = bytecode.string_pool.borrow_mut();
-                        self.method_registry.call(type_name, &method_name, &args, &mut pool)?
+                        self.method_registry.call_by_hash(hash, &args, &mut pool)?
                     }
                     Value::Module {
                         exports, ..
