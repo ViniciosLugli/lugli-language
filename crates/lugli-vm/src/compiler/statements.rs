@@ -30,18 +30,18 @@ impl Compiler {
                     self.compile_expr(init)?;
                 } else {
                     let null_index = self.add_constant(Value::Null);
-                    self.emit(Instruction::Constant(null_index));
+                    self.emit_unknown(Instruction::Constant(null_index));
                 }
 
                 // Emit appropriate store instruction
                 if let Some(local_index) = storage_info {
                     // Local scope - store as local variable
-                    self.emit(Instruction::Store(local_index));
+                    self.emit_unknown(Instruction::Store(local_index));
                 } else {
                     // Global scope - store as global variable
                     let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
                     let name_index = self.add_constant(Value::String(name_id));
-                    self.emit(Instruction::StoreGlobal(name_index));
+                    self.emit_unknown(Instruction::StoreGlobal(name_index));
                 }
 
                 Ok(true) // Handled
@@ -53,9 +53,9 @@ impl Compiler {
                     self.compile_expr(val)?;
                 } else {
                     let null_index = self.add_constant(Value::Null);
-                    self.emit(Instruction::Constant(null_index));
+                    self.emit_unknown(Instruction::Constant(null_index));
                 }
-                self.emit(Instruction::Return);
+                self.emit_unknown(Instruction::Return);
                 Ok(true) // Handled
             }
             Stmt::StructDecl {
@@ -116,11 +116,11 @@ impl Compiler {
                 })));
 
                 let struct_index = self.add_constant(struct_meta);
-                self.emit(Instruction::Constant(struct_index));
+                self.emit_unknown(Instruction::Constant(struct_index));
 
                 let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
                 let name_index = self.add_constant(Value::String(name_id));
-                self.emit(Instruction::StoreGlobal(name_index));
+                self.emit_unknown(Instruction::StoreGlobal(name_index));
 
                 // Compile methods as separate functions with TypeName_methodName convention
                 for method in methods {
@@ -200,8 +200,8 @@ impl Compiler {
                 // Add implicit return if needed
                 if !matches!(body.last(), Some(Stmt::Return { .. })) {
                     let null_index = self.add_constant(Value::Null);
-                    self.emit(Instruction::Constant(null_index));
-                    self.emit(Instruction::Return);
+                    self.emit_unknown(Instruction::Constant(null_index));
+                    self.emit_unknown(Instruction::Return);
                 }
 
                 self.patch_jump(jump_over_body)?;
@@ -226,12 +226,12 @@ impl Compiler {
                 // Otherwise, use regular DefineFunction
                 if captures.is_empty() {
                     // No captures - regular function
-                    self.emit(Instruction::DefineFunction(function_index));
+                    self.emit_unknown(Instruction::DefineFunction(function_index));
                 } else {
                     // Has captures - create closure
                     let capture_indices: Vec<usize> = captures.iter().filter_map(|name| saved_locals.get(name).copied()).collect();
 
-                    self.emit(Instruction::MakeClosure {
+                    self.emit_unknown(Instruction::MakeClosure {
                         function_index,
                         capture_indices,
                     });
@@ -239,7 +239,7 @@ impl Compiler {
 
                 let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
                 let name_index = self.add_constant(Value::String(name_id));
-                self.emit(Instruction::StoreGlobal(name_index));
+                self.emit_unknown(Instruction::StoreGlobal(name_index));
 
                 Ok(true) // Handled
             }
@@ -261,7 +261,7 @@ impl Compiler {
                         let bind_name = alias.clone().unwrap_or_else(|| module_path.last().unwrap().clone());
 
                         // ImportModule stores directly in globals with no stack effect
-                        self.emit(Instruction::ImportModule {
+                        self.emit_unknown(Instruction::ImportModule {
                             module_idx,
                             bind_name,
                         });
@@ -269,7 +269,7 @@ impl Compiler {
                     Some(item_names) => {
                         // from module import item1, item2
                         // ImportFrom stores directly in globals with no stack effect
-                        self.emit(Instruction::ImportFrom {
+                        self.emit_unknown(Instruction::ImportFrom {
                             module_idx,
                             names: item_names.clone(),
                         });

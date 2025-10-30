@@ -183,7 +183,6 @@ impl Machine {
             .ok_or_else(|| LugliError::runtime(format!("Invalid constant index {} (total: {})", index, bytecode.constants.len())))
     }
 
-    #[allow(dead_code)]
     fn get_source_context(&self, bytecode: &Bytecode) -> Option<lugli_common::SourceContext> {
         let location = bytecode.get_location(self.ip)?;
         if location.line == 0 {
@@ -465,7 +464,14 @@ impl Machine {
                 }
                 Err(e) => {
                     if let LugliError::Runtime(data) = e {
-                        return Err(LugliError::runtime_with_trace(data.message, self.generate_stack_trace(bytecode)));
+                        let context = self.get_source_context(bytecode);
+                        return Err(LugliError::runtime_full(
+                            data.message,
+                            data.code,
+                            context.or(data.context),
+                            data.suggestion,
+                            self.generate_stack_trace(bytecode),
+                        ));
                     } else {
                         return Err(e);
                     }
@@ -934,6 +940,15 @@ impl Machine {
 
                 if let Value::String(name_id) = prop_name {
                     if let Value::Dict(dict_ref) = &object {
+                        // Detect potential circular reference (self-assignment)
+                        if let Value::Dict(value_dict_ref) = &value {
+                            if Rc::ptr_eq(dict_ref, value_dict_ref) {
+                                eprintln!("⚠️  WARNING: Assigning dictionary to itself creates a circular reference");
+                                eprintln!("   This will cause a memory leak as Rc reference count never reaches 0");
+                                eprintln!("   Consider using weak references or avoid circular structures");
+                            }
+                        }
+
                         dict_ref
                             .try_borrow_mut()
                             .map_err(|_| LugliError::runtime("Cannot modify struct while it's being used"))?

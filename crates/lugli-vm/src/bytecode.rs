@@ -1,7 +1,7 @@
 use lugli_common::{Span, StringPool, Value};
 use std::cell::RefCell;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Instruction {
     Constant(usize),
 
@@ -91,6 +91,25 @@ impl SourceLocation {
             line: 0,
             column: 0,
         }
+    }
+
+    pub fn to_source_context(&self, source_code: Option<&String>) -> lugli_common::SourceContext {
+        use lugli_common::SourceContext;
+
+        let mut context = SourceContext::new(
+            self.file_path.clone(),
+            self.line,
+            self.column,
+            self.span,
+        );
+
+        if let Some(source) = source_code {
+            if let Some(source_line) = source.lines().nth(self.line.saturating_sub(1)) {
+                context = context.with_source(source_line.to_string());
+            }
+        }
+
+        context
     }
 }
 

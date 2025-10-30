@@ -5,7 +5,10 @@ use lugli_common::{LugliError, Span, Value};
 
 mod control_flow;
 mod expressions;
+mod optimizer;
 mod statements;
+
+use optimizer::PeepholeOptimizer;
 
 pub struct CompilerDebug {
     pub trace_emit: bool,
@@ -76,7 +79,7 @@ impl Compiler {
 
             // Pop intermediate expression results except for the last statement
             if i < stmt_count - 1 && matches!(stmt, lugli_ast::Stmt::Expression { .. }) {
-                self.emit(Instruction::Pop);
+                self.emit_unknown(Instruction::Pop);
             }
         }
 
@@ -87,9 +90,15 @@ impl Compiler {
                 || !matches!(program.statements.last(), Some(lugli_ast::Stmt::Expression { .. }) | Some(lugli_ast::Stmt::Return { .. }))
             {
                 let null_index = self.add_constant(Value::Null);
-                self.emit(Instruction::Constant(null_index));
+                self.emit_unknown(Instruction::Constant(null_index));
             }
-            self.emit(Instruction::Return);
+            self.emit_unknown(Instruction::Return);
+        }
+
+        // Apply peephole optimizations if enabled
+        if std::env::var("LUGLI_NO_OPTIMIZE").is_err() {
+            let optimizer = PeepholeOptimizer::new();
+            self.bytecode.instructions = optimizer.optimize(std::mem::take(&mut self.bytecode.instructions));
         }
 
         Ok(std::mem::take(&mut self.bytecode))
@@ -113,17 +122,11 @@ impl Compiler {
     // Helper methods used by submodules
     pub(crate) fn add_constant(&mut self, value: Value) -> usize { self.bytecode.add_constant(value) }
 
-    pub(crate) fn emit(&mut self, instruction: Instruction) {
-        if self.debug.trace_emit {
-            eprintln!("[COMPILE] Emit {:04}: {:?}", self.bytecode.instructions.len(), instruction);
-        }
-        self.debug.instruction_count += 1;
-        self.bytecode.emit(instruction);
+    pub(crate) fn get_span(&self, id: lugli_ast::NodeId) -> Span {
+        self.span_map.get(id).unwrap_or_else(|| Span::new(0, 0))
     }
 
-    // Reserved for Phase 2: Apply source locations to all emitted instructions
-    #[allow(dead_code)]
-    pub(crate) fn emit_at(&mut self, instruction: Instruction, span: Span) {
+    pub(crate) fn emit(&mut self, instruction: Instruction, span: Span) {
         if self.debug.trace_emit {
             eprintln!("[COMPILE] Emit {:04}: {:?} at {:?}", self.bytecode.instructions.len(), instruction, span);
         }
@@ -132,7 +135,15 @@ impl Compiler {
         self.bytecode.emit_with_location(instruction, location);
     }
 
-    #[allow(dead_code)]
+    // Emit without span for backwards compatibility during migration
+    pub(crate) fn emit_unknown(&mut self, instruction: Instruction) {
+        if self.debug.trace_emit {
+            eprintln!("[COMPILE] Emit {:04}: {:?}", self.bytecode.instructions.len(), instruction);
+        }
+        self.debug.instruction_count += 1;
+        self.bytecode.emit(instruction);
+    }
+
     fn span_to_location(&self, span: Span) -> SourceLocation {
         if let Some(ref source) = self.source_code {
             let (line, column) = self.calculate_line_column(source, span.start);
@@ -142,7 +153,6 @@ impl Compiler {
         }
     }
 
-    #[allow(dead_code)]
     fn calculate_line_column(&self, source: &str, offset: usize) -> (usize, usize) {
         let mut line = 1;
         let mut column = 1;
@@ -176,7 +186,7 @@ impl Compiler {
 
     pub(crate) fn emit_jump(&mut self, instruction: Instruction) -> usize {
         let index = self.bytecode.instructions.len();
-        self.emit(instruction);
+        self.emit_unknown(instruction);
         index
     }
 

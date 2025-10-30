@@ -13,27 +13,27 @@ impl Compiler {
                     LiteralValue::Number(n) => {
                         // Optimize small integers to use immediate instructions
                         if n.fract() == 0.0 && *n >= -128.0 && *n <= 127.0 {
-                            self.emit(Instruction::LoadSmallInt(*n as i8));
+                            self.emit_unknown(Instruction::LoadSmallInt(*n as i8));
                         } else if n.fract() == 0.0 && *n >= -32768.0 && *n <= 32767.0 {
-                            self.emit(Instruction::LoadInt(*n as i16));
+                            self.emit_unknown(Instruction::LoadInt(*n as i16));
                         } else {
                             let constant_index = self.add_constant(Value::Number(*n));
-                            self.emit(Instruction::Constant(constant_index));
+                            self.emit_unknown(Instruction::Constant(constant_index));
                         }
                     }
                     LiteralValue::Boolean(true) => {
-                        self.emit(Instruction::LoadTrue);
+                        self.emit_unknown(Instruction::LoadTrue);
                     }
                     LiteralValue::Boolean(false) => {
-                        self.emit(Instruction::LoadFalse);
+                        self.emit_unknown(Instruction::LoadFalse);
                     }
                     LiteralValue::Null => {
-                        self.emit(Instruction::LoadNull);
+                        self.emit_unknown(Instruction::LoadNull);
                     }
                     LiteralValue::String(s) => {
                         let id = self.bytecode.string_pool.borrow_mut().intern(s);
                         let constant_index = self.add_constant(Value::String(id));
-                        self.emit(Instruction::Constant(constant_index));
+                        self.emit_unknown(Instruction::Constant(constant_index));
                     }
                 }
                 Ok(())
@@ -43,15 +43,15 @@ impl Compiler {
             } => {
                 // Check upvalues first (for closures)
                 if let Some(&upvalue_index) = self.upvalues.get(name) {
-                    self.emit(Instruction::LoadUpvalue(upvalue_index));
+                    self.emit_unknown(Instruction::LoadUpvalue(upvalue_index));
                     Ok(())
                 } else if let Some(&local_index) = self.locals.get(name) {
-                    self.emit(Instruction::Load(local_index));
+                    self.emit_unknown(Instruction::Load(local_index));
                     Ok(())
                 } else {
                     let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
                     let name_index = self.add_constant(Value::String(name_id));
-                    self.emit(Instruction::LoadGlobal(name_index));
+                    self.emit_unknown(Instruction::LoadGlobal(name_index));
                     Ok(())
                 }
             }
@@ -74,9 +74,9 @@ impl Compiler {
                             if n.fract() == 0.0 && *n >= -128.0 && *n <= 127.0 {
                                 self.compile_expr(left)?;
                                 match operator {
-                                    lugli_lexer::TokenKind::Plus => self.emit(Instruction::AddInt(*n as i8)),
-                                    lugli_lexer::TokenKind::Minus => self.emit(Instruction::SubInt(*n as i8)),
-                                    lugli_lexer::TokenKind::Star => self.emit(Instruction::MulInt(*n as i8)),
+                                    lugli_lexer::TokenKind::Plus => self.emit_unknown(Instruction::AddInt(*n as i8)),
+                                    lugli_lexer::TokenKind::Minus => self.emit_unknown(Instruction::SubInt(*n as i8)),
+                                    lugli_lexer::TokenKind::Star => self.emit_unknown(Instruction::MulInt(*n as i8)),
                                     _ => unreachable!(),
                                 }
                                 true
@@ -96,21 +96,21 @@ impl Compiler {
                     self.compile_expr(right)?;
 
                     match operator {
-                        lugli_lexer::TokenKind::Plus => self.emit(Instruction::Add),
-                        lugli_lexer::TokenKind::Minus => self.emit(Instruction::Subtract),
-                        lugli_lexer::TokenKind::Star => self.emit(Instruction::Multiply),
-                        lugli_lexer::TokenKind::Slash => self.emit(Instruction::Divide),
-                        lugli_lexer::TokenKind::IntegerDivision => self.emit(Instruction::IntegerDivide),
-                        lugli_lexer::TokenKind::Percent => self.emit(Instruction::Modulo),
-                        lugli_lexer::TokenKind::Power => self.emit(Instruction::Power),
-                        lugli_lexer::TokenKind::EqualEqual => self.emit(Instruction::Equal),
-                        lugli_lexer::TokenKind::BangEqual => self.emit(Instruction::NotEqual),
-                        lugli_lexer::TokenKind::Greater => self.emit(Instruction::Greater),
-                        lugli_lexer::TokenKind::GreaterEqual => self.emit(Instruction::GreaterEqual),
-                        lugli_lexer::TokenKind::Less => self.emit(Instruction::Less),
-                        lugli_lexer::TokenKind::LessEqual => self.emit(Instruction::LessEqual),
-                        lugli_lexer::TokenKind::And => self.emit(Instruction::And),
-                        lugli_lexer::TokenKind::Or => self.emit(Instruction::Or),
+                        lugli_lexer::TokenKind::Plus => self.emit_unknown(Instruction::Add),
+                        lugli_lexer::TokenKind::Minus => self.emit_unknown(Instruction::Subtract),
+                        lugli_lexer::TokenKind::Star => self.emit_unknown(Instruction::Multiply),
+                        lugli_lexer::TokenKind::Slash => self.emit_unknown(Instruction::Divide),
+                        lugli_lexer::TokenKind::IntegerDivision => self.emit_unknown(Instruction::IntegerDivide),
+                        lugli_lexer::TokenKind::Percent => self.emit_unknown(Instruction::Modulo),
+                        lugli_lexer::TokenKind::Power => self.emit_unknown(Instruction::Power),
+                        lugli_lexer::TokenKind::EqualEqual => self.emit_unknown(Instruction::Equal),
+                        lugli_lexer::TokenKind::BangEqual => self.emit_unknown(Instruction::NotEqual),
+                        lugli_lexer::TokenKind::Greater => self.emit_unknown(Instruction::Greater),
+                        lugli_lexer::TokenKind::GreaterEqual => self.emit_unknown(Instruction::GreaterEqual),
+                        lugli_lexer::TokenKind::Less => self.emit_unknown(Instruction::Less),
+                        lugli_lexer::TokenKind::LessEqual => self.emit_unknown(Instruction::LessEqual),
+                        lugli_lexer::TokenKind::And => self.emit_unknown(Instruction::And),
+                        lugli_lexer::TokenKind::Or => self.emit_unknown(Instruction::Or),
                         _ => return Err(LugliError::runtime(format!("Unsupported binary operator: {:?}", operator))),
                     }
                 }
@@ -124,8 +124,8 @@ impl Compiler {
                 self.compile_expr(operand)?;
 
                 match operator {
-                    lugli_lexer::TokenKind::Minus => self.emit(Instruction::Negate),
-                    lugli_lexer::TokenKind::Bang => self.emit(Instruction::Not),
+                    lugli_lexer::TokenKind::Minus => self.emit_unknown(Instruction::Negate),
+                    lugli_lexer::TokenKind::Bang => self.emit_unknown(Instruction::Not),
                     _ => return Err(LugliError::runtime(format!("Unsupported unary operator: {:?}", operator))),
                 }
                 Ok(())
@@ -161,7 +161,7 @@ impl Compiler {
                     // Add method name as constant and emit CallMethod instruction
                     let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
                     let name_index = self.add_constant(Value::String(name_id));
-                    self.emit(Instruction::CallMethod(name_index, arguments.len() as u8));
+                    self.emit_unknown(Instruction::CallMethod(name_index, arguments.len() as u8));
                 } else {
                     // Regular function call
                     // Compile arguments first (they'll be on stack in order)
@@ -178,7 +178,7 @@ impl Compiler {
                     self.compile_expr(callee)?;
 
                     // Emit call instruction with argument count
-                    self.emit(Instruction::Call(arguments.len() as u8));
+                    self.emit_unknown(Instruction::Call(arguments.len() as u8));
                 }
                 Ok(())
             }
@@ -196,7 +196,7 @@ impl Compiler {
                     // This is a variable access, not property access
                     let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
                     let name_index = self.add_constant(Value::String(name_id));
-                    self.emit(Instruction::LoadGlobal(name_index));
+                    self.emit_unknown(Instruction::LoadGlobal(name_index));
                     return Ok(());
                 }
 
@@ -207,7 +207,7 @@ impl Compiler {
                 // Add property name as constant and emit GetProperty instruction
                 let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
                 let name_index = self.add_constant(Value::String(name_id));
-                self.emit(Instruction::GetProperty(name_index));
+                self.emit_unknown(Instruction::GetProperty(name_index));
                 Ok(())
             }
             Expr::Set {
@@ -227,18 +227,18 @@ impl Compiler {
 
                     // Check if it's a local variable first
                     if let Some(&local_index) = self.locals.get(name) {
-                        self.emit(Instruction::Store(local_index));
-                        self.emit(Instruction::Load(local_index));
+                        self.emit_unknown(Instruction::Store(local_index));
+                        self.emit_unknown(Instruction::Load(local_index));
                     } else if let Some(&upvalue_index) = self.upvalues.get(name) {
                         // It's an upvalue (captured from parent scope)
-                        self.emit(Instruction::StoreUpvalue(upvalue_index));
-                        self.emit(Instruction::LoadUpvalue(upvalue_index));
+                        self.emit_unknown(Instruction::StoreUpvalue(upvalue_index));
+                        self.emit_unknown(Instruction::LoadUpvalue(upvalue_index));
                     } else {
                         // It's a global variable
                         let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
                         let name_index = self.add_constant(Value::String(name_id));
-                        self.emit(Instruction::StoreGlobal(name_index));
-                        self.emit(Instruction::LoadGlobal(name_index));
+                        self.emit_unknown(Instruction::StoreGlobal(name_index));
+                        self.emit_unknown(Instruction::LoadGlobal(name_index));
                     }
                     return Ok(());
                 }
@@ -259,7 +259,7 @@ impl Compiler {
                         self.compile_expr(index_expr)?;
                         self.compile_expr(value_expr)?;
 
-                        self.emit(Instruction::SetIndex);
+                        self.emit_unknown(Instruction::SetIndex);
                         return Ok(());
                     } else {
                         return Err(LugliError::runtime("Invalid index assignment value"));
@@ -271,7 +271,7 @@ impl Compiler {
 
                 let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
                 let name_index = self.add_constant(Value::String(name_id));
-                self.emit(Instruction::SetProperty(name_index));
+                self.emit_unknown(Instruction::SetProperty(name_index));
 
                 Ok(())
             }
@@ -284,7 +284,7 @@ impl Compiler {
                 }
 
                 // Emit MakeList instruction with element count
-                self.emit(Instruction::MakeList(elements.len()));
+                self.emit_unknown(Instruction::MakeList(elements.len()));
                 Ok(())
             }
             Expr::Dict {
@@ -297,7 +297,7 @@ impl Compiler {
                 }
 
                 // Emit MakeDict instruction with pair count
-                self.emit(Instruction::MakeDict(pairs.len()));
+                self.emit_unknown(Instruction::MakeDict(pairs.len()));
                 Ok(())
             }
             Expr::Index {
@@ -312,7 +312,7 @@ impl Compiler {
                 self.compile_expr(index)?;
 
                 // Emit GetIndex instruction
-                self.emit(Instruction::GetIndex);
+                self.emit_unknown(Instruction::GetIndex);
                 Ok(())
             }
             Expr::FString {
@@ -325,7 +325,7 @@ impl Compiler {
                     // Empty f-string => ""
                     let empty_id = self.bytecode.string_pool.borrow_mut().intern("");
                     let empty_str = self.add_constant(Value::String(empty_id));
-                    self.emit(Instruction::Constant(empty_str));
+                    self.emit_unknown(Instruction::Constant(empty_str));
                     return Ok(());
                 }
 
@@ -334,11 +334,11 @@ impl Compiler {
                     FStringPart::Text(text) => {
                         let text_id = self.bytecode.string_pool.borrow_mut().intern(text);
                         let const_idx = self.add_constant(Value::String(text_id));
-                        self.emit(Instruction::Constant(const_idx));
+                        self.emit_unknown(Instruction::Constant(const_idx));
                     }
                     FStringPart::Expression(expr) => {
                         self.compile_expr(expr)?;
-                        self.emit(Instruction::ToString);
+                        self.emit_unknown(Instruction::ToString);
                     }
                 }
 
@@ -348,14 +348,14 @@ impl Compiler {
                         FStringPart::Text(text) => {
                             let text_id = self.bytecode.string_pool.borrow_mut().intern(text);
                             let const_idx = self.add_constant(Value::String(text_id));
-                            self.emit(Instruction::Constant(const_idx));
+                            self.emit_unknown(Instruction::Constant(const_idx));
                         }
                         FStringPart::Expression(expr) => {
                             self.compile_expr(expr)?;
-                            self.emit(Instruction::ToString);
+                            self.emit_unknown(Instruction::ToString);
                         }
                     }
-                    self.emit(Instruction::Add); // String concatenation uses Add
+                    self.emit_unknown(Instruction::Add); // String concatenation uses Add
                 }
 
                 Ok(())
@@ -407,8 +407,8 @@ impl Compiler {
                 // Add implicit return if needed
                 if !matches!(body.last(), Some(lugli_ast::Stmt::Return { .. })) {
                     let null_index = self.add_constant(Value::Null);
-                    self.emit(Instruction::Constant(null_index));
-                    self.emit(Instruction::Return);
+                    self.emit_unknown(Instruction::Constant(null_index));
+                    self.emit_unknown(Instruction::Return);
                 }
 
                 // Patch the jump to skip over the function body
@@ -431,7 +431,7 @@ impl Compiler {
                         bytecode_id: 0, // Main bytecode
                     };
                     let function_index = self.add_constant(function_value);
-                    self.emit(Instruction::Constant(function_index));
+                    self.emit_unknown(Instruction::Constant(function_index));
                 } else {
                     // Has captures - emit MakeClosure instruction
                     // First create the base function template
@@ -447,7 +447,7 @@ impl Compiler {
                     let capture_indices: Vec<usize> = captures.iter().filter_map(|name| saved_locals.get(name).copied()).collect();
 
                     // Emit MakeClosure - VM will create closure with upvalues from stack
-                    self.emit(Instruction::MakeClosure {
+                    self.emit_unknown(Instruction::MakeClosure {
                         function_index,
                         capture_indices,
                     });
@@ -476,23 +476,23 @@ impl Compiler {
                 // 5. Leave result on stack
 
                 // Create empty list []
-                self.emit(Instruction::MakeList(0));
+                self.emit_unknown(Instruction::MakeList(0));
 
                 // Store result list in temporary local
                 let depth = self.loop_depth;
                 let result_local = self.declare_local(format!("__comp_result_{}", depth));
-                self.emit(Instruction::Store(result_local));
+                self.emit_unknown(Instruction::Store(result_local));
 
                 // Compile and store the iterable
                 self.compile_expr(iterable)?;
                 let iterable_local = self.declare_local(format!("__comp_iter_{}", depth));
-                self.emit(Instruction::Store(iterable_local));
+                self.emit_unknown(Instruction::Store(iterable_local));
 
                 // Initialize index to 0
                 let index_local = self.declare_local(format!("__comp_idx_{}", depth));
                 let zero_constant = self.add_constant(Value::Number(0.0));
-                self.emit(Instruction::Constant(zero_constant));
-                self.emit(Instruction::Store(index_local));
+                self.emit_unknown(Instruction::Constant(zero_constant));
+                self.emit_unknown(Instruction::Store(index_local));
 
                 // Declare the loop variable
                 let var_local = self.declare_local(variable.clone());
@@ -501,19 +501,19 @@ impl Compiler {
                 let loop_start = self.current_instruction();
 
                 // Check if index < len(iterable)
-                self.emit(Instruction::Load(index_local));
-                self.emit(Instruction::Load(iterable_local));
+                self.emit_unknown(Instruction::Load(index_local));
+                self.emit_unknown(Instruction::Load(iterable_local));
                 let len_id = self.bytecode.string_pool.borrow_mut().intern("len");
                 let len_name = self.add_constant(Value::String(len_id));
-                self.emit(Instruction::CallMethod(len_name, 0));
-                self.emit(Instruction::Less);
+                self.emit_unknown(Instruction::CallMethod(len_name, 0));
+                self.emit_unknown(Instruction::Less);
                 let exit_jump = self.emit_jump(Instruction::JumpIfFalse(0));
 
                 // Get element at current index
-                self.emit(Instruction::Load(iterable_local));
-                self.emit(Instruction::Load(index_local));
-                self.emit(Instruction::GetIndex);
-                self.emit(Instruction::Store(var_local));
+                self.emit_unknown(Instruction::Load(iterable_local));
+                self.emit_unknown(Instruction::Load(index_local));
+                self.emit_unknown(Instruction::GetIndex);
+                self.emit_unknown(Instruction::Store(var_local));
 
                 // Optional condition check
                 if let Some(cond) = condition.as_ref() {
@@ -521,39 +521,39 @@ impl Compiler {
                     let skip_append = self.emit_jump(Instruction::JumpIfFalse(0));
 
                     // Append element to result list
-                    self.emit(Instruction::Load(result_local));
+                    self.emit_unknown(Instruction::Load(result_local));
                     self.compile_expr(element)?;
                     let push_id = self.bytecode.string_pool.borrow_mut().intern("push");
                     let push_const = self.add_constant(Value::String(push_id));
-                    self.emit(Instruction::CallMethod(push_const, 1));
-                    self.emit(Instruction::Pop); // Pop return value from push
+                    self.emit_unknown(Instruction::CallMethod(push_const, 1));
+                    self.emit_unknown(Instruction::Pop); // Pop return value from push
 
                     self.patch_jump(skip_append)?;
                 } else {
                     // No condition - always append
-                    self.emit(Instruction::Load(result_local));
+                    self.emit_unknown(Instruction::Load(result_local));
                     self.compile_expr(element)?;
                     let push_id = self.bytecode.string_pool.borrow_mut().intern("push");
                     let push_const = self.add_constant(Value::String(push_id));
-                    self.emit(Instruction::CallMethod(push_const, 1));
-                    self.emit(Instruction::Pop); // Pop return value from push
+                    self.emit_unknown(Instruction::CallMethod(push_const, 1));
+                    self.emit_unknown(Instruction::Pop); // Pop return value from push
                 }
 
                 // Increment index
-                self.emit(Instruction::Load(index_local));
+                self.emit_unknown(Instruction::Load(index_local));
                 let one_constant = self.add_constant(Value::Number(1.0));
-                self.emit(Instruction::Constant(one_constant));
-                self.emit(Instruction::Add);
-                self.emit(Instruction::Store(index_local));
+                self.emit_unknown(Instruction::Constant(one_constant));
+                self.emit_unknown(Instruction::Add);
+                self.emit_unknown(Instruction::Store(index_local));
 
                 // Jump back to loop start
-                self.emit(Instruction::Loop(loop_start));
+                self.emit_unknown(Instruction::Loop(loop_start));
 
                 // Patch exit jump
                 self.patch_jump(exit_jump)?;
 
                 // Load result list onto stack
-                self.emit(Instruction::Load(result_local));
+                self.emit_unknown(Instruction::Load(result_local));
 
                 // Clean up locals (4 locals: result, iterable, index, variable)
                 self.local_count -= 4;
@@ -589,23 +589,23 @@ impl Compiler {
                     // Compile pattern test → Stack: [match_value, pattern_result]
                     match &arm.pattern {
                         Pattern::Literal(lit_val) => {
-                            self.emit(Instruction::Dup);
+                            self.emit_unknown(Instruction::Dup);
                             let lit_const = self.add_constant(self.literal_to_value(lit_val));
-                            self.emit(Instruction::Constant(lit_const));
-                            self.emit(Instruction::Equal);
+                            self.emit_unknown(Instruction::Constant(lit_const));
+                            self.emit_unknown(Instruction::Equal);
                         }
                         Pattern::Identifier(name) => {
                             // Bind match value to local variable
                             let var_local = self.declare_local(name.clone());
                             arm_locals.push(name.clone());
-                            self.emit(Instruction::Dup);
-                            self.emit(Instruction::Store(var_local)); // Store pops the dup
+                            self.emit_unknown(Instruction::Dup);
+                            self.emit_unknown(Instruction::Store(var_local)); // Store pops the dup
                             let true_const = self.add_constant(Value::Bool(true));
-                            self.emit(Instruction::Constant(true_const));
+                            self.emit_unknown(Instruction::Constant(true_const));
                         }
                         Pattern::Wildcard => {
                             let true_const = self.add_constant(Value::Bool(true));
-                            self.emit(Instruction::Constant(true_const));
+                            self.emit_unknown(Instruction::Constant(true_const));
                         }
                     }
 
@@ -633,7 +633,7 @@ impl Compiler {
 
                     // Success: pattern (and guard if present) matched
                     // Stack: [match_value]
-                    self.emit(Instruction::Pop);
+                    self.emit_unknown(Instruction::Pop);
                     // Stack: []
 
                     self.compile_expr(&arm.body)?;
