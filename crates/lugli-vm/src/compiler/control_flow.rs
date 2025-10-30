@@ -82,12 +82,12 @@ impl Compiler {
                     self.compile_stmt(stmt)?;
                     // Pop expression results to avoid stack buildup in loops
                     if matches!(stmt, Stmt::Expression { .. }) {
-                        self.emit(Instruction::Pop);
+                        self.emit_unknown(Instruction::Pop);
                     }
                 }
 
                 // Jump back to loop start
-                self.emit(Instruction::Loop(loop_start));
+                self.emit_unknown(Instruction::Loop(loop_start));
 
                 // Patch exit jump
                 self.patch_jump(exit_jump)?;
@@ -119,12 +119,12 @@ impl Compiler {
                     self.compile_stmt(stmt)?;
                     // Pop expression results to avoid stack buildup in loops
                     if matches!(stmt, Stmt::Expression { .. }) {
-                        self.emit(Instruction::Pop);
+                        self.emit_unknown(Instruction::Pop);
                     }
                 }
 
                 // Jump back to loop start (infinite loop)
-                self.emit(Instruction::Loop(loop_start));
+                self.emit_unknown(Instruction::Loop(loop_start));
 
                 // Pop loop info and patch continue/break jumps
                 if let Some((_, _, continue_jumps, break_jumps)) = self.loop_stack.pop() {
@@ -154,13 +154,13 @@ impl Compiler {
 
                 // Store the iterable
                 let iterable_local = self.declare_local(format!("__iterable_{}", depth));
-                self.emit(Instruction::Store(iterable_local));
+                self.emit_unknown(Instruction::Store(iterable_local));
 
                 // Initialize index to 0
                 let index_local = self.declare_local(format!("__index_{}", depth));
                 let zero_constant = self.add_constant(lugli_common::Value::Number(0.0));
-                self.emit(Instruction::Constant(zero_constant));
-                self.emit(Instruction::Store(index_local));
+                self.emit_unknown(Instruction::Constant(zero_constant));
+                self.emit_unknown(Instruction::Store(index_local));
 
                 // Declare the loop variable
                 let var_local = self.declare_local(variable.clone());
@@ -171,29 +171,29 @@ impl Compiler {
                 self.loop_stack.push((loop_start, 0, Vec::new(), Vec::new()));
 
                 // Check if index < len(iterable)
-                self.emit(Instruction::Load(index_local));
-                self.emit(Instruction::Load(iterable_local));
+                self.emit_unknown(Instruction::Load(index_local));
+                self.emit_unknown(Instruction::Load(iterable_local));
                 let len_id = self.bytecode.string_pool.borrow_mut().intern("len");
                 let len_name = self.add_constant(lugli_common::Value::String(len_id));
-                self.emit(Instruction::CallMethod(len_name, 0));
+                self.emit_unknown(Instruction::CallMethod(len_name, 0));
 
                 // Now stack has: [index, length]
                 // Check if index < length
-                self.emit(Instruction::Less);
+                self.emit_unknown(Instruction::Less);
                 let exit_jump = self.emit_jump(Instruction::JumpIfFalse(0));
 
                 // Get element at current index
-                self.emit(Instruction::Load(iterable_local));
-                self.emit(Instruction::Load(index_local));
-                self.emit(Instruction::GetIndex);
-                self.emit(Instruction::Store(var_local));
+                self.emit_unknown(Instruction::Load(iterable_local));
+                self.emit_unknown(Instruction::Load(index_local));
+                self.emit_unknown(Instruction::GetIndex);
+                self.emit_unknown(Instruction::Store(var_local));
 
                 // Compile body
                 for stmt in body {
                     self.compile_stmt(stmt)?;
                     // Pop expression results to avoid stack buildup in loops
                     if matches!(stmt, Stmt::Expression { .. }) {
-                        self.emit(Instruction::Pop);
+                        self.emit_unknown(Instruction::Pop);
                     }
                 }
 
@@ -208,14 +208,14 @@ impl Compiler {
                 }
 
                 // Increment index
-                self.emit(Instruction::Load(index_local));
+                self.emit_unknown(Instruction::Load(index_local));
                 let one_constant = self.add_constant(lugli_common::Value::Number(1.0));
-                self.emit(Instruction::Constant(one_constant));
-                self.emit(Instruction::Add);
-                self.emit(Instruction::Store(index_local));
+                self.emit_unknown(Instruction::Constant(one_constant));
+                self.emit_unknown(Instruction::Add);
+                self.emit_unknown(Instruction::Store(index_local));
 
                 // Jump back to loop start
-                self.emit(Instruction::Loop(loop_start));
+                self.emit_unknown(Instruction::Loop(loop_start));
 
                 // Patch exit jump
                 self.patch_jump(exit_jump)?;

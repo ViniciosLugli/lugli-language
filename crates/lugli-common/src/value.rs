@@ -13,13 +13,43 @@ use std::{
 
 pub type NativeFunction = fn(&[Value], &mut StringPool) -> Result<Value, LugliError>;
 
+/// Runtime value representation for Lugli language.
+///
+/// # Memory Management & Circular References
+///
+/// **WARNING**: Circular references in reference-counted types (Dict, List, Closure, StructInstance)
+/// will cause memory leaks. Rust's `Rc<RefCell<>>` uses reference counting without cycle detection.
+///
+/// ## Example of Memory Leak:
+/// ```lugli
+/// let x = {}
+/// x.self = x  # Creates cycle: x → Dict → x
+/// # When x goes out of scope, Rc count never reaches 0 → memory leak
+/// ```
+///
+/// ## Mitigation Strategies:
+/// 1. **Avoid self-references**: Don't assign objects to themselves or create cycles
+/// 2. **Use GC monitoring**: The `GarbageCollector` tracks allocations (see `lugli-common::gc`)
+/// 3. **Break cycles manually**: Set fields to `null` before dropping large structures
+/// 4. **Weak references**: Future versions will support `WeakDict` and `WeakList` variants
+///
+/// ## Similar to:
+/// - **Python**: Uses refcounting + cycle detection (we only have refcounting)
+/// - **Ruby**: Uses tri-color marking GC (we have basic mark-sweep)
+/// - **Lua**: Uses incremental GC (our GC is adaptive threshold-based)
+///
+/// ## Production Usage:
+/// For long-running applications, monitor memory usage and avoid circular data structures.
+/// Use the VM's GC statistics (`GarbageCollector::stats()`) to tune thresholds.
 #[derive(Clone)]
 pub enum Value {
     Number(f64),
     String(StringId),
     Bool(bool),
     Null,
+    /// List with potential for circular references (see type docs)
     List(Rc<RefCell<Vec<Value>>>),
+    /// Dictionary with potential for circular references (see type docs)
     Dict(Rc<RefCell<HashMap<StringId, Value>>>),
     Function { name: String, params: Vec<String>, body_start: usize, bytecode_id: usize },
     Closure { name: String, params: Vec<String>, body_start: usize, bytecode_id: usize, upvalues: Vec<Rc<RefCell<Value>>> },
@@ -43,7 +73,7 @@ impl PartialEq for Value {
                         if a_ref.len() != b_ref.len() {
                             return false;
                         }
-                        a_ref.iter().all(|(k, v)| b_ref.get(k).map_or(false, |v2| v.equals(v2)))
+                        a_ref.iter().all(|(k, v)| b_ref.get(k).is_some_and(|v2| v.equals(v2)))
                     }
                     _ => false,
                 }
@@ -366,7 +396,7 @@ impl Value {
                         if a_ref.len() != b_ref.len() {
                             return false;
                         }
-                        a_ref.iter().all(|(k, v)| b_ref.get(k).map_or(false, |v2| v.equals(v2)))
+                        a_ref.iter().all(|(k, v)| b_ref.get(k).is_some_and(|v2| v.equals(v2)))
                     }
                     _ => false,
                 }
