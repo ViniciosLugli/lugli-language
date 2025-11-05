@@ -114,7 +114,7 @@ fn show_history(editor: &Editor<super::ReplHelper, FileHistory>) {
     }
 
     // Show last 20 entries
-    let start = if len > 20 { len - 20 } else { 0 };
+    let start = len.saturating_sub(20);
 
     for (i, entry) in history.iter().enumerate().skip(start) {
         println!("  {} {}", format!("{}:", i + 1).bright_black(), entry);

@@ -290,21 +290,31 @@ let result = process.run("ls", ["-la"])
 
 The project is organized as a **Rust workspace** with **7 professional crates** in the `crates/` directory:
 
-### Crate Dependencies (Bottom to Top)
+### Crate Dependencies
+
+**Actual Dependency Graph:**
 
 ```
-lugli (CLI)
+lugli (CLI) → all crates
     ↓
-lugli-vm (Bytecode Virtual Machine) ← lugli-stdlib (Standard Library)
-    ↓                                      ↓
-lugli-parser (AST → Bytecode Compiler)     ↓
-    ↓                                      ↓
-lugli-ast (AST Definitions)                ↓
-    ↓                                      ↓
-lugli-lexer (Source → Tokens)              ↓
-    ↓                                      ↓
-    └────── lugli-common (Shared Types) ──┘
+lugli-vm → lugli-common + lugli-lexer + lugli-ast + lugli-parser + lugli-stdlib
+    ↓
+lugli-parser → lugli-common + lugli-lexer + lugli-ast
+    ↓
+lugli-ast → lugli-common + lugli-lexer
+    ↓
+lugli-lexer → lugli-common
+    ↓
+lugli-stdlib → lugli-common
+    ↓
+lugli-common (Foundation)
 ```
+
+**Key Characteristics:**
+- `lugli-common` is a foundational crate imported by all others (shared types)
+- `lugli` CLI depends directly on all crates for maximum flexibility
+- Each layer depends on all layers below it, not just the immediate neighbor
+- No circular dependencies (clean dependency tree)
 
 ### Core Components
 

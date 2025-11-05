@@ -345,7 +345,7 @@ impl<'a> Parser<'a> {
         loop {
             items.push(parse_fn(self)?);
 
-            if !self.match_any(&[separator.clone()]) {
+            if !self.match_any(std::slice::from_ref(separator)) {
                 break;
             }
 

@@ -1,3 +1,8 @@
+//! Parser for Lugli source code.
+//!
+//! Transforms tokens into an Abstract Syntax Tree (AST) using recursive descent parsing
+//! with Pratt parsing for expressions. Includes error recovery and detailed error messages.
+
 use lugli_ast::{Program, SpanMap};
 use lugli_lexer::LexError;
 use thiserror::Error;

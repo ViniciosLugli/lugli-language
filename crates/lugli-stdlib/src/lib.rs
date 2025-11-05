@@ -1,3 +1,8 @@
+//! Standard library implementation for Lugli.
+//!
+//! Provides native functions and method implementations for built-in types (List, Dict, String).
+//! Functions are registered with the VM and callable from Lugli code.
+
 use lugli_common::{LugliError, StringPool, Value};
 
 pub mod core;

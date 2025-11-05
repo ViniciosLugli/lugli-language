@@ -71,22 +71,20 @@ impl PeepholeOptimizer {
 
         while i < instructions.len() {
             // Try 3-instruction patterns first (binary ops)
-            if i + 2 < instructions.len() {
-                if let Some(folded) = self.try_fold_binary(&instructions[i], &instructions[i + 1], &instructions[i + 2]) {
+            if i + 2 < instructions.len()
+                && let Some(folded) = self.try_fold_binary(&instructions[i], &instructions[i + 1], &instructions[i + 2]) {
                     result.push(folded);
                     i += 3;
                     continue;
                 }
-            }
 
             // Try 2-instruction patterns (unary ops)
-            if i + 1 < instructions.len() {
-                if let Some(folded) = self.try_fold_unary(&instructions[i], &instructions[i + 1]) {
+            if i + 1 < instructions.len()
+                && let Some(folded) = self.try_fold_unary(&instructions[i], &instructions[i + 1]) {
                     result.push(folded);
                     i += 2;
                     continue;
                 }
-            }
 
             // No optimization, keep instruction
             result.push(instructions[i].clone());
@@ -251,23 +249,21 @@ impl PeepholeOptimizer {
 
             // Pattern: Constant Pop → (remove both)
             // BUT: Don't remove if it might affect closure/upvalue setup
-            if i + 1 < instructions.len() {
-                if self.is_pure_constant(inst) && matches!(instructions[i + 1], Instruction::Pop) {
+            if i + 1 < instructions.len()
+                && self.is_pure_constant(inst) && matches!(instructions[i + 1], Instruction::Pop) {
                     // Check if this is near closure-related instructions
                     if !self.is_near_closure_ops(i, &instructions) {
                         i += 2;
                         continue;
                     }
                 }
-            }
 
             // Pattern: Jump to next instruction → remove jump
-            if let Instruction::Jump(target) = inst {
-                if *target == i + 1 {
+            if let Instruction::Jump(target) = inst
+                && *target == i + 1 {
                     i += 1;
                     continue;
                 }
-            }
 
             result.push(inst.clone());
 
