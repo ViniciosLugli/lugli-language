@@ -163,3 +163,47 @@ jobs:
 
       - name: Test with all features
         run: cargo test --workspace --all-features --verbose
+
+  examples:
+    name: Verify Working Examples
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Build lugli CLI
+        run: cargo build --release --bin lugli
+
+      - name: Verify working examples
+        run: |
+          echo "Testing examples in examples/working/..."
+          EXIT_CODE=0
+          for example in examples/working/*.lg; do
+            if [ -f "$example" ]; then
+              echo "Testing $example..."
+              if ./target/release/lugli run "$example"; then
+                echo "✓ $example passed"
+              else
+                echo "✗ $example failed"
+                EXIT_CODE=1
+              fi
+            fi
+          done
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "All examples passed!"
+          else
+            echo "Some examples failed!"
+            exit 1
+          fi
+
+      - name: Check example count
+        run: |
+          WORKING_COUNT=$(find examples/working -name "*.lg" | wc -l)
+          echo "Working examples: $WORKING_COUNT"
+          if [ $WORKING_COUNT -eq 0 ]; then
+            echo "Warning: No working examples found!"
+            exit 1
+          fi
