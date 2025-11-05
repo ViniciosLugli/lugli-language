@@ -1,0 +1,48 @@
+# Loops and Collections
+
+# Lists
+let numbers = [1, 2, 3, 4, 5]
+print(f"Numbers: {numbers}")
+
+# For loop
+let sum = 0
+for n in numbers {
+    sum = sum + n
+}
+print(f"Sum: {sum}")
+
+# List with negative indexing (Python-style!)
+print(f"First: {numbers[0]}")
+print(f"Last: {numbers[-1]}")
+print(f"Second to last: {numbers[-2]}")
+
+# List methods
+let fruits = []
+fruits.push("apple")
+fruits.push("banana")
+fruits.push("cherry")
+print(f"Fruits: {fruits}")
+print(f"Count: {fruits.len()}")
+
+# Dictionaries
+let person = {
+    "name": "Alice",
+    "age": 30,
+    "city": "Portland"
+}
+print(f"Person: {person}")
+let name_key = "name"
+print(f"Name: {person[name_key]}")
+
+# While loop
+let count = 0
+while count < 5 {
+    print(f"Count: {count}")
+    count = count + 1
+}
+
+# String methods
+let text = "hello world"
+print(f"Original: {text}")
+print(f"Upper: {text.upper()}")
+print(f"Length: {text.len()}")

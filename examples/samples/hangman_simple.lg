@@ -1,0 +1,87 @@
+# Simplified Hangman to test with current implementation
+print("🎮 Welcome to Hangman!")
+print("Try to guess the word letter by letter.")
+print()
+
+let word = "lugli"
+let founded = []
+
+# Initialize founded with underscores
+for i in range(len(word)) {
+    founded.push("_")
+}
+
+let attempts = 0
+let wrong_letters = []
+let MAX_ATTEMPTS = 6
+
+print("Let's start!")
+print("Word: " + founded.join(" "))
+print()
+
+# Simple game loop
+while attempts < MAX_ATTEMPTS {
+    let remaining = MAX_ATTEMPTS - attempts
+    print("Attempts remaining: " + str(remaining))
+
+    if len(wrong_letters) > 0 {
+        print("Wrong letters: " + wrong_letters.join(", "))
+    }
+
+    let letter = input("Enter a letter: ").trim().lower()
+
+    # Validate input
+    if len(letter) != 1 {
+        print("Please enter exactly one letter!")
+        continue
+    }
+
+    if !letter.is_alphabetic() {
+        print("Please enter a valid letter!")
+        continue
+    }
+
+    # Check if already guessed
+    if founded.contains(letter) || wrong_letters.contains(letter) {
+        print("You already guessed '" + letter + "'!")
+        continue
+    }
+
+    # Check the letter
+    let found = false
+    for i in range(len(word)) {
+        if word.chars()[i] == letter {
+            founded[i] = letter
+            found = true
+        }
+    }
+
+    if found {
+        print("✅ Good guess! The letter '" + letter + "' is in the word.")
+
+        # Check if won
+        if !founded.contains("_") {
+            print()
+            print("🎉 Congratulations! You won!")
+            print("The word was: " + word)
+            break
+        }
+    } else {
+        print("❌ Sorry, the letter '" + letter + "' is not in the word.")
+        wrong_letters.push(letter)
+        attempts = attempts + 1
+
+        if attempts >= MAX_ATTEMPTS {
+            print()
+            print("💀 Game Over! You ran out of attempts.")
+            print("The word was: " + word)
+            break
+        }
+    }
+
+    print()
+    print("Word: " + founded.join(" "))
+    print()
+}
+
+print("Thanks for playing Hangman! 🎮")

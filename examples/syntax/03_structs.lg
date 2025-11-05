@@ -1,0 +1,153 @@
+# Modern Struct Examples
+# Demonstrates Python+Rust hybrid struct syntax with 'self'
+
+# Basic struct definition
+struct Person {
+    name: str,
+    age: i32,
+    email: str
+}
+
+impl Person {
+    # Constructor (static method)
+    fn new(name: str, age: i32, email: str) -> Person {
+        return Person {
+            name: name,
+            age: age,
+            email: email
+        }
+    }
+
+    # Instance methods using 'self' (Python-style)
+    fn greet(self) -> str {
+        return f"Hi, I'm {self.name} and I'm {self.age} years old"
+    }
+
+    # Mutable method (Rust-style with !)
+    fn have_birthday!(mut self) {
+        self.age += 1
+        print(f"Happy birthday! {self.name} is now {self.age}")
+    }
+
+    # Query method (Rust-style with ?)
+    fn is_adult?(self) -> bool {
+        return self.age >= 18
+    }
+
+    # Method with parameters
+    fn send_email(self, subject: str, body: str) -> bool {
+        print(f"Sending email to {self.email}")
+        print(f"Subject: {subject}")
+        print(f"Body: {body}")
+        return true
+    }
+}
+
+# Struct with generic types
+struct Container<T> {
+    items: [T],
+    capacity: i32
+}
+
+impl<T> Container<T> {
+    fn new(capacity: i32) -> Container<T> {
+        return Container {
+            items: [],
+            capacity: capacity
+        }
+    }
+
+    fn add!(mut self, item: T) -> bool {
+        if self.items.len() < self.capacity {
+            self.items.push(item)
+            return true
+        }
+        return false
+    }
+
+    fn is_full?(self) -> bool {
+        return self.items.len() >= self.capacity
+    }
+
+    fn get_items(self) -> [T] {
+        return self.items
+    }
+}
+
+# Struct with inheritance-like behavior
+struct Student : Person {
+    student_id: str,
+    gpa: f64,
+    major: str
+}
+
+impl Student {
+    fn new(name: str, age: i32, email: str, student_id: str, major: str) -> Student {
+        return Student {
+            name: name,
+            age: age,
+            email: email,
+            student_id: student_id,
+            gpa: 0.0,
+            major: major
+        }
+    }
+
+    fn update_gpa!(mut self, new_gpa: f64) {
+        self.gpa = new_gpa
+        print(f"{self.name}'s GPA updated to {self.gpa}")
+    }
+
+    fn get_status(self) -> str {
+        let status = if self.gpa >= 3.5 {
+            "Dean's List"
+        } elif self.gpa >= 3.0 {
+            "Good Standing"
+        } elif self.gpa >= 2.0 {
+            "Probation"
+        } else {
+            "Academic Warning"
+        }
+        return f"{self.name} ({self.student_id}): {status}"
+    }
+}
+
+# Usage examples
+let mut person = Person::new("Alice", 25, "alice@example.com")
+print(person.greet())
+print(f"Is adult: {person.is_adult?()}")
+
+person.have_birthday!()
+person.send_email("Hello", "How are you?")
+
+# Generic container
+let mut numbers = Container::<i32>::new(5)
+numbers.add!(1)
+numbers.add!(2)
+numbers.add!(3)
+print(f"Container full: {numbers.is_full?()}")
+print(f"Items: {numbers.get_items()}")
+
+# Student example
+let mut student = Student::new("Bob", 20, "bob@university.edu", "STU123", "Computer Science")
+print(student.greet())  # Inherited from Person
+student.update_gpa!(3.7)
+print(student.get_status())
+
+# Struct literal with Python-style dict syntax
+let person2 = Person {
+    name: "Charlie",
+    age: 30,
+    email: "charlie@example.com"
+}
+
+# Destructuring (Python-style)
+let {name, age, email} = person2
+print(f"Extracted: {name}, {age}, {email}")
+
+# Pattern matching with structs
+match person {
+    Person { age: a, .. } if a >= 65 => print("Senior citizen"),
+    Person { age: a, .. } if a >= 18 => print("Adult"),
+    _ => print("Minor")
+}

@@ -1,0 +1,37 @@
+# Struct benchmark
+struct Point {
+    x
+    y
+
+    fn distance(self, other) {
+        let dx = self.x - other.x
+        let dy = self.y - other.y
+        return (dx * dx + dy * dy)
+    }
+
+    fn move_by(self, dx, dy) {
+        self.x = self.x + dx
+        self.y = self.y + dy
+    }
+}
+
+fn benchmark_structs(n) {
+    let points = []
+    mut i = 0
+    while i < n {
+        points.push(Point { x: i, y: i * 2 })
+        i = i + 1
+    }
+
+    # Calculate distances
+    let origin = Point { x: 0, y: 0 }
+    let distances = []
+    for p in points {
+        distances.push(p.distance(origin))
+    }
+
+    return distances.len()
+}
+
+# Benchmark target
+benchmark_structs(500)

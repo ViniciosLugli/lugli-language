@@ -1,0 +1,339 @@
+# Collections Examples
+# Demonstrates advanced collection operations in Python+Rust hybrid syntax
+
+import collections
+
+# Lists - Dynamic arrays
+let mut numbers = [1, 2, 3, 4, 5]
+print(f"Original list: {numbers}")
+
+# List methods
+numbers.push(6)
+numbers.append(7)  # Python-style alias
+numbers.insert(0, 0)
+print(f"After additions: {numbers}")
+
+let popped = numbers.pop()
+let removed = numbers.remove(3)  # Remove by value
+let deleted = numbers.delete(1)  # Remove by index
+print(f"Popped: {popped}, Removed: {removed}, Deleted: {deleted}")
+print(f"Final list: {numbers}")
+
+# List slicing and indexing
+let fruits = ["apple", "banana", "cherry", "date", "elderberry"]
+print(f"All fruits: {fruits}")
+print(f"First 3: {fruits[0:3]}")
+print(f"Last 2: {fruits[-2:]}")
+print(f"Every other: {fruits[::2]}")
+print(f"Reversed: {fruits[::-1]}")
+
+# List comprehensions (covered in 06_comprehensions.lg but worth reviewing)
+let squares = [x * x for x in range(1, 6)]
+let evens = [x for x in range(20) if x % 2 == 0]
+print(f"Squares: {squares}")
+print(f"Evens: {evens}")
+
+# Nested lists
+let matrix = [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+]
+
+print("Matrix:")
+for row in matrix {
+    print(f"  {row}")
+}
+
+# Flattening nested lists
+let flattened = [item for row in matrix for item in row]
+print(f"Flattened: {flattened}")
+
+# List sorting
+let mut words = ["banana", "apple", "cherry", "date"]
+words.sort()
+print(f"Sorted: {words}")
+
+let mut nums = [3, 1, 4, 1, 5, 9, 2, 6]
+nums.sort_by(|a, b| b.cmp(a))  # Reverse sort
+print(f"Reverse sorted: {nums}")
+
+# Custom sorting
+struct Person {
+    name: str,
+    age: i32
+}
+
+let mut people = [
+    Person { name: "Alice", age: 25 },
+    Person { name: "Bob", age: 20 },
+    Person { name: "Charlie", age: 30 }
+]
+
+people.sort_by_key(|p| p.age)
+print("Sorted by age:")
+for person in people {
+    print(f"  {person.name}: {person.age}")
+}
+
+# Dictionaries - Hash maps
+let mut scores = {"Alice": 95, "Bob": 87, "Charlie": 92}
+print(f"Scores: {scores}")
+
+# Dictionary operations
+scores["Diana"] = 88  # Add new entry
+scores["Alice"] = 96  # Update existing
+print(f"Updated scores: {scores}")
+
+# Dictionary methods
+print(f"Keys: {scores.keys()}")
+print(f"Values: {scores.values()}")
+print(f"Items: {scores.items()}")
+
+# Safe access
+match scores.get("Eve") {
+    Some(score) => print(f"Eve's score: {score}"),
+    None => print("Eve not found")
+}
+
+let alice_score = scores.get("Alice").unwrap_or(0)
+print(f"Alice's score: {alice_score}")
+
+# Dictionary comprehensions
+let word_lengths = {word: word.len() for word in words}
+print(f"Word lengths: {word_lengths}")
+
+let grade_map = {name: "A" if score >= 90 else "B" if score >= 80 else "C"
+                 for name, score in scores.items()}
+print(f"Grades: {grade_map}")
+
+# Merging dictionaries
+let more_scores = {"Eve": 94, "Frank": 89}
+scores.update(more_scores)
+print(f"Merged scores: {scores}")
+
+# Sets - Unique collections
+let mut colors = Set::new()
+colors.insert("red")
+colors.insert("green")
+colors.insert("blue")
+colors.insert("red")  # Duplicate, won't be added
+print(f"Colors set: {colors}")
+
+# Set from list (removes duplicates)
+let numbers_with_dupes = [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
+let unique_numbers = Set::from(numbers_with_dupes)
+print(f"Unique numbers: {unique_numbers}")
+
+# Set operations
+let set1 = Set::from([1, 2, 3, 4, 5])
+let set2 = Set::from([3, 4, 5, 6, 7])
+
+print(f"Set 1: {set1}")
+print(f"Set 2: {set2}")
+print(f"Union: {set1.union(set2)}")
+print(f"Intersection: {set1.intersection(set2)}")
+print(f"Difference: {set1.difference(set2)}")
+print(f"Symmetric difference: {set1.symmetric_difference(set2)}")
+
+# Set membership and relations
+print(f"3 in set1: {set1.contains(3)}")
+print(f"Is set1 subset of set2: {set1.is_subset(set2)}")
+print(f"Is set1 superset of set2: {set1.is_superset(set2)}")
+print(f"Are sets disjoint: {set1.is_disjoint(set2)}")
+
+# Tuples - Immutable sequences
+let point = (3, 4)
+let person_info = ("Alice", 25, "Engineer")
+let rgb = (255, 128, 0)
+
+print(f"Point: {point}")
+print(f"Person: {person_info}")
+print(f"RGB: {rgb}")
+
+# Tuple unpacking
+let (x, y) = point
+let (name, age, job) = person_info
+let (r, g, b) = rgb
+
+print(f"Coordinates: x={x}, y={y}")
+print(f"Person details: {name}, {age}, {job}")
+print(f"Color components: R={r}, G={g}, B={b}")
+
+# Named tuples
+struct Point3D {
+    x: f64,
+    y: f64,
+    z: f64
+}
+
+let origin = Point3D { x: 0.0, y: 0.0, z: 0.0 }
+let point3d = Point3D { x: 1.0, y: 2.0, z: 3.0 }
+
+print(f"Origin: ({origin.x}, {origin.y}, {origin.z})")
+print(f"Point: ({point3d.x}, {point3d.y}, {point3d.z})")
+
+# Deques - Double-ended queues
+let mut deque = collections.Deque::new()
+deque.push_back("middle")
+deque.push_front("first")
+deque.push_back("last")
+
+print(f"Deque: {deque}")
+
+let front = deque.pop_front()
+let back = deque.pop_back()
+print(f"Popped front: {front}, back: {back}")
+print(f"Remaining: {deque}")
+
+# Stacks and Queues
+let mut stack = collections.Stack::new()
+stack.push("first")
+stack.push("second")
+stack.push("third")
+
+print("Stack operations (LIFO):")
+while !stack.is_empty() {
+    print(f"  Popped: {stack.pop()}")
+}
+
+let mut queue = collections.Queue::new()
+queue.enqueue("first")
+queue.enqueue("second")
+queue.enqueue("third")
+
+print("Queue operations (FIFO):")
+while !queue.is_empty() {
+    print(f"  Dequeued: {queue.dequeue()}")
+}
+
+# Priority Queue
+let mut pq = collections.PriorityQueue::new()
+pq.push(("Low priority", 1))
+pq.push(("High priority", 10))
+pq.push(("Medium priority", 5))
+
+print("Priority queue:")
+while !pq.is_empty() {
+    let (task, priority) = pq.pop()
+    print(f"  {task} (priority: {priority})")
+}
+
+# Counter - Frequency counting
+let text = "hello world hello python world hello"
+let word_count = collections.Counter::from(text.split())
+print(f"Word frequencies: {word_count}")
+
+let most_common = word_count.most_common(2)
+print(f"Most common words: {most_common}")
+
+# Default Dictionary
+let mut groups = collections.DefaultDict::new(|| [])
+let items = [("fruit", "apple"), ("fruit", "banana"), ("vegetable", "carrot"), ("fruit", "cherry")]
+
+for (category, item) in items {
+    groups[category].push(item)
+}
+
+print("Grouped items:")
+for (category, items) in groups.items() {
+    print(f"  {category}: {items}")
+}
+
+# Ordered Dictionary
+let mut ordered = collections.OrderedDict::new()
+ordered["c"] = 3
+ordered["a"] = 1
+ordered["b"] = 2
+
+print("Ordered dictionary (insertion order):")
+for (key, value) in ordered.items() {
+    print(f"  {key}: {value}")
+}
+
+# ChainMap - Multiple dictionaries
+let dict1 = {"a": 1, "b": 2}
+let dict2 = {"b": 3, "c": 4}
+let dict3 = {"c": 5, "d": 6}
+
+let chain = collections.ChainMap::new([dict1, dict2, dict3])
+print(f"ChainMap lookup 'a': {chain.get('a')}")  # From dict1
+print(f"ChainMap lookup 'b': {chain.get('b')}")  # From dict1 (first occurrence)
+print(f"ChainMap lookup 'c': {chain.get('c')}")  # From dict2 (first occurrence)
+print(f"ChainMap lookup 'd': {chain.get('d')}")  # From dict3
+
+# Frozen sets (immutable sets)
+let frozen = collections.FrozenSet::from([1, 2, 3, 4, 5])
+print(f"Frozen set: {frozen}")
+
+# Can't modify frozen sets
+# frozen.insert(6)  # This would cause an error
+
+# Multi-dimensional collections
+let mut tensor = [[[0 for k in range(3)] for j in range(3)] for i in range(3)]
+tensor[1][1][1] = 42
+print(f"3D tensor center value: {tensor[1][1][1]}")
+
+# Iterating over collections
+let data = {
+    "numbers": [1, 2, 3, 4, 5],
+    "letters": ["a", "b", "c"],
+    "colors": Set::from(["red", "green", "blue"])
+}
+
+print("Iterating over nested collections:")
+for (key, collection) in data.items() {
+    print(f"  {key}:")
+    for item in collection {
+        print(f"    {item}")
+    }
+}
+
+# Collection utilities
+fn find_common_elements<T>(collections: [[T]]) -> Set<T> where T: Eq + Hash {
+    if collections.is_empty() {
+        return Set::new()
+    }
+
+    let mut common = Set::from(collections[0])
+    for collection in collections[1:] {
+        common = common.intersection(Set::from(collection))
+    }
+    common
+}
+
+let lists = [
+    [1, 2, 3, 4, 5],
+    [3, 4, 5, 6, 7],
+    [4, 5, 6, 7, 8]
+]
+
+let common = find_common_elements(lists)
+print(f"Common elements: {common}")
+
+# Performance comparisons
+import time
+
+# List vs Set membership testing
+let large_list = range(10000)
+let large_set = Set::from(large_list)
+
+let target = 9999
+
+# List search (O(n))
+let start = time.now()
+let found_in_list = large_list.contains(target)
+let list_time = time.now() - start
+
+# Set search (O(1))
+let start = time.now()
+let found_in_set = large_set.contains(target)
+let set_time = time.now() - start
+
+print(f"List search time: {list_time:.6f}s")
+print(f"Set search time: {set_time:.6f}s")
+print(f"Set is {list_time / set_time:.0f}x faster")
+
+# Memory usage comparison
+print(f"List memory usage: {large_list.memory_usage()} bytes")
+print(f"Set memory usage: {large_set.memory_usage()} bytes")

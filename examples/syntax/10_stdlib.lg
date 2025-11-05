@@ -1,0 +1,415 @@
+# Standard Library Examples
+# Demonstrates standard library modules and functions
+
+import Console
+import DateTime
+import Math
+import String
+import List
+import Dict
+import File
+import Process
+import Random
+import Json
+
+# Console operations
+print("=== Console Operations ===")
+Console.log("This is a log message")
+Console.warn("This is a warning")
+Console.error("This is an error message")
+Console.debug("This is a debug message")
+
+# Console formatting
+Console.println!("Formatted output")
+Console.print!("No newline")
+Console.print!(" - continues on same line\n")
+
+# Console input
+# let user_input = Console.input!("Enter your name: ")
+# Console.println!(f"Hello, {user_input}!")
+
+# DateTime operations
+print("\n=== DateTime Operations ===")
+let now = DateTime.now()
+print(f"Current time: {now}")
+
+let custom_date = DateTime.new(2024, 12, 25, 10, 30, 0)
+print(f"Christmas 2024: {custom_date}")
+
+# Date formatting
+print(f"ISO format: {now.to_iso()}")
+print(f"Custom format: {now.format('%Y-%m-%d %H:%M:%S')}")
+
+# Date arithmetic
+let tomorrow = now.add_days(1)
+let next_week = now.add_weeks(1)
+let next_month = now.add_months(1)
+
+print(f"Tomorrow: {tomorrow}")
+print(f"Next week: {next_week}")
+print(f"Next month: {next_month}")
+
+# Date components
+print(f"Year: {now.year()}")
+print(f"Month: {now.month()}")
+print(f"Day: {now.day()}")
+print(f"Hour: {now.hour()}")
+print(f"Minute: {now.minute()}")
+print(f"Second: {now.second()}")
+print(f"Weekday: {now.weekday()}")
+
+# Timestamps
+let timestamp = now.timestamp()
+let from_timestamp = DateTime.from_timestamp(timestamp)
+print(f"Timestamp: {timestamp}")
+print(f"From timestamp: {from_timestamp}")
+
+# Math operations
+print("\n=== Math Operations ===")
+print(f"Pi: {Math.PI}")
+print(f"E: {Math.E}")
+
+# Basic math functions
+let x = 16.0
+print(f"sqrt({x}): {Math.sqrt(x)}")
+print(f"pow({x}, 0.5): {Math.pow(x, 0.5)}")
+print(f"log({x}): {Math.log(x)}")
+print(f"log10({x}): {Math.log10(x)}")
+
+# Trigonometric functions
+let angle = Math.PI / 4  # 45 degrees
+print(f"sin(π/4): {Math.sin(angle)}")
+print(f"cos(π/4): {Math.cos(angle)}")
+print(f"tan(π/4): {Math.tan(angle)}")
+
+# Rounding functions
+let value = 3.7
+print(f"ceil({value}): {Math.ceil(value)}")
+print(f"floor({value}): {Math.floor(value)}")
+print(f"round({value}): {Math.round(value)}")
+
+# Min/Max
+let numbers = [3, 7, 1, 9, 4]
+print(f"min({numbers}): {Math.min(numbers)}")
+print(f"max({numbers}): {Math.max(numbers)}")
+
+# Absolute value
+print(f"abs(-5): {Math.abs(-5)}")
+print(f"abs(5): {Math.abs(5)}")
+
+# Random number generation
+print("\n=== Random Operations ===")
+print(f"Random float [0,1): {Random.random()}")
+print(f"Random int [1,10]: {Random.randint(1, 10)}")
+print(f"Random float [1.0,10.0]: {Random.uniform(1.0, 10.0)}")
+
+# Random choice
+let colors = ["red", "green", "blue", "yellow"]
+print(f"Random color: {Random.choice(colors)}")
+
+# Random sample
+let sample = Random.sample(numbers, 3)
+print(f"Random sample of 3: {sample}")
+
+# Shuffle
+let mut deck = ["A", "K", "Q", "J", "10", "9", "8", "7"]
+Random.shuffle!(deck)
+print(f"Shuffled deck: {deck}")
+
+# Random seed for reproducibility
+Random.seed(42)
+print(f"Seeded random 1: {Random.random()}")
+print(f"Seeded random 2: {Random.random()}")
+
+Random.seed(42)  # Reset seed
+print(f"Seeded random 1 (again): {Random.random()}")  # Same as first
+
+# String utilities
+print("\n=== String Utilities ===")
+let text = "  Hello, World!  "
+print(f"Original: '{text}'")
+print(f"Trim: '{String.trim(text)}'")
+print(f"Upper: '{String.upper(text)}'")
+print(f"Lower: '{String.lower(text)}'")
+print(f"Title: '{String.title(text)}'")
+
+# String analysis
+print(f"Length: {String.len(text)}")
+print(f"Contains 'World': {String.contains(text, 'World')}")
+print(f"Starts with '  H': {String.starts_with(text, '  H')}")
+print(f"Ends with '!  ': {String.ends_with(text, '!  ')}")
+
+# String manipulation
+let sentence = "the quick brown fox"
+print(f"Replace 'fox' with 'dog': {String.replace(sentence, 'fox', 'dog')}")
+print(f"Split by spaces: {String.split(sentence, ' ')}")
+print(f"Join with '-': {String.join(['a', 'b', 'c'], '-')}")
+
+# String validation
+let email = "user@example.com"
+let phone = "123-456-7890"
+print(f"Is email valid: {String.is_email(email)}")
+print(f"Is phone valid: {String.is_phone(phone)}")
+
+# List utilities
+print("\n=== List Utilities ===")
+let items = [1, 2, 3, 4, 5]
+print(f"Original list: {items}")
+print(f"Length: {List.len(items)}")
+print(f"Sum: {List.sum(items)}")
+print(f"Average: {List.avg(items)}")
+
+# List operations
+print(f"Reversed: {List.reverse(items)}")
+print(f"Sorted: {List.sort([3, 1, 4, 1, 5])}")
+
+# List filtering and mapping
+let evens = List.filter(items, |x| x % 2 == 0)
+let doubled = List.map(items, |x| x * 2)
+print(f"Even numbers: {evens}")
+print(f"Doubled: {doubled}")
+
+# List reduction
+let product = List.reduce(items, |acc, x| acc * x, 1)
+print(f"Product: {product}")
+
+# List searching
+print(f"Find 3: {List.find(items, |x| x == 3)}")
+print(f"Index of 4: {List.index_of(items, 4)}")
+
+# Dictionary utilities
+print("\n=== Dictionary Utilities ===")
+let scores = {"Alice": 95, "Bob": 87, "Charlie": 92}
+print(f"Original dict: {scores}")
+print(f"Keys: {Dict.keys(scores)}")
+print(f"Values: {Dict.values(scores)}")
+print(f"Items: {Dict.items(scores)}")
+
+# Dictionary operations
+print(f"Get Alice's score: {Dict.get(scores, 'Alice', 0)}")
+print(f"Get David's score: {Dict.get(scores, 'David', 0)}")
+
+let merged = Dict.merge(scores, {"David": 88, "Eve": 91})
+print(f"Merged: {merged}")
+
+# Dictionary filtering
+let high_scores = Dict.filter(scores, |k, v| v >= 90)
+print(f"High scores: {high_scores}")
+
+# File operations
+print("\n=== File Operations ===")
+
+# Check if file exists
+if File.exists("example.txt") {
+    print("example.txt exists")
+
+    # Read file
+    match File.read("example.txt") {
+        Ok(content) => print(f"File content: {content}"),
+        Err(error) => print(f"Error reading file: {error}")
+    }
+
+    # Get file info
+    match File.info("example.txt") {
+        Ok(info) => {
+            print(f"File size: {info.size} bytes")
+            print(f"Modified: {info.modified}")
+        },
+        Err(error) => print(f"Error getting file info: {error}")
+    }
+} else {
+    print("example.txt does not exist")
+
+    # Create a sample file
+    let sample_content = "This is a sample file.\nIt has multiple lines.\n"
+    match File.write("example.txt", sample_content) {
+        Ok(_) => print("Sample file created"),
+        Err(error) => print(f"Error creating file: {error}")
+    }
+}
+
+# Directory operations
+match File.list_dir(".") {
+    Ok(files) => {
+        print("Current directory contents:")
+        for file in files {
+            print(f"  {file}")
+        }
+    },
+    Err(error) => print(f"Error listing directory: {error}")
+}
+
+# Process operations
+print("\n=== Process Operations ===")
+
+# Get environment variables
+print(f"PATH: {Process.env('PATH')}")
+print(f"HOME: {Process.env('HOME')}")
+
+# Set environment variable
+Process.set_env!("MY_VAR", "Hello World")
+print(f"MY_VAR: {Process.env('MY_VAR')}")
+
+# Get current working directory
+print(f"Current directory: {Process.cwd()}")
+
+# Execute external command
+match Process.exec(["echo", "Hello from external command"]) {
+    Ok(output) => print(f"Command output: {output}"),
+    Err(error) => print(f"Command failed: {error}")
+}
+
+# JSON operations
+print("\n=== JSON Operations ===")
+
+let data = {
+    "name": "Alice",
+    "age": 30,
+    "hobbies": ["reading", "swimming", "coding"],
+    "address": {
+        "street": "123 Main St",
+        "city": "Anytown",
+        "zip": "12345"
+    }
+}
+
+# Serialize to JSON
+let json_string = Json.stringify(data)
+print(f"JSON string: {json_string}")
+
+# Parse JSON
+match Json.parse(json_string) {
+    Ok(parsed) => {
+        print(f"Parsed name: {parsed.name}")
+        print(f"Parsed hobbies: {parsed.hobbies}")
+        print(f"Parsed city: {parsed.address.city}")
+    },
+    Err(error) => print(f"JSON parse error: {error}")
+}
+
+# Pretty print JSON
+let pretty_json = Json.pretty_print(data)
+print(f"Pretty JSON:\n{pretty_json}")
+
+# Type conversion utilities
+print("\n=== Type Conversions ===")
+
+# String conversions
+print(f"'123' to int: {String.to_int('123')}")
+print(f"'3.14' to float: {String.to_float('3.14')}")
+print(f"'true' to bool: {String.to_bool('true')}")
+
+# Number conversions
+print(f"123 to string: {Int.to_string(123)}")
+print(f"3.14 to string: {Float.to_string(3.14)}")
+print(f"3.14 to int: {Float.to_int(3.14)}")
+
+# Collection conversions
+let tuple_data = (1, 2, 3)
+let list_from_tuple = List.from_tuple(tuple_data)
+print(f"Tuple to list: {list_from_tuple}")
+
+let set_data = Set.from([1, 2, 2, 3, 3, 3])
+let list_from_set = List.from_set(set_data)
+print(f"Set to list: {list_from_set}")
+
+# URL and encoding utilities
+print("\n=== URL and Encoding ===")
+let url = "https://example.com/search?q=hello world&lang=en"
+let encoded = Url.encode(url)
+let decoded = Url.decode(encoded)
+print(f"Original: {url}")
+print(f"Encoded: {encoded}")
+print(f"Decoded: {decoded}")
+
+# Base64 encoding
+let text_to_encode = "Hello, World!"
+let base64_encoded = Base64.encode(text_to_encode)
+let base64_decoded = Base64.decode(base64_encoded)
+print(f"Text: {text_to_encode}")
+print(f"Base64: {base64_encoded}")
+print(f"Decoded: {base64_decoded}")
+
+# Hash functions
+print("\n=== Hash Functions ===")
+let password = "secret123"
+print(f"MD5: {Hash.md5(password)}")
+print(f"SHA1: {Hash.sha1(password)}")
+print(f"SHA256: {Hash.sha256(password)}")
+
+# Timer and performance
+print("\n=== Timer and Performance ===")
+let start_time = Timer.now()
+
+# Simulate some work
+let mut sum = 0
+for i in range(100000) {
+    sum += i
+}
+
+let elapsed = Timer.elapsed(start_time)
+print(f"Calculation took: {elapsed:.4f} seconds")
+print(f"Sum: {sum}")
+
+# Benchmark function
+fn benchmark(func: fn() -> any, iterations: i32) -> f64 {
+    let start = Timer.now()
+    for _ in range(iterations) {
+        func()
+    }
+    return Timer.elapsed(start) / iterations as f64
+}
+
+let avg_time = benchmark(|| Math.sqrt(12345.67), 10000)
+print(f"Average sqrt time: {avg_time:.8f} seconds")
+
+# Memory utilities
+print("\n=== Memory Utilities ===")
+let large_list = range(100000)
+print(f"Memory usage of large list: {Memory.usage(large_list)} bytes")
+print(f"Total memory usage: {Memory.total()} bytes")
+print(f"Available memory: {Memory.available()} bytes")
+
+# Garbage collection (if applicable)
+Memory.gc()
+print("Garbage collection triggered")
+
+# System information
+print("\n=== System Information ===")
+print(f"Platform: {System.platform()}")
+print(f"Architecture: {System.arch()}")
+print(f"CPU count: {System.cpu_count()}")
+print(f"Memory total: {System.memory_total()} bytes")
+print(f"Uptime: {System.uptime()} seconds")
+
+# Regex utilities (if not in separate module)
+print("\n=== Regex Utilities ===")
+let email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+let text_with_emails = "Contact us at info@example.com or support@test.org"
+
+let matches = Regex.find_all(email_pattern, text_with_emails)
+print(f"Email matches: {matches}")
+
+let is_valid = Regex.test(email_pattern, "user@example.com")
+print(f"Is 'user@example.com' valid email: {is_valid}")
+
+# Async operations (if supported)
+print("\n=== Async Operations ===")
+async fn fetch_data(url: str) -> Result<str, str> {
+    # Simulate async operation
+    await Timer.sleep(0.1)
+    return Ok(f"Data from {url}")
+}
+
+async fn main_async() {
+    let result = await fetch_data("https://api.example.com")
+    match result {
+        Ok(data) => print(f"Fetched: {data}"),
+        Err(error) => print(f"Error: {error}")
+    }
+}
+
+# Run async function (conceptual)
+# Runtime.run(main_async())
+
+print("\n=== Standard Library Demo Complete ===")

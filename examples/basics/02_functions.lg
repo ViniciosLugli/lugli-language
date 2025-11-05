@@ -1,0 +1,36 @@
+# Functions and Control Flow
+
+# Simple function
+fn greet(name) {
+    return f"Hello, {name}!"
+}
+
+# Function with arithmetic
+fn add(a, b) {
+    return a + b
+}
+
+fn multiply(a, b) {
+    return a * b
+}
+
+# Call functions
+let message = greet("World")
+print(message)
+
+let sum = add(10, 20)
+print(f"10 + 20 = {sum}")
+
+let product = multiply(5, 7)
+print(f"5 * 7 = {product}")
+
+# Conditional logic
+fn max(a, b) {
+    if a > b {
+        return a
+    } else {
+        return b
+    }
+}
+
+print(f"max(15, 23) = {max(15, 23)}")

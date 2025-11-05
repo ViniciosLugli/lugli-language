@@ -1,0 +1,24 @@
+[package]
+name = "lugli-vm"
+version.workspace = true
+description = "Bytecode virtual machine and compiler for the Lugli programming language"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+lugli-common.workspace = true
+lugli-lexer.workspace = true
+lugli-ast.workspace = true
+lugli-parser.workspace = true
+lugli-stdlib.workspace = true
+thiserror.workspace = true
+hashbrown.workspace = true
+colored.workspace = true
+
+[dev-dependencies]
+lugli-parser.workspace = true
+criterion.workspace = true
+proptest.workspace = true
+pretty_assertions.workspace = true

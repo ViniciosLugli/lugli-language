@@ -1,0 +1,21 @@
+[package]
+name = "lugli-stdlib"
+version.workspace = true
+description = "Standard library for the Lugli programming language"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+lugli-common.workspace = true
+chrono.workspace = true
+regex.workspace = true
+thiserror.workspace = true
+hashbrown.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+pretty_assertions.workspace = true
+
