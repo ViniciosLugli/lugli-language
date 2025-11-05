@@ -7,7 +7,7 @@ use crate::cli::CliError;
 use colored::Colorize;
 use lugli_vm::Machine;
 use rustyline::{Config, Editor, error::ReadlineError};
-use std::path::PathBuf;
+use std::{path::PathBuf, cell::RefCell, rc::Rc};
 
 use commands::handle_command;
 use completer::LugliCompleter;
@@ -16,15 +16,21 @@ use validator::InputValidator;
 
 const HISTORY_FILE: &str = ".lugli_history";
 const MAX_HISTORY_SIZE: usize = 1000;
+const MAX_BYTECODE_CACHE: usize = 10;
 
 pub fn start() -> Result<(), CliError> {
-    println!("{}", "Lugli REPL v0.4.0".bright_cyan().bold());
+    println!("{}", format!("Lugli REPL v{}", env!("CARGO_PKG_VERSION")).bright_cyan().bold());
     println!("Type 'exit', 'quit', or press Ctrl+D to quit");
     println!("Type ':help' for available commands\n");
 
-    let config = Config::builder().max_history_size(MAX_HISTORY_SIZE)?.auto_add_history(true).build();
+    let config = Config::builder()
+        .max_history_size(MAX_HISTORY_SIZE)?
+        .auto_add_history(true)
+        .bracketed_paste(true)
+        .build();
 
-    let helper = ReplHelper::new();
+    let variables = Rc::new(RefCell::new(Vec::new()));
+    let helper = ReplHelper::new_with_variables(variables.clone());
     let mut editor = Editor::with_config(config)?;
     editor.set_helper(Some(helper));
 
@@ -74,6 +80,9 @@ pub fn start() -> Result<(), CliError> {
                             Ok(bytecode) => {
                                 match lugli_vm::run_with_vm(&mut vm, &bytecode) {
                                     Ok(value) => {
+                                        // Store last result in _ variable
+                                        vm.globals.insert("_".to_string(), value.clone());
+
                                         if !matches!(value, lugli_common::Value::Null) {
                                             println!("{}", format_value(&value, &bytecode));
                                         }
@@ -82,8 +91,14 @@ pub fn start() -> Result<(), CliError> {
                                         eprintln!("{}: {}", "Runtime Error".red().bold(), e);
                                     }
                                 }
-                                // Always save bytecode for string pool access
+                                // Save bytecode with bounded retention to prevent memory leaks
                                 bytecodes.push(bytecode);
+                                if bytecodes.len() > MAX_BYTECODE_CACHE {
+                                    bytecodes.remove(0);
+                                }
+
+                                // Update tab completion variables
+                                update_completion_variables(&vm, &variables);
                             }
                             Err(e) => {
                                 eprintln!("{}: {}", "Compilation Error".red().bold(), e);
@@ -121,6 +136,14 @@ pub fn start() -> Result<(), CliError> {
 }
 
 fn get_history_path() -> PathBuf { if let Some(home) = dirs::home_dir() { home.join(HISTORY_FILE) } else { PathBuf::from(HISTORY_FILE) } }
+
+fn update_completion_variables(vm: &Machine, variables: &Rc<RefCell<Vec<String>>>) {
+    let user_vars: Vec<String> = vm.globals.keys()
+        .filter(|k| !matches!(vm.globals.get(*k), Some(lugli_common::Value::NativeFunction { .. })))
+        .map(|k| k.clone())
+        .collect();
+    *variables.borrow_mut() = user_vars;
+}
 
 fn format_value(value: &lugli_common::Value, bytecode: &lugli_vm::Bytecode) -> String {
     use lugli_common::Value;
@@ -164,9 +187,9 @@ struct ReplHelper {
 }
 
 impl ReplHelper {
-    fn new() -> Self {
+    fn new_with_variables(variables: Rc<RefCell<Vec<String>>>) -> Self {
         Self {
-            completer: LugliCompleter::new(),
+            completer: LugliCompleter::new_with_variables(variables),
             highlighter: LugliHighlighter::new(),
             validator: InputValidator::new(),
         }

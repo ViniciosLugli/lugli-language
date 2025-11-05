@@ -128,9 +128,54 @@ impl Machine {
         self.ip = 0;
         self.call_stack.clear();
         self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
-        self.bytecode_registry.clear();
-        self.next_bytecode_id = 1;
+
+        // Keep only recent bytecodes to prevent memory leak (max 10)
+        const MAX_REPL_BYTECODES: usize = 10;
+        if self.bytecode_registry.len() > MAX_REPL_BYTECODES {
+            let keep_from_id = self.next_bytecode_id.saturating_sub(MAX_REPL_BYTECODES);
+            self.bytecode_registry.retain(|&id, _| id >= keep_from_id);
+        }
+
         self.open_upvalues.clear();
+    }
+
+    pub fn format_value(&self, value: &Value) -> String {
+        use lugli_common::Value;
+
+        match value {
+            Value::String(id) => {
+                // Try to resolve string from any registered bytecode
+                for bytecode in self.bytecode_registry.values() {
+                    let pool = bytecode.string_pool.borrow();
+                    if let Some(s) = pool.try_resolve(*id) {
+                        return format!("\"{}\"", s);
+                    }
+                }
+                // Fallback if not found
+                format!("<string#{}>", id.as_u32())
+            }
+            Value::List(l) => match l.try_borrow() {
+                Ok(list_ref) => {
+                    let items: Vec<String> = list_ref.iter().map(|v| self.format_value(v)).collect();
+                    format!("[{}]", items.join(", "))
+                }
+                Err(_) => "[<borrowed list>]".to_string(),
+            },
+            Value::Dict(d) => match d.try_borrow() {
+                Ok(dict_ref) => {
+                    let mut items = Vec::new();
+                    for (k, v) in dict_ref.iter() {
+                        let key_str = self.bytecode_registry.values()
+                            .find_map(|bc| bc.string_pool.borrow().try_resolve(*k).map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("<string#{}>", k.as_u32()));
+                        items.push(format!("\"{}\": {}", key_str, self.format_value(v)));
+                    }
+                    format!("{{ {} }}", items.join(", "))
+                }
+                Err(_) => "{<borrowed dict>}".to_string(),
+            },
+            _ => value.to_string(),
+        }
     }
 
     fn peek(&self) -> Result<&Value, LugliError> { self.stack.last().ok_or_else(|| LugliError::runtime("Stack underflow")) }
