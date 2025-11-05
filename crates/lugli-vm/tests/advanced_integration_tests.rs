@@ -228,7 +228,7 @@ mod real_world_scenarios {
         "#;
 
         let result = run_and_get_number(source).unwrap();
-        assert!(result >= 10.0 && result <= 11.0); // Should be around 10.2
+        assert!((10.0..=11.0).contains(&result)); // Should be around 10.2
     }
 
     #[test]

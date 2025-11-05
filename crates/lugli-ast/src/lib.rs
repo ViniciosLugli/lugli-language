@@ -53,7 +53,7 @@ mod tests {
             start: 0,
             end: 10,
         };
-        let program = Program::new(vec![], span.clone());
+        let program = Program::new(vec![], span);
 
         assert_eq!(program.statements.len(), 0);
         assert_eq!(program.span(), &span);
@@ -258,7 +258,7 @@ mod tests {
         } = var_decl
         {
             assert_eq!(name, "x");
-            assert_eq!(is_const, false);
+            assert!(!is_const);
         } else {
             panic!("Expected VarDecl statement");
         }
@@ -351,12 +351,12 @@ mod tests {
         }
 
         impl Visitor<()> for TestVisitor {
-            fn visit_expr(&mut self, expr: &Expr) -> () {
+            fn visit_expr(&mut self, expr: &Expr) {
                 self.expr_count += 1;
                 self.walk_expr(expr)
             }
 
-            fn visit_stmt(&mut self, stmt: &Stmt) -> () {
+            fn visit_stmt(&mut self, stmt: &Stmt) {
                 self.stmt_count += 1;
                 self.walk_stmt(stmt)
             }

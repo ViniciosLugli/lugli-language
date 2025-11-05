@@ -1,3 +1,8 @@
+#![allow(clippy::clone_on_copy)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::collapsible_match)]
+#![allow(clippy::needless_return)]
+
 use lugli_ast::{AstNode, CallData, Expr, IfData, LiteralValue, NodeId, Program, Stmt, Visitor, VisitorMut};
 use lugli_common::Span;
 use lugli_lexer::TokenKind;
@@ -412,7 +417,7 @@ mod visitor_pattern_tests {
     }
 
     impl Visitor<()> for ExpressionCounter {
-        fn visit_expr(&mut self, expr: &Expr) -> () {
+        fn visit_expr(&mut self, expr: &Expr) {
             self.total_expr_count += 1;
 
             match expr {
@@ -510,7 +515,7 @@ mod visitor_pattern_tests {
     }
 
     impl Visitor<()> for IdentifierCollector {
-        fn visit_expr(&mut self, expr: &Expr) -> () {
+        fn visit_expr(&mut self, expr: &Expr) {
             if let Expr::Identifier {
                 name, ..
             } = expr
@@ -586,7 +591,7 @@ mod visitor_pattern_tests {
     }
 
     impl VisitorMut<()> for NameReplacer {
-        fn visit_expr_mut(&mut self, expr: &mut Expr) -> () {
+        fn visit_expr_mut(&mut self, expr: &mut Expr) {
             if let Expr::Identifier {
                 name, ..
             } = expr
@@ -867,7 +872,7 @@ mod ast_node_interface_tests {
         }
 
         impl Visitor<()> for DepthCounter {
-            fn visit_expr(&mut self, expr: &Expr) -> () {
+            fn visit_expr(&mut self, expr: &Expr) {
                 self.current_depth += 1;
                 if self.current_depth > self.max_depth {
                     self.max_depth = self.current_depth;
