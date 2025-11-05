@@ -31,9 +31,9 @@ fn test_abs_zero() {
 
 #[test]
 fn test_abs_decimal() {
-    let source = "abs(-3.14)";
+    let source = "abs(-3.15)";
     let result = run_and_get_value(source);
-    assert_eq!(result, Value::Number(3.14));
+    assert_eq!(result, Value::Number(3.15));
 }
 
 #[test]
@@ -52,16 +52,16 @@ fn test_round_down() {
 
 #[test]
 fn test_round_with_places() {
-    let source = "round(3.14159, 2)";
+    let source = "round(3.15159, 2)";
     let result = run_and_get_value(source);
-    assert_eq!(result, Value::Number(3.14));
+    assert_eq!(result, Value::Number(3.15));
 }
 
 #[test]
 fn test_round_with_places_three() {
-    let source = "round(3.14159, 3)";
+    let source = "round(3.15159, 3)";
     let result = run_and_get_value(source);
-    assert_eq!(result, Value::Number(3.142));
+    assert_eq!(result, Value::Number(3.152));
 }
 
 #[test]
