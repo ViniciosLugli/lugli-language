@@ -47,13 +47,13 @@ impl ParserError {
                 let span = match parse_err {
                     ParseError::UnexpectedToken {
                         token,
-                    } => token.span.clone(),
+                    } => token.span,
                     ParseError::Expected {
                         found, ..
-                    } => found.span.clone(),
+                    } => found.span,
                     ParseError::Custom {
                         span, ..
-                    } => span.clone(),
+                    } => *span,
                     _ => lugli_common::Span {
                         start: 0,
                         end: 0,

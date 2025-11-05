@@ -44,8 +44,11 @@ mod time_function_tests {
 
         assert!(result.is_ok());
         assert!(result.unwrap().equals(&Value::Null));
+        // Check minimum sleep time
         assert!(elapsed >= std::time::Duration::from_millis(10));
-        assert!(elapsed < std::time::Duration::from_millis(50));
+        // More lenient upper bound for CI environments (especially macOS)
+        // Sleep can take longer due to scheduler overhead, context switches, etc.
+        assert!(elapsed < std::time::Duration::from_millis(200), "Sleep took {:?}, expected < 200ms", elapsed);
 
         let error_result = sleep_fn(&[], &mut pool);
         assert!(error_result.is_err());

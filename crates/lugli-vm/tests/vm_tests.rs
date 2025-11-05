@@ -367,12 +367,12 @@ fn test_to_string_whole_number() {
 
 #[test]
 fn test_to_string_decimal() {
-    let (result, bytecode) = run_vm(vec![Instruction::Constant(0), Instruction::ToString, Instruction::Return], vec![Value::Number(3.14)]).unwrap();
+    let (result, bytecode) = run_vm(vec![Instruction::Constant(0), Instruction::ToString, Instruction::Return], vec![Value::Number(2.5)]).unwrap();
 
     if let Value::String(result_id) = result {
         let pool = bytecode.string_pool.borrow();
         let resolved = pool.resolve(result_id);
-        assert_eq!(resolved, "3.14");
+        assert_eq!(resolved, "2.5");
     } else {
         panic!("Expected String result, got {:?}", result);
     }
