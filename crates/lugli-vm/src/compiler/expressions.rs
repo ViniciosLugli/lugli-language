@@ -482,12 +482,12 @@ impl Compiler {
 
                 // Track loop structures for each clause
                 struct LoopInfo {
-                    _iterable_local: usize,  // Reserved for future filtered nested comprehensions
+                    _iterable_local: usize, // Reserved for future filtered nested comprehensions
                     index_local: usize,
-                    _var_local: usize,       // Reserved for future filtered nested comprehensions
+                    _var_local: usize, // Reserved for future filtered nested comprehensions
                     loop_start: usize,
                     exit_jump: usize,
-                    _skip_jump: Option<usize>,  // Reserved for future filtered nested comprehensions
+                    _skip_jump: Option<usize>, // Reserved for future filtered nested comprehensions
                 }
                 let mut loops: Vec<LoopInfo> = Vec::new();
                 let mut var_names: Vec<String> = Vec::new();
@@ -696,7 +696,9 @@ impl Compiler {
 
                     if is_last {
                         match stmt {
-                            lugli_ast::Stmt::Expression { expr, .. } => {
+                            lugli_ast::Stmt::Expression {
+                                expr, ..
+                            } => {
                                 // Check if the expression is an assignment (Set)
                                 // Assignments shouldn't be the return value of a block
                                 if matches!(expr, lugli_ast::Expr::Set { .. }) {
@@ -707,7 +709,9 @@ impl Compiler {
                                     self.compile_expr(expr)?;
                                 }
                             }
-                            lugli_ast::Stmt::If { .. } => {
+                            lugli_ast::Stmt::If {
+                                ..
+                            } => {
                                 // If-statements leave a value on the stack (from compile_branch_as_expr)
                                 self.compile_stmt(stmt)?;
                             }

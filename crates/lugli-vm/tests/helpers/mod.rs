@@ -1,6 +1,6 @@
 // Test helper functions for VM integration tests
 
-#![allow(dead_code)]  // Helpers used selectively across different test files
+#![allow(dead_code)] // Helpers used selectively across different test files
 
 use lugli_common::Value;
 use lugli_parser::Parser;

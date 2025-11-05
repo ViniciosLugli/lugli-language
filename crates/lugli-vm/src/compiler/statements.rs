@@ -211,7 +211,8 @@ impl Compiler {
                     }
                     Some(Stmt::Expression {
                         ..
-                    }) | Some(Stmt::If {
+                    })
+                    | Some(Stmt::If {
                         ..
                     }) => {
                         // Expression result is on stack, just add Return instruction

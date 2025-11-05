@@ -87,7 +87,10 @@ impl Compiler {
         if self.bytecode.instructions.is_empty() || !matches!(self.bytecode.instructions.last(), Some(Instruction::Return)) {
             // If the last statement wasn't an expression, if-statement, or return, add null
             if stmt_count == 0
-                || !matches!(program.statements.last(), Some(lugli_ast::Stmt::Expression { .. }) | Some(lugli_ast::Stmt::Return { .. }) | Some(lugli_ast::Stmt::If { .. }))
+                || !matches!(
+                    program.statements.last(),
+                    Some(lugli_ast::Stmt::Expression { .. }) | Some(lugli_ast::Stmt::Return { .. }) | Some(lugli_ast::Stmt::If { .. })
+                )
             {
                 let null_index = self.add_constant(Value::Null);
                 self.emit_unknown(Instruction::Constant(null_index));
@@ -170,7 +173,10 @@ impl Compiler {
             let is_last = i == stmts.len() - 1;
 
             if is_last {
-                if let Stmt::Expression { expr, .. } = stmt {
+                if let Stmt::Expression {
+                    expr, ..
+                } = stmt
+                {
                     self.compile_expr(expr)?;
                 } else {
                     self.compile_stmt(stmt)?;

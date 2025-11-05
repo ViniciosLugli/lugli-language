@@ -327,14 +327,28 @@ impl<'a> Parser<'a> {
 
             // First check: is the immediate next token a statement keyword or nested block?
             let next = self.scanner.peek();
-            let is_definitely_block = next.as_ref().map(|t| matches!(
-                t.kind,
-                TokenKind::If | TokenKind::For | TokenKind::While | TokenKind::Loop
-                | TokenKind::Let | TokenKind::Mut | TokenKind::Const
-                | TokenKind::Return | TokenKind::Break | TokenKind::Continue
-                | TokenKind::Fn | TokenKind::Struct | TokenKind::Match
-                | TokenKind::LeftBrace // Nested block like { { expr } }
-            )).unwrap_or(false);
+            let is_definitely_block = next
+                .as_ref()
+                .map(|t| {
+                    matches!(
+                        t.kind,
+                        TokenKind::If
+                            | TokenKind::For
+                            | TokenKind::While
+                            | TokenKind::Loop
+                            | TokenKind::Let
+                            | TokenKind::Mut
+                            | TokenKind::Const
+                            | TokenKind::Return
+                            | TokenKind::Break
+                            | TokenKind::Continue
+                            | TokenKind::Fn
+                            | TokenKind::Struct
+                            | TokenKind::Match
+                            | TokenKind::LeftBrace // Nested block like { { expr } }
+                    )
+                })
+                .unwrap_or(false);
 
             if is_definitely_block {
                 return self.block_expression();
@@ -384,11 +398,13 @@ impl<'a> Parser<'a> {
 
         let condition = Box::new(self.expression()?);
 
-        let then_branch = Box::new(if self.check(&TokenKind::LeftBrace) {
-            self.block_expression()?
-        } else {
-            return Err(self.expected_error("'{' after if condition in expression context"));
-        });
+        let then_branch = Box::new(
+            if self.check(&TokenKind::LeftBrace) {
+                self.block_expression()?
+            } else {
+                return Err(self.expected_error("'{' after if condition in expression context"));
+            },
+        );
 
         let else_branch = if self.match_any(&[TokenKind::Else]) {
             if self.check(&TokenKind::If) {
@@ -462,11 +478,7 @@ impl<'a> Parser<'a> {
 
             self.consume(&TokenKind::FatArrow, "Expected '=>' after pattern")?;
 
-            let body = if self.check(&TokenKind::LeftBrace) {
-                Box::new(self.block_expression()?)
-            } else {
-                Box::new(self.expression()?)
-            };
+            let body = if self.check(&TokenKind::LeftBrace) { Box::new(self.block_expression()?) } else { Box::new(self.expression()?) };
 
             arms.push(MatchArm {
                 pattern,
