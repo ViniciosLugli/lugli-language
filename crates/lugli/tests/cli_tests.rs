@@ -12,8 +12,7 @@ mod cli_error_tests {
     fn test_run_nonexistent_file() {
         // Test that running a non-existent file produces appropriate error behavior
         // This tests the error handling path of the CLI
-        let result =
-            std::process::Command::new("cargo").args(["run", "--bin", "lugli", "--", "run", "nonexistent.lg"]).current_dir("../..").output();
+        let result = std::process::Command::new("cargo").args(["run", "--bin", "lugli", "--", "run", "nonexistent.lg"]).current_dir("../..").output();
 
         match result {
             Ok(output) => {
