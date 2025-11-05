@@ -3,9 +3,7 @@ use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 pub struct InputValidator;
 
 impl InputValidator {
-    pub fn new() -> Self {
-        Self
-    }
+    pub fn new() -> Self { Self }
 
     fn count_unclosed_delimiters(input: &str) -> (i32, i32, i32) {
         let mut parens = 0;
@@ -67,13 +65,8 @@ impl InputValidator {
         }
 
         // Check if line ends with certain keywords that suggest continuation
-        
 
-        trimmed.ends_with('{')
-            || trimmed.ends_with('(')
-            || trimmed.ends_with('[')
-            || trimmed.ends_with(',')
-            || trimmed.ends_with('\\')
+        trimmed.ends_with('{') || trimmed.ends_with('(') || trimmed.ends_with('[') || trimmed.ends_with(',') || trimmed.ends_with('\\')
     }
 }
 
@@ -81,10 +74,6 @@ impl Validator for InputValidator {
     fn validate(&self, ctx: &mut ValidationContext) -> rustyline::Result<ValidationResult> {
         let input = ctx.input();
 
-        if Self::needs_more_input(input) {
-            Ok(ValidationResult::Incomplete)
-        } else {
-            Ok(ValidationResult::Valid(None))
-        }
+        if Self::needs_more_input(input) { Ok(ValidationResult::Incomplete) } else { Ok(ValidationResult::Valid(None)) }
     }
 }

@@ -30,3 +30,40 @@ pub fn parse(source: &str) -> Result<(Program, SpanMap), ParserError> {
     let mut parser = Parser::new(source)?;
     Ok(parser.parse()?)
 }
+
+// Error conversion methods
+impl ParserError {
+    /// Convert ParserError to LugliError with proper span information
+    pub fn to_lugli_error(&self) -> lugli_common::LugliError {
+        match self {
+            ParserError::Lex(lex_err) => lugli_common::LugliError::Lex {
+                message: lex_err.to_string(),
+                span: lugli_common::Span {
+                    start: 0,
+                    end: 0,
+                },
+            },
+            ParserError::Parse(parse_err) => {
+                let span = match parse_err {
+                    ParseError::UnexpectedToken {
+                        token,
+                    } => token.span.clone(),
+                    ParseError::Expected {
+                        found, ..
+                    } => found.span.clone(),
+                    ParseError::Custom {
+                        span, ..
+                    } => span.clone(),
+                    _ => lugli_common::Span {
+                        start: 0,
+                        end: 0,
+                    },
+                };
+                lugli_common::LugliError::Parse {
+                    message: parse_err.to_string(),
+                    span,
+                }
+            }
+        }
+    }
+}

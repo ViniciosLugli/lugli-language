@@ -1,19 +1,18 @@
-use lugli_ast::{
-    AstNode, CallData, Expr, IfData, LiteralValue, NodeId, Program, Stmt, Visitor, VisitorMut,
-};
+use lugli_ast::{AstNode, CallData, Expr, IfData, LiteralValue, NodeId, Program, Stmt, Visitor, VisitorMut};
 use lugli_common::Span;
 use lugli_lexer::TokenKind;
 
-fn make_id(n: usize) -> NodeId {
-    NodeId::new(n)
-}
+fn make_id(n: usize) -> NodeId { NodeId::new(n) }
 
 mod ast_construction_tests {
     use super::*;
 
     #[test]
     fn test_complex_nested_program() {
-        let span = Span { start: 0, end: 100 };
+        let span = Span {
+            start: 0,
+            end: 100,
+        };
         let mut id_counter = 0;
         let mut next_id = || {
             let id = id_counter;
@@ -135,7 +134,10 @@ mod ast_construction_tests {
 
         // Verify function declaration
         if let Stmt::FnDecl {
-            name, params, body, ..
+            name,
+            params,
+            body,
+            ..
         } = &program.statements[0]
         {
             assert_eq!(name, "fibonacci");
@@ -147,7 +149,9 @@ mod ast_construction_tests {
 
         // Verify variable declaration
         if let Stmt::VarDecl {
-            name, initializer, ..
+            name,
+            initializer,
+            ..
         } = &program.statements[1]
         {
             assert_eq!(name, "result");
@@ -236,18 +240,33 @@ mod ast_construction_tests {
         };
 
         // Verify structure - Dict nodes don't have span() after NodeId migration
-        if let Expr::Dict { pairs, .. } = complex_dict {
+        if let Expr::Dict {
+            pairs, ..
+        } = complex_dict
+        {
             assert_eq!(pairs.len(), 2);
 
             // Check the numbers list
-            if let (_, Expr::List { elements, .. }) = &pairs[0] {
+            if let (
+                _,
+                Expr::List {
+                    elements, ..
+                },
+            ) = &pairs[0]
+            {
                 assert_eq!(elements.len(), 3);
             } else {
                 panic!("Expected list in first pair");
             }
 
             // Check the nested metadata dict
-            if let (_, Expr::Dict { pairs: inner_pairs, .. }) = &pairs[1] {
+            if let (
+                _,
+                Expr::Dict {
+                    pairs: inner_pairs, ..
+                },
+            ) = &pairs[1]
+            {
                 assert_eq!(inner_pairs.len(), 2);
             } else {
                 panic!("Expected dict in second pair");
@@ -356,12 +375,20 @@ mod ast_construction_tests {
         };
 
         // Verify structure - For nodes don't have span() after NodeId migration
-        if let Stmt::For { variable, body, .. } = for_loop {
+        if let Stmt::For {
+            variable,
+            body,
+            ..
+        } = for_loop
+        {
             assert_eq!(variable, "item");
             assert_eq!(body.len(), 1);
 
             // Check nested if statement
-            if let Stmt::If { data, .. } = &body[0] {
+            if let Stmt::If {
+                data, ..
+            } = &body[0]
+            {
                 assert_eq!(data.elif_branches.len(), 1);
                 assert!(data.else_branch.is_some());
             } else {
@@ -389,10 +416,18 @@ mod visitor_pattern_tests {
             self.total_expr_count += 1;
 
             match expr {
-                Expr::Literal { .. } => self.literal_count += 1,
-                Expr::Identifier { .. } => self.identifier_count += 1,
-                Expr::Binary { .. } => self.binary_count += 1,
-                Expr::Call { .. } => self.call_count += 1,
+                Expr::Literal {
+                    ..
+                } => self.literal_count += 1,
+                Expr::Identifier {
+                    ..
+                } => self.identifier_count += 1,
+                Expr::Binary {
+                    ..
+                } => self.binary_count += 1,
+                Expr::Call {
+                    ..
+                } => self.call_count += 1,
                 _ => {}
             }
 
@@ -402,7 +437,10 @@ mod visitor_pattern_tests {
 
     #[test]
     fn test_visitor_counting() {
-        let span = Span { start: 0, end: 20 };
+        let span = Span {
+            start: 0,
+            end: 20,
+        };
         let mut id_counter = 0;
         let mut next_id = || {
             let id = id_counter;
@@ -473,7 +511,10 @@ mod visitor_pattern_tests {
 
     impl Visitor<()> for IdentifierCollector {
         fn visit_expr(&mut self, expr: &Expr) -> () {
-            if let Expr::Identifier { name, .. } = expr {
+            if let Expr::Identifier {
+                name, ..
+            } = expr
+            {
                 self.identifiers.push(name.clone());
             }
             self.walk_expr(expr)
@@ -482,7 +523,10 @@ mod visitor_pattern_tests {
 
     #[test]
     fn test_identifier_collection() {
-        let span = Span { start: 0, end: 30 };
+        let span = Span {
+            start: 0,
+            end: 30,
+        };
         let mut id_counter = 0;
         let mut next_id = || {
             let id = id_counter;
@@ -543,7 +587,10 @@ mod visitor_pattern_tests {
 
     impl VisitorMut<()> for NameReplacer {
         fn visit_expr_mut(&mut self, expr: &mut Expr) -> () {
-            if let Expr::Identifier { name, .. } = expr {
+            if let Expr::Identifier {
+                name, ..
+            } = expr
+            {
                 if *name == self.old_name {
                     *name = self.new_name.clone();
                 }
@@ -554,7 +601,10 @@ mod visitor_pattern_tests {
 
     #[test]
     fn test_mutable_visitor() {
-        let span = Span { start: 0, end: 15 };
+        let span = Span {
+            start: 0,
+            end: 15,
+        };
         let mut id_counter = 0;
         let mut next_id = || {
             let id = id_counter;
@@ -589,12 +639,26 @@ mod visitor_pattern_tests {
         replacer.visit_program_mut(&mut program);
 
         // Verify that identifiers were replaced
-        if let Stmt::Expression { expr, .. } = &program.statements[0] {
-            if let Expr::Binary { left, right, .. } = expr {
-                if let Expr::Identifier { name: left_name, .. } = left.as_ref() {
+        if let Stmt::Expression {
+            expr, ..
+        } = &program.statements[0]
+        {
+            if let Expr::Binary {
+                left,
+                right,
+                ..
+            } = expr
+            {
+                if let Expr::Identifier {
+                    name: left_name, ..
+                } = left.as_ref()
+                {
                     assert_eq!(left_name, "new_var");
                 }
-                if let Expr::Identifier { name: right_name, .. } = right.as_ref() {
+                if let Expr::Identifier {
+                    name: right_name, ..
+                } = right.as_ref()
+                {
                     assert_eq!(right_name, "new_var");
                 }
             }
@@ -634,14 +698,23 @@ mod span_tracking_tests {
 
         // Verify NodeIds are assigned
         match &binary_expr {
-            Expr::Binary { id, left, right, .. } => {
+            Expr::Binary {
+                id,
+                left,
+                right,
+                ..
+            } => {
                 assert_eq!(*id, make_id(2));
                 match left.as_ref() {
-                    Expr::Literal { id, .. } => assert_eq!(*id, make_id(0)),
+                    Expr::Literal {
+                        id, ..
+                    } => assert_eq!(*id, make_id(0)),
                     _ => panic!("Expected Literal"),
                 }
                 match right.as_ref() {
-                    Expr::Identifier { id, .. } => assert_eq!(*id, make_id(1)),
+                    Expr::Identifier {
+                        id, ..
+                    } => assert_eq!(*id, make_id(1)),
                     _ => panic!("Expected Identifier"),
                 }
             }
@@ -683,19 +756,31 @@ mod span_tracking_tests {
 
         // Verify NodeId hierarchy
         match &nested_call {
-            Expr::Call { id, data, .. } => {
+            Expr::Call {
+                id,
+                data,
+                ..
+            } => {
                 assert_eq!(*id, make_id(0));
                 match &data.callee {
-                    Expr::Identifier { id, .. } => assert_eq!(*id, make_id(1)),
+                    Expr::Identifier {
+                        id, ..
+                    } => assert_eq!(*id, make_id(1)),
                     _ => panic!("Expected Identifier"),
                 }
                 assert_eq!(data.arguments.len(), 1);
 
                 match &data.arguments[0] {
-                    Expr::Call { id, data, .. } => {
+                    Expr::Call {
+                        id,
+                        data,
+                        ..
+                    } => {
                         assert_eq!(*id, make_id(2));
                         match &data.arguments[0] {
-                            Expr::Literal { id, .. } => assert_eq!(*id, make_id(4)),
+                            Expr::Literal {
+                                id, ..
+                            } => assert_eq!(*id, make_id(4)),
                             _ => panic!("Expected Literal"),
                         }
                     }
@@ -712,7 +797,10 @@ mod ast_node_interface_tests {
 
     #[test]
     fn test_ast_node_trait_consistency() {
-        let span = Span { start: 10, end: 20 };
+        let span = Span {
+            start: 10,
+            end: 20,
+        };
         let mut id_counter = 0;
         let mut next_id = || {
             let id = id_counter;

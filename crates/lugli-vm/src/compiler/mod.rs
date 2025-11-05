@@ -1,6 +1,6 @@
 use crate::{Bytecode, Instruction};
 use hashbrown::HashMap;
-use lugli_ast::{Stmt, SpanMap};
+use lugli_ast::{SpanMap, Stmt};
 use lugli_common::{LugliError, Value};
 
 mod control_flow;

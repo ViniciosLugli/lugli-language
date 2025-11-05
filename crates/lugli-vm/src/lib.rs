@@ -49,7 +49,12 @@ pub fn compile_and_run(program: &lugli_ast::Program, span_map: lugli_ast::SpanMa
     run(&bytecode)
 }
 
-pub fn compile_and_run_with_source(program: &lugli_ast::Program, span_map: lugli_ast::SpanMap, file_path: &str, source: &str) -> Result<Value, VmError> {
+pub fn compile_and_run_with_source(
+    program: &lugli_ast::Program,
+    span_map: lugli_ast::SpanMap,
+    file_path: &str,
+    source: &str,
+) -> Result<Value, VmError> {
     let bytecode = compile_with_source(program, span_map, file_path, source)?;
     run(&bytecode)
 }

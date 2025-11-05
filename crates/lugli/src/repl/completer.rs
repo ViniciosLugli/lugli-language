@@ -1,5 +1,7 @@
-use rustyline::completion::{Completer, Pair};
-use rustyline::Context;
+use rustyline::{
+    Context,
+    completion::{Completer, Pair},
+};
 use std::collections::HashSet;
 
 pub struct LugliCompleter {
@@ -12,10 +14,8 @@ impl LugliCompleter {
     pub fn new() -> Self {
         let keywords = vec![
             // Keywords
-            "let", "mut", "const", "fn", "struct", "impl", "if", "elif", "else",
-            "match", "for", "while", "loop", "break", "continue", "return",
-            "import", "from", "as", "true", "false", "null",
-            // Type hints
+            "let", "mut", "const", "fn", "struct", "impl", "if", "elif", "else", "match", "for", "while", "loop", "break", "continue", "return",
+            "import", "from", "as", "true", "false", "null", // Type hints
             "num", "str", "bool", "list", "dict",
         ]
         .into_iter()
@@ -24,19 +24,59 @@ impl LugliCompleter {
 
         let builtins = vec![
             // Core functions
-            "print", "println", "input", "len", "str", "int", "float", "bool",
-            "type", "range", "enumerate", "zip", "map", "filter", "reduce",
-            "all", "any", "sum", "min", "max", "sorted", "reversed",
+            "print",
+            "println",
+            "input",
+            "len",
+            "str",
+            "int",
+            "float",
+            "bool",
+            "type",
+            "range",
+            "enumerate",
+            "zip",
+            "map",
+            "filter",
+            "reduce",
+            "all",
+            "any",
+            "sum",
+            "min",
+            "max",
+            "sorted",
+            "reversed",
             // Math functions
-            "abs", "pow", "round", "floor", "ceil", "sqrt",
+            "abs",
+            "pow",
+            "round",
+            "floor",
+            "ceil",
+            "sqrt",
             // String methods
-            "upper", "lower", "split", "join", "replace", "trim", "contains",
+            "upper",
+            "lower",
+            "split",
+            "join",
+            "replace",
+            "trim",
+            "contains",
             // List methods
-            "push", "pop", "insert", "remove", "clear", "extend",
+            "push",
+            "pop",
+            "insert",
+            "remove",
+            "clear",
+            "extend",
             // Dict methods
-            "keys", "values", "items", "get", "has_key",
+            "keys",
+            "values",
+            "items",
+            "get",
+            "has_key",
             // Macros
-            "format!", "import!",
+            "format!",
+            "import!",
         ]
         .into_iter()
         .map(String::from)
@@ -83,24 +123,15 @@ impl LugliCompleter {
         let before_cursor = &line[..pos];
 
         // Find the start of the current word
-        
 
-        before_cursor
-            .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '!' && c != '?')
-            .map(|i| i + 1)
-            .unwrap_or(0)
+        before_cursor.rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '!' && c != '?').map(|i| i + 1).unwrap_or(0)
     }
 }
 
 impl Completer for LugliCompleter {
     type Candidate = Pair;
 
-    fn complete(
-        &self,
-        line: &str,
-        pos: usize,
-        _ctx: &Context<'_>,
-    ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
+    fn complete(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
         if line.is_empty() || pos == 0 {
             return Ok((0, vec![]));
         }

@@ -47,11 +47,7 @@ impl<'a> Parser<'a> {
         let name = self.consume_identifier("Expected variable name")?;
 
         // Parse optional type hint
-        let type_hint = if self.match_any(&[TokenKind::Colon]) {
-            Some(self.parse_type_hint()?)
-        } else {
-            None
-        };
+        let type_hint = if self.match_any(&[TokenKind::Colon]) { Some(self.parse_type_hint()?) } else { None };
 
         let initializer = if self.match_any(&[TokenKind::Equal]) {
             Some(self.expression()?)
@@ -98,20 +94,13 @@ impl<'a> Parser<'a> {
         self.skip_newlines();
 
         let parsed_params = self.parse_params()?;
-        let params: Vec<(String, Option<lugli_ast::TypeHint>)> = parsed_params
-            .iter()
-            .map(|p| (p.name.clone(), p.type_hint.clone()))
-            .collect();
+        let params: Vec<(String, Option<lugli_ast::TypeHint>)> = parsed_params.iter().map(|p| (p.name.clone(), p.type_hint.clone())).collect();
 
         self.skip_newlines();
         self.consume(&TokenKind::RightParen, "Expected ')' after parameters")?;
 
         // Parse optional return type hint
-        let return_type = if self.match_any(&[TokenKind::Arrow]) {
-            Some(self.parse_type_hint()?)
-        } else {
-            None
-        };
+        let return_type = if self.match_any(&[TokenKind::Arrow]) { Some(self.parse_type_hint()?) } else { None };
 
         let body = self.block_body()?;
 
@@ -150,15 +139,11 @@ impl<'a> Parser<'a> {
 
                 // Parse optional type hint and default value
                 let (type_hint, default_value) = if self.check(&TokenKind::Colon) {
-                    self.advance();  // consume colon
+                    self.advance(); // consume colon
                     let is_type_hint = matches!(self.peek_kind(), Some(TokenKind::Identifier(_)));
                     if is_type_hint {
                         let hint = Some(self.parse_type_hint()?);
-                        let default = if self.match_any(&[TokenKind::Equal]) {
-                            Some(self.expression()?)
-                        } else {
-                            None
-                        };
+                        let default = if self.match_any(&[TokenKind::Equal]) { Some(self.expression()?) } else { None };
                         (hint, default)
                     } else {
                         (None, Some(self.expression()?))
@@ -356,7 +341,9 @@ impl<'a> Parser<'a> {
         let id = self.span_map.alloc_id();
         self.span_map.insert(id, span);
 
-        Ok(Stmt::Break { id })
+        Ok(Stmt::Break {
+            id,
+        })
     }
 
     pub(crate) fn continue_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -369,7 +356,9 @@ impl<'a> Parser<'a> {
         let id = self.span_map.alloc_id();
         self.span_map.insert(id, span);
 
-        Ok(Stmt::Continue { id })
+        Ok(Stmt::Continue {
+            id,
+        })
     }
 
     pub(crate) fn block_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -436,7 +425,10 @@ impl<'a> Parser<'a> {
             let final_value_span = self.get_expr_span(final_value.id());
 
             let assignment_expr = match expr.clone() {
-                Expr::Identifier { name, id } => {
+                Expr::Identifier {
+                    name,
+                    id,
+                } => {
                     let id_span = self.get_expr_span(id);
                     let span = self.merge_spans(id_span, final_value_span);
                     let set_id = self.span_map.alloc_id();
@@ -455,7 +447,11 @@ impl<'a> Parser<'a> {
                         value: Box::new(final_value),
                     }
                 }
-                Expr::Get { object, name, id } => {
+                Expr::Get {
+                    object,
+                    name,
+                    id,
+                } => {
                     let get_span = self.get_expr_span(id);
                     let span = self.merge_spans(get_span, final_value_span);
                     let set_id = self.span_map.alloc_id();
@@ -468,7 +464,11 @@ impl<'a> Parser<'a> {
                         value: Box::new(final_value),
                     }
                 }
-                Expr::Index { object, index, id } => {
+                Expr::Index {
+                    object,
+                    index,
+                    id,
+                } => {
                     let index_span = self.get_expr_span(id);
                     let span = self.merge_spans(index_span, final_value_span);
                     let set_id = self.span_map.alloc_id();

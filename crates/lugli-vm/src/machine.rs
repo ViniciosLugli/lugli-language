@@ -371,11 +371,13 @@ impl Machine {
 
         let mut parser = lugli_parser::Parser::new(&source)
             .map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
-        let (ast, span_map) = parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
+        let (ast, span_map) =
+            parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
 
         let mut compiler = crate::Compiler::new();
-        let module_bytecode =
-            compiler.compile(&ast, span_map).map_err(|e| LugliError::runtime(format!("Compile error in module '{}': {}", resolved_path.display(), e)))?;
+        let module_bytecode = compiler
+            .compile(&ast, span_map)
+            .map_err(|e| LugliError::runtime(format!("Compile error in module '{}': {}", resolved_path.display(), e)))?;
 
         // Assign and register bytecode ID for this module
         let module_bytecode_id = self.next_bytecode_id;
@@ -704,14 +706,13 @@ impl Machine {
                         if self.debug.trace_calls {
                             eprintln!("[CALL] Executing native function: {}", name);
                         }
-                        let args_start_index = self.stack.len()
-                            .checked_sub(arg_count + 1)
-                            .ok_or_else(|| {
-                                LugliError::runtime(format!(
-                                    "Stack underflow: need {} arguments but stack only has {} elements",
-                                    arg_count, self.stack.len()
-                                ))
-                            })?;
+                        let args_start_index = self.stack.len().checked_sub(arg_count + 1).ok_or_else(|| {
+                            LugliError::runtime(format!(
+                                "Stack underflow: need {} arguments but stack only has {} elements",
+                                arg_count,
+                                self.stack.len()
+                            ))
+                        })?;
                         let args_end_index = self.stack.len() - 1;
                         let args = self.stack.get(args_start_index..args_end_index).ok_or_else(|| {
                             LugliError::runtime(format!(
@@ -964,11 +965,12 @@ impl Machine {
                     if let Value::Dict(dict_ref) = &object {
                         // Detect potential circular reference (self-assignment)
                         if let Value::Dict(value_dict_ref) = &value
-                            && Rc::ptr_eq(dict_ref, value_dict_ref) {
-                                eprintln!("⚠️  WARNING: Assigning dictionary to itself creates a circular reference");
-                                eprintln!("   This will cause a memory leak as Rc reference count never reaches 0");
-                                eprintln!("   Consider using weak references or avoid circular structures");
-                            }
+                            && Rc::ptr_eq(dict_ref, value_dict_ref)
+                        {
+                            eprintln!("⚠️  WARNING: Assigning dictionary to itself creates a circular reference");
+                            eprintln!("   This will cause a memory leak as Rc reference count never reaches 0");
+                            eprintln!("   Consider using weak references or avoid circular structures");
+                        }
 
                         dict_ref
                             .try_borrow_mut()

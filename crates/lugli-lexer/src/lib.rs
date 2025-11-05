@@ -259,11 +259,7 @@ mod tests {
         // Original: ~48 bytes (TokenKind discriminant + String 24 bytes + Span 16 bytes + padding)
         // Actual: 32 bytes (TokenKind discriminant 16 bytes + Span 16 bytes)
         // This is a 33% reduction in size!
-        assert!(
-            token_size <= 32,
-            "Token size should be <= 32 bytes, got {} bytes",
-            token_size
-        );
+        assert!(token_size <= 32, "Token size should be <= 32 bytes, got {} bytes", token_size);
 
         let reduction_percent = ((48.0 - token_size as f64) / 48.0 * 100.0) as u32;
         println!("✅ Token size: {} bytes (reduced {}% from 48 bytes)", token_size, reduction_percent);

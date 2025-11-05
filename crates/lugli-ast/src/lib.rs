@@ -45,13 +45,14 @@ mod tests {
     use super::*;
     use lugli_lexer::TokenKind;
 
-    fn make_id(n: u32) -> NodeId {
-        NodeId::new(n as usize)
-    }
+    fn make_id(n: u32) -> NodeId { NodeId::new(n as usize) }
 
     #[test]
     fn test_program_creation() {
-        let span = Span { start: 0, end: 10 };
+        let span = Span {
+            start: 0,
+            end: 10,
+        };
         let program = Program::new(vec![], span.clone());
 
         assert_eq!(program.statements.len(), 0);
@@ -93,7 +94,10 @@ mod tests {
         };
 
         assert_eq!(ident_expr.id(), make_id(0));
-        if let Expr::Identifier { name, .. } = ident_expr {
+        if let Expr::Identifier {
+            name, ..
+        } = ident_expr
+        {
             assert_eq!(name, "variable");
         } else {
             panic!("Expected Identifier expression");
@@ -140,11 +144,17 @@ mod tests {
 
         let call_expr = Expr::Call {
             id: make_id(3),
-            data: Box::new(CallData { callee, arguments }),
+            data: Box::new(CallData {
+                callee,
+                arguments,
+            }),
         };
 
         assert_eq!(call_expr.id(), make_id(3));
-        if let Expr::Call { data, .. } = call_expr {
+        if let Expr::Call {
+            data, ..
+        } = call_expr
+        {
             assert_eq!(data.arguments.len(), 2);
         } else {
             panic!("Expected Call expression");
@@ -174,7 +184,10 @@ mod tests {
         };
 
         assert_eq!(list_expr.id(), make_id(3));
-        if let Expr::List { elements, .. } = list_expr {
+        if let Expr::List {
+            elements, ..
+        } = list_expr
+        {
             assert_eq!(elements.len(), 3);
         } else {
             panic!("Expected List expression");
@@ -212,7 +225,10 @@ mod tests {
         };
 
         assert_eq!(dict_expr.id(), make_id(4));
-        if let Expr::Dict { pairs, .. } = dict_expr {
+        if let Expr::Dict {
+            pairs, ..
+        } = dict_expr
+        {
             assert_eq!(pairs.len(), 2);
         } else {
             panic!("Expected Dict expression");
@@ -236,7 +252,9 @@ mod tests {
 
         assert_eq!(var_decl.id(), make_id(1));
         if let Stmt::VarDecl {
-            name, is_const, ..
+            name,
+            is_const,
+            ..
         } = var_decl
         {
             assert_eq!(name, "x");
@@ -267,7 +285,10 @@ mod tests {
 
         assert_eq!(fn_decl.id(), make_id(2));
         if let Stmt::FnDecl {
-            name, params, body, ..
+            name,
+            params,
+            body,
+            ..
         } = fn_decl
         {
             assert_eq!(name, "add");
@@ -310,7 +331,10 @@ mod tests {
         };
 
         assert_eq!(if_stmt.id(), make_id(5));
-        if let Stmt::If { data, .. } = if_stmt {
+        if let Stmt::If {
+            data, ..
+        } = if_stmt
+        {
             assert_eq!(data.then_branch.len(), 1);
             assert!(data.else_branch.is_some());
             assert_eq!(data.else_branch.unwrap().len(), 1);
@@ -338,7 +362,10 @@ mod tests {
             }
         }
 
-        let span = Span { start: 0, end: 10 };
+        let span = Span {
+            start: 0,
+            end: 10,
+        };
         let program = Program::new(
             vec![
                 Stmt::VarDecl {

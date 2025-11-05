@@ -16,26 +16,22 @@ pub enum CliError {
 }
 
 impl From<rustyline::error::ReadlineError> for CliError {
-    fn from(err: rustyline::error::ReadlineError) -> Self {
-        CliError::ReplError(err.to_string())
-    }
+    fn from(err: rustyline::error::ReadlineError) -> Self { CliError::ReplError(err.to_string()) }
 }
 
 pub fn run_file(file_path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(file_path).map_err(|_| CliError::FileNotFound(file_path.to_string()))?;
 
-    let (program, span_map) = lugli_parser::parse(&source).map_err(|e| CliError::Runtime(format_parse_error(e, file_path, &source)))?;
+    let (program, span_map) = lugli_parser::parse(&source).map_err(|e| {
+        let lugli_error = e.to_lugli_error();
+        let formatter = if should_use_colors() { ErrorFormatter::new() } else { ErrorFormatter::without_colors() };
+        CliError::Runtime(formatter.format(&lugli_error))
+    })?;
 
     match lugli_vm::compile_and_run_with_source(&program, span_map, file_path, &source) {
         Ok(_) => Ok(()),
         Err(e) => Err(CliError::Runtime(format_vm_error(e))),
     }
-}
-
-fn format_parse_error(error: lugli_parser::ParserError, _file_path: &str, _source: &str) -> String {
-    let use_colors = should_use_colors();
-
-    if use_colors { format!("{} [{}]: {}", "Error".red().bold(), "Parse".yellow(), error) } else { format!("Error [Parse]: {}", error) }
 }
 
 fn format_vm_error(error: VmError) -> String {
