@@ -15,10 +15,8 @@ impl Compiler {
                 // Jump to else/end if condition is false
                 let jump_to_else = self.emit_jump(Instruction::JumpIfFalse(0));
 
-                // Compile then branch
-                for stmt in &data.then_branch {
-                    self.compile_stmt(stmt)?;
-                }
+                // Compile then branch - leave last expression value on stack
+                self.compile_branch_as_expr(&data.then_branch)?;
 
                 let mut end_jumps = Vec::new();
 
@@ -34,9 +32,7 @@ impl Compiler {
                     self.compile_expr(elif_condition)?;
                     let elif_jump = self.emit_jump(Instruction::JumpIfFalse(0));
 
-                    for stmt in elif_body {
-                        self.compile_stmt(stmt)?;
-                    }
+                    self.compile_branch_as_expr(elif_body)?;
 
                     let end_jump = self.emit_jump(Instruction::Jump(0));
                     end_jumps.push(end_jump);
@@ -47,9 +43,10 @@ impl Compiler {
 
                 // Compile else branch if it exists
                 if let Some(else_body) = &data.else_branch {
-                    for stmt in else_body {
-                        self.compile_stmt(stmt)?;
-                    }
+                    self.compile_branch_as_expr(else_body)?;
+                } else {
+                    // No else branch - push null to ensure consistent stack behavior
+                    self.emit_unknown(crate::Instruction::LoadNull);
                 }
 
                 // Patch all end jumps to point here

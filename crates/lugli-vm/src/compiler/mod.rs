@@ -165,6 +165,32 @@ impl Compiler {
         }
     }
 
+    pub(crate) fn compile_branch_as_expr(&mut self, stmts: &[Stmt]) -> Result<(), LugliError> {
+        for (i, stmt) in stmts.iter().enumerate() {
+            let is_last = i == stmts.len() - 1;
+
+            if is_last {
+                if let Stmt::Expression { expr, .. } = stmt {
+                    self.compile_expr(expr)?;
+                } else {
+                    self.compile_stmt(stmt)?;
+                    self.emit_unknown(Instruction::LoadNull);
+                }
+            } else {
+                self.compile_stmt(stmt)?;
+                if matches!(stmt, Stmt::Expression { .. }) {
+                    self.emit_unknown(Instruction::Pop);
+                }
+            }
+        }
+
+        if stmts.is_empty() {
+            self.emit_unknown(Instruction::LoadNull);
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::only_used_in_recursion)]
     pub(crate) fn try_evaluate_constant(&self, expr: &lugli_ast::Expr) -> Option<Value> {
         use lugli_ast::{Expr, LiteralValue};

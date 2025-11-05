@@ -11,7 +11,7 @@ pub mod stmt;
 pub mod type_hint;
 pub mod visitor;
 
-pub use expr::{CallData, Expr, FStringPart, ListComprehensionData, LiteralValue, MatchArm, Pattern};
+pub use expr::{CallData, ComprehensionClause, Expr, FStringPart, ListComprehensionData, LiteralValue, MatchArm, Pattern};
 pub use span_map::{NodeId, SpanMap};
 pub use stmt::{IfData, Stmt, StructDeclData, StructField};
 pub use type_hint::TypeHint;
