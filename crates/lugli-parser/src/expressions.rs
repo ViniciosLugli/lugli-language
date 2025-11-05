@@ -13,8 +13,8 @@ impl<'a> Parser<'a> {
             self.skip_newlines();
             let right = self.and()?;
 
-            let left_span = self.span_map.get(expr.id()).unwrap();
-            let right_span = self.span_map.get(right.id()).unwrap();
+            let left_span = self.get_expr_span(expr.id());
+            let right_span = self.get_expr_span(right.id());
             let span = self.merge_spans(left_span, right_span);
             let id = self.span_map.alloc_id();
             self.span_map.insert(id, span);
@@ -38,8 +38,8 @@ impl<'a> Parser<'a> {
             self.skip_newlines();
             let right = self.equality()?;
 
-            let left_span = self.span_map.get(expr.id()).unwrap();
-            let right_span = self.span_map.get(right.id()).unwrap();
+            let left_span = self.get_expr_span(expr.id());
+            let right_span = self.get_expr_span(right.id());
             let span = self.merge_spans(left_span, right_span);
             let id = self.span_map.alloc_id();
             self.span_map.insert(id, span);
@@ -63,8 +63,8 @@ impl<'a> Parser<'a> {
             self.skip_newlines();
             let right = self.comparison()?;
 
-            let left_span = self.span_map.get(expr.id()).unwrap();
-            let right_span = self.span_map.get(right.id()).unwrap();
+            let left_span = self.get_expr_span(expr.id());
+            let right_span = self.get_expr_span(right.id());
             let span = self.merge_spans(left_span, right_span);
             let id = self.span_map.alloc_id();
             self.span_map.insert(id, span);
@@ -88,8 +88,8 @@ impl<'a> Parser<'a> {
             self.skip_newlines();
             let right = self.term()?;
 
-            let left_span = self.span_map.get(expr.id()).unwrap();
-            let right_span = self.span_map.get(right.id()).unwrap();
+            let left_span = self.get_expr_span(expr.id());
+            let right_span = self.get_expr_span(right.id());
             let span = self.merge_spans(left_span, right_span);
             let id = self.span_map.alloc_id();
             self.span_map.insert(id, span);
@@ -113,8 +113,8 @@ impl<'a> Parser<'a> {
             self.skip_newlines();
             let right = self.factor()?;
 
-            let left_span = self.span_map.get(expr.id()).unwrap();
-            let right_span = self.span_map.get(right.id()).unwrap();
+            let left_span = self.get_expr_span(expr.id());
+            let right_span = self.get_expr_span(right.id());
             let span = self.merge_spans(left_span, right_span);
             let id = self.span_map.alloc_id();
             self.span_map.insert(id, span);
@@ -138,8 +138,8 @@ impl<'a> Parser<'a> {
             self.skip_newlines();
             let right = self.power()?;
 
-            let left_span = self.span_map.get(expr.id()).unwrap();
-            let right_span = self.span_map.get(right.id()).unwrap();
+            let left_span = self.get_expr_span(expr.id());
+            let right_span = self.get_expr_span(right.id());
             let span = self.merge_spans(left_span, right_span);
             let id = self.span_map.alloc_id();
             self.span_map.insert(id, span);
@@ -164,8 +164,8 @@ impl<'a> Parser<'a> {
             self.skip_newlines();
             let right = self.power()?; // Recursive for right-associativity
 
-            let left_span = self.span_map.get(expr.id()).unwrap();
-            let right_span = self.span_map.get(right.id()).unwrap();
+            let left_span = self.get_expr_span(expr.id());
+            let right_span = self.get_expr_span(right.id());
             let span = self.merge_spans(left_span, right_span);
             let id = self.span_map.alloc_id();
             self.span_map.insert(id, span);
@@ -187,7 +187,7 @@ impl<'a> Parser<'a> {
             let operator_span = self.previous().span;
             let operand = self.unary()?;
 
-            let operand_span = self.span_map.get(operand.id()).unwrap();
+            let operand_span = self.get_expr_span(operand.id());
             let span = self.merge_spans(operator_span, operand_span);
             let id = self.span_map.alloc_id();
             self.span_map.insert(id, span);
@@ -212,7 +212,7 @@ impl<'a> Parser<'a> {
                 let index = self.expression()?;
                 self.consume(&TokenKind::RightBracket, "Expected ']' after index")?;
 
-                let object_span = self.span_map.get(expr.id()).unwrap();
+                let object_span = self.get_expr_span(expr.id());
                 let end_span = self.previous_span();
                 let span = self.merge_spans(object_span, end_span);
                 let id = self.span_map.alloc_id();
@@ -238,7 +238,7 @@ impl<'a> Parser<'a> {
                     name.push('?');
                 }
 
-                let object_span = self.span_map.get(expr.id()).unwrap();
+                let object_span = self.get_expr_span(expr.id());
                 let end_span = self.previous_span();
                 let span = self.merge_spans(object_span, end_span);
                 let id = self.span_map.alloc_id();
@@ -282,7 +282,7 @@ impl<'a> Parser<'a> {
 
         self.consume_closing(&TokenKind::RightParen, "Expected ')' after arguments")?;
 
-        let callee_span = self.span_map.get(callee.id()).unwrap();
+        let callee_span = self.get_expr_span(callee.id());
         let end_span = self.previous_span();
         let span = self.merge_spans(callee_span, end_span);
         let id = self.span_map.alloc_id();

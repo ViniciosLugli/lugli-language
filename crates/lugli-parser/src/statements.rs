@@ -417,8 +417,8 @@ impl<'a> Parser<'a> {
                     }
                 };
 
-                let expr_span = self.span_map.get(expr.id()).unwrap();
-                let value_span = self.span_map.get(value.id()).unwrap();
+                let expr_span = self.get_expr_span(expr.id());
+                let value_span = self.get_expr_span(value.id());
                 let bin_span = self.merge_spans(expr_span, value_span);
                 let bin_id = self.span_map.alloc_id();
                 self.span_map.insert(bin_id, bin_span);
@@ -433,11 +433,11 @@ impl<'a> Parser<'a> {
                 value
             };
 
-            let final_value_span = self.span_map.get(final_value.id()).unwrap();
+            let final_value_span = self.get_expr_span(final_value.id());
 
             let assignment_expr = match expr.clone() {
                 Expr::Identifier { name, id } => {
-                    let id_span = self.span_map.get(id).unwrap();
+                    let id_span = self.get_expr_span(id);
                     let span = self.merge_spans(id_span, final_value_span);
                     let set_id = self.span_map.alloc_id();
                     self.span_map.insert(set_id, span);
@@ -456,7 +456,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Expr::Get { object, name, id } => {
-                    let get_span = self.span_map.get(id).unwrap();
+                    let get_span = self.get_expr_span(id);
                     let span = self.merge_spans(get_span, final_value_span);
                     let set_id = self.span_map.alloc_id();
                     self.span_map.insert(set_id, span);
@@ -469,7 +469,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Expr::Index { object, index, id } => {
-                    let index_span = self.span_map.get(id).unwrap();
+                    let index_span = self.get_expr_span(id);
                     let span = self.merge_spans(index_span, final_value_span);
                     let set_id = self.span_map.alloc_id();
                     self.span_map.insert(set_id, span);
@@ -488,7 +488,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 _ => {
-                    let expr_span = self.span_map.get(expr.id()).unwrap();
+                    let expr_span = self.get_expr_span(expr.id());
                     return Err(ParseError::Custom {
                         message: "Invalid assignment target".to_string(),
                         span: expr_span,
@@ -496,7 +496,7 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            let assignment_span = self.span_map.get(assignment_expr.id()).unwrap();
+            let assignment_span = self.get_expr_span(assignment_expr.id());
             let stmt_id = self.span_map.alloc_id();
             self.span_map.insert(stmt_id, assignment_span);
 
@@ -506,7 +506,7 @@ impl<'a> Parser<'a> {
             })
         } else {
             self.consume_statement_terminator()?;
-            let expr_span = self.span_map.get(expr.id()).unwrap();
+            let expr_span = self.get_expr_span(expr.id());
             let stmt_id = self.span_map.alloc_id();
             self.span_map.insert(stmt_id, expr_span);
 
@@ -612,7 +612,7 @@ impl<'a> Parser<'a> {
 
         let item = Box::new(self.statement()?);
 
-        let item_span = self.span_map.get(item.id()).unwrap();
+        let item_span = self.get_expr_span(item.id());
         let span = self.merge_spans(start_span, item_span);
         let id = self.span_map.alloc_id();
         self.span_map.insert(id, span);

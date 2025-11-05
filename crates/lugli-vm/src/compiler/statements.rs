@@ -258,7 +258,14 @@ impl Compiler {
                     None => {
                         // import module [as alias]
                         // Determine binding name: alias if provided, else last component of path
-                        let bind_name = alias.clone().unwrap_or_else(|| module_path.last().unwrap().clone());
+                        let bind_name = if let Some(alias_name) = alias {
+                            alias_name.clone()
+                        } else {
+                            module_path
+                                .last()
+                                .ok_or_else(|| LugliError::runtime("Empty module path in import statement"))?
+                                .clone()
+                        };
 
                         // ImportModule stores directly in globals with no stack effect
                         self.emit_unknown(Instruction::ImportModule {
