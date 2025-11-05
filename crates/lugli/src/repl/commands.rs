@@ -1,7 +1,9 @@
 use colored::Colorize;
 use lugli_vm::Machine;
-use rustyline::history::{FileHistory, History};
-use rustyline::Editor;
+use rustyline::{
+    Editor,
+    history::{FileHistory, History},
+};
 
 pub fn handle_command(
     input: &str,
@@ -24,12 +26,7 @@ pub fn handle_command(
             println!("Goodbye!");
             std::process::exit(0);
         }
-        _ => {
-            return Err(format!(
-                "Unknown command: {}. Type :help for available commands.",
-                parts[0]
-            ))
-        }
+        _ => return Err(format!("Unknown command: {}. Type :help for available commands.", parts[0])),
     }
 
     Ok(())
@@ -39,10 +36,7 @@ fn show_help() {
     println!("\n{}", "REPL Commands:".bright_cyan().bold());
     println!("  {}  - Show this help message", ":help, :h".bright_green());
     println!("  {}  - Show current variables", ":vars, :v".bright_green());
-    println!(
-        "  {} - Clear the screen",
-        ":clear, :cls".bright_green()
-    );
+    println!("  {} - Clear the screen", ":clear, :cls".bright_green());
     println!("  {} - Reset VM state (clear all variables)", ":reset, :r".bright_green());
     println!("  {} - Show command history", ":history, :hist".bright_green());
     println!("  {} - Exit the REPL", ":quit, :q, :exit".bright_green());
@@ -85,12 +79,8 @@ fn clear_screen() {
 }
 
 fn reset_vm(vm: &mut Machine) {
-    let native_functions: Vec<_> = vm
-        .globals
-        .iter()
-        .filter(|(_, v)| matches!(v, lugli_common::Value::NativeFunction { .. }))
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
+    let native_functions: Vec<_> =
+        vm.globals.iter().filter(|(_, v)| matches!(v, lugli_common::Value::NativeFunction { .. })).map(|(k, v)| (k.clone(), v.clone())).collect();
 
     vm.reset();
 

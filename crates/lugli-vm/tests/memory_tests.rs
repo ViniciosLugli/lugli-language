@@ -174,8 +174,12 @@ fn test_gc_adaptive_threshold() {
 
     // After GC, threshold should have increased (allocations hit threshold)
     let new_threshold = gc.stats().threshold;
-    assert!(new_threshold > initial_threshold || new_threshold == initial_threshold,
-            "Threshold adjusted: {} -> {}", initial_threshold, new_threshold);
+    assert!(
+        new_threshold > initial_threshold || new_threshold == initial_threshold,
+        "Threshold adjusted: {} -> {}",
+        initial_threshold,
+        new_threshold
+    );
 
     // Verify GC was triggered (allocations reset)
     assert_eq!(gc.stats().allocations, 0, "Allocations should reset after GC");

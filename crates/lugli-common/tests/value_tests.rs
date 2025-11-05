@@ -384,15 +384,9 @@ mod list_concat_tests {
 
     #[test]
     fn test_list_concat_efficiency() {
-        let list1 = Value::List(Rc::new(RefCell::new(vec![
-            Value::Number(1.0),
-            Value::Number(2.0),
-        ])));
+        let list1 = Value::List(Rc::new(RefCell::new(vec![Value::Number(1.0), Value::Number(2.0)])));
 
-        let list2 = Value::List(Rc::new(RefCell::new(vec![
-            Value::Number(3.0),
-            Value::Number(4.0),
-        ])));
+        let list2 = Value::List(Rc::new(RefCell::new(vec![Value::Number(3.0), Value::Number(4.0)])));
 
         let result = list1.add(&list2).unwrap();
 
@@ -473,8 +467,10 @@ mod hash_tests {
 
     #[test]
     fn test_hash_consistency() {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+        use std::{
+            collections::hash_map::DefaultHasher,
+            hash::{Hash, Hasher},
+        };
 
         let val1 = Value::Number(42.0);
         let val2 = Value::Number(42.0);

@@ -111,14 +111,18 @@ impl GarbageCollector {
                         }
                     }
                 }
-                Value::Closure { upvalues, .. } => {
+                Value::Closure {
+                    upvalues, ..
+                } => {
                     for upvalue in upvalues {
                         if let Ok(upvalue_ref) = upvalue.try_borrow() {
                             worklist.push(upvalue_ref.clone());
                         }
                     }
                 }
-                Value::StructInstance { fields, .. } => {
+                Value::StructInstance {
+                    fields, ..
+                } => {
                     for field in fields.values() {
                         worklist.push(field.clone());
                     }
@@ -157,20 +161,29 @@ impl GarbageCollector {
     /// - Closure/Struct: Use value discriminant + hash of name/first field
     /// - Primitives: ID=0 (don't need tracking, no cycles possible)
     fn value_id(&self, value: &Value) -> usize {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+        use std::{
+            collections::hash_map::DefaultHasher,
+            hash::{Hash, Hasher},
+        };
 
         match value {
             Value::Dict(d) => d.as_ptr() as usize,
             Value::List(l) => l.as_ptr() as usize,
-            Value::Closure { name, upvalues, .. } => {
+            Value::Closure {
+                name,
+                upvalues,
+                ..
+            } => {
                 // Combine closure name hash with upvalues pointer
                 let mut hasher = DefaultHasher::new();
                 name.hash(&mut hasher);
                 upvalues.as_ptr().hash(&mut hasher);
                 hasher.finish() as usize
             }
-            Value::StructInstance { name, fields } => {
+            Value::StructInstance {
+                name,
+                fields,
+            } => {
                 // Combine struct name with fields pointer
                 let mut hasher = DefaultHasher::new();
                 name.hash(&mut hasher);
@@ -194,9 +207,7 @@ impl GarbageCollector {
 }
 
 impl Default for GarbageCollector {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 /// GC statistics for monitoring and debugging

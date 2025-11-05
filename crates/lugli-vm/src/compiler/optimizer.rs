@@ -22,7 +22,7 @@ impl PeepholeOptimizer {
     pub fn new() -> Self {
         Self {
             optimize_constants: true,
-            optimize_jumps: false, // Temporarily disabled - may break jump targets
+            optimize_jumps: false,     // Temporarily disabled - may break jump targets
             optimize_dead_code: false, // Temporarily disabled - too aggressive with closures
         }
     }
@@ -72,19 +72,21 @@ impl PeepholeOptimizer {
         while i < instructions.len() {
             // Try 3-instruction patterns first (binary ops)
             if i + 2 < instructions.len()
-                && let Some(folded) = self.try_fold_binary(&instructions[i], &instructions[i + 1], &instructions[i + 2]) {
-                    result.push(folded);
-                    i += 3;
-                    continue;
-                }
+                && let Some(folded) = self.try_fold_binary(&instructions[i], &instructions[i + 1], &instructions[i + 2])
+            {
+                result.push(folded);
+                i += 3;
+                continue;
+            }
 
             // Try 2-instruction patterns (unary ops)
             if i + 1 < instructions.len()
-                && let Some(folded) = self.try_fold_unary(&instructions[i], &instructions[i + 1]) {
-                    result.push(folded);
-                    i += 2;
-                    continue;
-                }
+                && let Some(folded) = self.try_fold_unary(&instructions[i], &instructions[i + 1])
+            {
+                result.push(folded);
+                i += 2;
+                continue;
+            }
 
             // No optimization, keep instruction
             result.push(instructions[i].clone());
@@ -249,21 +251,21 @@ impl PeepholeOptimizer {
 
             // Pattern: Constant Pop → (remove both)
             // BUT: Don't remove if it might affect closure/upvalue setup
-            if i + 1 < instructions.len()
-                && self.is_pure_constant(inst) && matches!(instructions[i + 1], Instruction::Pop) {
-                    // Check if this is near closure-related instructions
-                    if !self.is_near_closure_ops(i, &instructions) {
-                        i += 2;
-                        continue;
-                    }
+            if i + 1 < instructions.len() && self.is_pure_constant(inst) && matches!(instructions[i + 1], Instruction::Pop) {
+                // Check if this is near closure-related instructions
+                if !self.is_near_closure_ops(i, &instructions) {
+                    i += 2;
+                    continue;
                 }
+            }
 
             // Pattern: Jump to next instruction → remove jump
             if let Instruction::Jump(target) = inst
-                && *target == i + 1 {
-                    i += 1;
-                    continue;
-                }
+                && *target == i + 1
+            {
+                i += 1;
+                continue;
+            }
 
             result.push(inst.clone());
 
@@ -305,10 +307,7 @@ impl PeepholeOptimizer {
         for inst in &instructions[start..end] {
             if matches!(
                 inst,
-                Instruction::DefineFunction(_)
-                    | Instruction::MakeClosure { .. }
-                    | Instruction::LoadUpvalue(_)
-                    | Instruction::StoreUpvalue(_)
+                Instruction::DefineFunction(_) | Instruction::MakeClosure { .. } | Instruction::LoadUpvalue(_) | Instruction::StoreUpvalue(_)
             ) {
                 return true;
             }
@@ -359,13 +358,7 @@ impl PeepholeOptimizer {
         instructions
             .into_iter()
             .enumerate()
-            .map(|(i, inst)| {
-                if let Some(&new_target) = ultimate_targets.get(&i) {
-                    Instruction::Jump(new_target)
-                } else {
-                    inst
-                }
-            })
+            .map(|(i, inst)| if let Some(&new_target) = ultimate_targets.get(&i) { Instruction::Jump(new_target) } else { inst })
             .collect()
     }
 
@@ -399,9 +392,7 @@ impl PeepholeOptimizer {
 }
 
 impl Default for PeepholeOptimizer {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]
@@ -411,11 +402,7 @@ mod tests {
     #[test]
     fn test_constant_folding_add() {
         let optimizer = PeepholeOptimizer::new();
-        let instructions = vec![
-            Instruction::LoadSmallInt(2),
-            Instruction::LoadSmallInt(3),
-            Instruction::Add,
-        ];
+        let instructions = vec![Instruction::LoadSmallInt(2), Instruction::LoadSmallInt(3), Instruction::Add];
 
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized, vec![Instruction::LoadSmallInt(5)]);
@@ -424,11 +411,7 @@ mod tests {
     #[test]
     fn test_constant_folding_multiply() {
         let optimizer = PeepholeOptimizer::new();
-        let instructions = vec![
-            Instruction::LoadSmallInt(4),
-            Instruction::LoadSmallInt(5),
-            Instruction::Multiply,
-        ];
+        let instructions = vec![Instruction::LoadSmallInt(4), Instruction::LoadSmallInt(5), Instruction::Multiply];
 
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized, vec![Instruction::LoadSmallInt(20)]);
@@ -437,11 +420,7 @@ mod tests {
     #[test]
     fn test_constant_folding_comparison() {
         let optimizer = PeepholeOptimizer::new();
-        let instructions = vec![
-            Instruction::LoadSmallInt(5),
-            Instruction::LoadSmallInt(3),
-            Instruction::Greater,
-        ];
+        let instructions = vec![Instruction::LoadSmallInt(5), Instruction::LoadSmallInt(3), Instruction::Greater];
 
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized, vec![Instruction::LoadTrue]);
@@ -450,11 +429,7 @@ mod tests {
     #[test]
     fn test_algebraic_simplification_add_zero() {
         let optimizer = PeepholeOptimizer::new();
-        let instructions = vec![
-            Instruction::LoadSmallInt(42),
-            Instruction::LoadSmallInt(0),
-            Instruction::Add,
-        ];
+        let instructions = vec![Instruction::LoadSmallInt(42), Instruction::LoadSmallInt(0), Instruction::Add];
 
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized, vec![Instruction::LoadSmallInt(42)]);
@@ -463,11 +438,7 @@ mod tests {
     #[test]
     fn test_algebraic_simplification_mul_one() {
         let optimizer = PeepholeOptimizer::new();
-        let instructions = vec![
-            Instruction::LoadSmallInt(42),
-            Instruction::LoadSmallInt(1),
-            Instruction::Multiply,
-        ];
+        let instructions = vec![Instruction::LoadSmallInt(42), Instruction::LoadSmallInt(1), Instruction::Multiply];
 
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized, vec![Instruction::LoadSmallInt(42)]);
@@ -476,11 +447,7 @@ mod tests {
     #[test]
     fn test_algebraic_simplification_mul_zero() {
         let optimizer = PeepholeOptimizer::new();
-        let instructions = vec![
-            Instruction::LoadSmallInt(42),
-            Instruction::LoadSmallInt(0),
-            Instruction::Multiply,
-        ];
+        let instructions = vec![Instruction::LoadSmallInt(42), Instruction::LoadSmallInt(0), Instruction::Multiply];
 
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized, vec![Instruction::LoadSmallInt(0)]);
@@ -490,11 +457,7 @@ mod tests {
     #[ignore] // Dead code elimination temporarily disabled (too aggressive with closures)
     fn test_dead_code_constant_pop() {
         let optimizer = PeepholeOptimizer::new();
-        let instructions = vec![
-            Instruction::LoadSmallInt(42),
-            Instruction::Pop,
-            Instruction::LoadSmallInt(1),
-        ];
+        let instructions = vec![Instruction::LoadSmallInt(42), Instruction::Pop, Instruction::LoadSmallInt(1)];
 
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized, vec![Instruction::LoadSmallInt(1)]);
@@ -521,11 +484,7 @@ mod tests {
     #[test]
     fn test_no_overflow_folding() {
         let optimizer = PeepholeOptimizer::new();
-        let instructions = vec![
-            Instruction::LoadSmallInt(127),
-            Instruction::LoadSmallInt(1),
-            Instruction::Add,
-        ];
+        let instructions = vec![Instruction::LoadSmallInt(127), Instruction::LoadSmallInt(1), Instruction::Add];
 
         // Should not fold due to i8 overflow
         let optimized = optimizer.optimize(instructions);

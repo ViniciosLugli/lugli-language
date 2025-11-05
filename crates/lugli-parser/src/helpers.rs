@@ -73,9 +73,7 @@ impl<'a> Parser<'a> {
     /// This should never fail as all parsed expressions must have spans.
     /// If this panics, it indicates a compiler bug.
     pub(crate) fn get_expr_span(&self, node_id: lugli_ast::NodeId) -> Span {
-        self.span_map
-            .get(node_id)
-            .expect("BUG: Expression missing from span map - all parsed expressions must have spans")
+        self.span_map.get(node_id).expect("BUG: Expression missing from span map - all parsed expressions must have spans")
     }
 
     pub(crate) fn peek_kind(&self) -> Option<&TokenKind> { self.scanner.current().map(|token| &token.kind) }
@@ -309,13 +307,12 @@ impl<'a> Parser<'a> {
                 let param_name = self.consume_identifier("Expected parameter name")?;
 
                 // Parse optional type hint
-                let type_hint = if self.match_any(&[TokenKind::Colon]) {
-                    Some(self.parse_type_hint()?)
-                } else {
-                    None
-                };
+                let type_hint = if self.match_any(&[TokenKind::Colon]) { Some(self.parse_type_hint()?) } else { None };
 
-                params.push(Param { name: param_name, type_hint });
+                params.push(Param {
+                    name: param_name,
+                    type_hint,
+                });
             }
 
             if !self.match_any(&[TokenKind::Comma]) {
@@ -327,15 +324,8 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    pub(crate) fn parse_delimited<T, F>(
-        &mut self,
-        end_token: &TokenKind,
-        separator: &TokenKind,
-        parse_fn: F,
-    ) -> Result<Vec<T>, ParseError>
-    where
-        F: Fn(&mut Self) -> Result<T, ParseError>,
-    {
+    pub(crate) fn parse_delimited<T, F>(&mut self, end_token: &TokenKind, separator: &TokenKind, parse_fn: F) -> Result<Vec<T>, ParseError>
+    where F: Fn(&mut Self) -> Result<T, ParseError> {
         let mut items = Vec::new();
 
         if self.check(end_token) {
@@ -472,11 +462,8 @@ mod tests {
     fn test_parse_delimited_empty() {
         let source = "]";
         let mut parser = Parser::new(source).unwrap();
-        let items: Vec<String> = parser
-            .parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| {
-                p.consume_identifier("Expected identifier")
-            })
-            .unwrap();
+        let items: Vec<String> =
+            parser.parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| p.consume_identifier("Expected identifier")).unwrap();
         assert_eq!(items.len(), 0);
     }
 
@@ -484,11 +471,7 @@ mod tests {
     fn test_parse_delimited_single() {
         let source = "x]";
         let mut parser = Parser::new(source).unwrap();
-        let items = parser
-            .parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| {
-                p.consume_identifier("Expected identifier")
-            })
-            .unwrap();
+        let items = parser.parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| p.consume_identifier("Expected identifier")).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0], "x");
     }
@@ -497,11 +480,7 @@ mod tests {
     fn test_parse_delimited_multiple() {
         let source = "a, b, c]";
         let mut parser = Parser::new(source).unwrap();
-        let items = parser
-            .parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| {
-                p.consume_identifier("Expected identifier")
-            })
-            .unwrap();
+        let items = parser.parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |p| p.consume_identifier("Expected identifier")).unwrap();
         assert_eq!(items.len(), 3);
         assert_eq!(items[0], "a");
         assert_eq!(items[1], "b");

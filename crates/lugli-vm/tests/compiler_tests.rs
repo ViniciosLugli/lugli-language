@@ -19,13 +19,14 @@ use lugli_vm::compile_and_run;
 
 // Helper function for creating spans
 fn dummy_span() -> Span {
-    Span { start: 0, end: 0 }
+    Span {
+        start: 0,
+        end: 0,
+    }
 }
 
 // Helper function for creating NodeIds
-fn make_id(n: usize) -> NodeId {
-    NodeId::new(n)
-}
+fn make_id(n: usize) -> NodeId { NodeId::new(n) }
 
 // Helper to create a SpanMap with dummy spans for all nodes
 fn make_span_map(count: usize) -> SpanMap {
@@ -374,11 +375,7 @@ fn test_compiler_property_assignment() {
 
     if let Err(e) = &result {
         println!("{}", lugli_vm::debug::disassemble(&bytecode, "test_compiler_property_assignment"));
-        panic!(
-            "Test failed with error: {}\nBytecode:\n{}",
-            e,
-            lugli_vm::debug::disassemble(&bytecode, "test_compiler_property_assignment")
-        );
+        panic!("Test failed with error: {}\nBytecode:\n{}", e, lugli_vm::debug::disassemble(&bytecode, "test_compiler_property_assignment"));
     }
 
     let mut pool = bytecode.string_pool.borrow_mut();

@@ -1,19 +1,18 @@
-mod validator;
+mod commands;
 mod completer;
 mod highlighter;
-mod commands;
+mod validator;
 
 use crate::cli::CliError;
 use colored::Colorize;
-use rustyline::error::ReadlineError;
-use rustyline::{Config, Editor};
-use std::path::PathBuf;
 use lugli_vm::Machine;
+use rustyline::{Config, Editor, error::ReadlineError};
+use std::path::PathBuf;
 
-use validator::InputValidator;
+use commands::handle_command;
 use completer::LugliCompleter;
 use highlighter::LugliHighlighter;
-use commands::handle_command;
+use validator::InputValidator;
 
 const HISTORY_FILE: &str = ".lugli_history";
 const MAX_HISTORY_SIZE: usize = 1000;
@@ -23,10 +22,7 @@ pub fn start() -> Result<(), CliError> {
     println!("Type 'exit', 'quit', or press Ctrl+D to quit");
     println!("Type ':help' for available commands\n");
 
-    let config = Config::builder()
-        .max_history_size(MAX_HISTORY_SIZE)?
-        .auto_add_history(true)
-        .build();
+    let config = Config::builder().max_history_size(MAX_HISTORY_SIZE)?.auto_add_history(true).build();
 
     let helper = ReplHelper::new();
     let mut editor = Editor::with_config(config)?;
@@ -35,9 +31,10 @@ pub fn start() -> Result<(), CliError> {
     // Load history from file
     let history_path = get_history_path();
     if let Err(e) = editor.load_history(&history_path)
-        && !matches!(e, ReadlineError::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::NotFound) {
-            eprintln!("{}: Failed to load history: {}", "Warning".yellow().bold(), e);
-        }
+        && !matches!(e, ReadlineError::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::NotFound)
+    {
+        eprintln!("{}: Failed to load history: {}", "Warning".yellow().bold(), e);
+    }
 
     let mut vm = Machine::new();
     let mut bytecodes: Vec<lugli_vm::Bytecode> = Vec::new();
@@ -123,13 +120,7 @@ pub fn start() -> Result<(), CliError> {
     Ok(())
 }
 
-fn get_history_path() -> PathBuf {
-    if let Some(home) = dirs::home_dir() {
-        home.join(HISTORY_FILE)
-    } else {
-        PathBuf::from(HISTORY_FILE)
-    }
-}
+fn get_history_path() -> PathBuf { if let Some(home) = dirs::home_dir() { home.join(HISTORY_FILE) } else { PathBuf::from(HISTORY_FILE) } }
 
 fn format_value(value: &lugli_common::Value, bytecode: &lugli_vm::Bytecode) -> String {
     use lugli_common::Value;
@@ -140,32 +131,27 @@ fn format_value(value: &lugli_common::Value, bytecode: &lugli_vm::Bytecode) -> S
             let s = pool.resolve(*id);
             format!("\"{}\"", s)
         }
-        Value::List(l) => {
-            match l.try_borrow() {
-                Ok(list_ref) => {
-                    let items: Vec<String> = list_ref.iter()
-                        .map(|v| format_value(v, bytecode))
-                        .collect();
-                    format!("[{}]", items.join(", "))
-                }
-                Err(_) => "[<borrowed list>]".to_string(),
+        Value::List(l) => match l.try_borrow() {
+            Ok(list_ref) => {
+                let items: Vec<String> = list_ref.iter().map(|v| format_value(v, bytecode)).collect();
+                format!("[{}]", items.join(", "))
             }
-        }
-        Value::Dict(d) => {
-            match d.try_borrow() {
-                Ok(dict_ref) => {
-                    let pool = bytecode.string_pool.borrow();
-                    let items: Vec<String> = dict_ref.iter()
-                        .map(|(k, v)| {
-                            let key = pool.resolve(*k);
-                            format!("\"{}\": {}", key, format_value(v, bytecode))
-                        })
-                        .collect();
-                    format!("{{ {} }}", items.join(", "))
-                }
-                Err(_) => "{<borrowed dict>}".to_string(),
+            Err(_) => "[<borrowed list>]".to_string(),
+        },
+        Value::Dict(d) => match d.try_borrow() {
+            Ok(dict_ref) => {
+                let pool = bytecode.string_pool.borrow();
+                let items: Vec<String> = dict_ref
+                    .iter()
+                    .map(|(k, v)| {
+                        let key = pool.resolve(*k);
+                        format!("\"{}\": {}", key, format_value(v, bytecode))
+                    })
+                    .collect();
+                format!("{{ {} }}", items.join(", "))
             }
-        }
+            Err(_) => "{<borrowed dict>}".to_string(),
+        },
         _ => value.to_string(),
     }
 }
@@ -193,12 +179,7 @@ impl rustyline::Helper for ReplHelper {}
 impl rustyline::completion::Completer for ReplHelper {
     type Candidate = rustyline::completion::Pair;
 
-    fn complete(
-        &self,
-        line: &str,
-        pos: usize,
-        _ctx: &rustyline::Context<'_>,
-    ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
+    fn complete(&self, line: &str, pos: usize, _ctx: &rustyline::Context<'_>) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
         self.completer.complete(line, pos, _ctx)
     }
 }
@@ -208,9 +189,7 @@ impl rustyline::hint::Hinter for ReplHelper {
 }
 
 impl rustyline::highlight::Highlighter for ReplHelper {
-    fn highlight<'l>(&self, line: &'l str, pos: usize) -> std::borrow::Cow<'l, str> {
-        self.highlighter.highlight(line, pos)
-    }
+    fn highlight<'l>(&self, line: &'l str, pos: usize) -> std::borrow::Cow<'l, str> { self.highlighter.highlight(line, pos) }
 
     fn highlight_char(&self, line: &str, pos: usize, forced: rustyline::highlight::CmdKind) -> bool {
         self.highlighter.highlight_char(line, pos, forced)
@@ -218,10 +197,7 @@ impl rustyline::highlight::Highlighter for ReplHelper {
 }
 
 impl rustyline::validate::Validator for ReplHelper {
-    fn validate(
-        &self,
-        ctx: &mut rustyline::validate::ValidationContext,
-    ) -> rustyline::Result<rustyline::validate::ValidationResult> {
+    fn validate(&self, ctx: &mut rustyline::validate::ValidationContext) -> rustyline::Result<rustyline::validate::ValidationResult> {
         self.validator.validate(ctx)
     }
 }
