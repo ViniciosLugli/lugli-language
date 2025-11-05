@@ -482,12 +482,12 @@ impl Compiler {
 
                 // Track loop structures for each clause
                 struct LoopInfo {
-                    iterable_local: usize,
+                    _iterable_local: usize,  // Reserved for future filtered nested comprehensions
                     index_local: usize,
-                    var_local: usize,
+                    _var_local: usize,       // Reserved for future filtered nested comprehensions
                     loop_start: usize,
                     exit_jump: usize,
-                    skip_jump: Option<usize>,
+                    _skip_jump: Option<usize>,  // Reserved for future filtered nested comprehensions
                 }
                 let mut loops: Vec<LoopInfo> = Vec::new();
                 let mut var_names: Vec<String> = Vec::new();
@@ -536,12 +536,12 @@ impl Compiler {
                     };
 
                     loops.push(LoopInfo {
-                        iterable_local,
+                        _iterable_local: iterable_local,
                         index_local,
-                        var_local,
+                        _var_local: var_local,
                         loop_start,
                         exit_jump,
-                        skip_jump,
+                        _skip_jump: skip_jump,
                     });
 
                     // If this is the last clause, append the element
