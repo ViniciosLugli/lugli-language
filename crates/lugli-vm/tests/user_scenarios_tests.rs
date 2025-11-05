@@ -290,7 +290,7 @@ mod algorithm_implementations {
                         return -1
                     }
 
-                    let mid = (left + right) / 2
+                    let mid = (left + right) // 2  # Integer division
                     let mid_val = arr[mid]
 
                     if mid_val == target {
@@ -485,12 +485,12 @@ mod builder_patterns {
                     return self
                 }
 
-                fn from(self, table) {
+                fn from_table(self, table) {
                     self.table = table
                     return self
                 }
 
-                fn where(self, condition) {
+                fn where_clause(self, condition) {
                     self.conditions = condition
                     return self
                 }
@@ -505,7 +505,7 @@ mod builder_patterns {
             }
 
             let qb = QueryBuilder { table: "", fields: "", conditions: "" }
-            let query = qb.select("*").from("users").where("age > 18").build()
+            let query = qb.select("*").from_table("users").where_clause("age > 18").build()
 
             if query.contains("SELECT") && query.contains("FROM users") && query.contains("WHERE") {
                 1
@@ -548,9 +548,7 @@ mod builder_patterns {
             }
 
             let req = RequestBuilder { url: "", method: "GET", headers: {} }
-            req.set_url("https://api.com")
-               .set_method("POST")
-               .add_header("Content-Type", "application/json")
+            req.set_url("https://api.com").set_method("POST").add_header("Content-Type", "application/json")
 
             if req.get_url() == "https://api.com" {
                 1
