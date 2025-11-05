@@ -1,10 +1,9 @@
+use crate::validation::*;
 use lugli_common::{LugliError, StringPool, Value};
 use std::{cell::RefCell, rc::Rc};
 
 pub fn dict_keys(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("keys expects 1 argument"));
-    }
+    check_arity(args, 1, "keys")?;
     match &args[0] {
         Value::Dict(d) => {
             let keys: Vec<Value> = d.borrow().keys().map(|k| Value::String(*k)).collect();
@@ -15,9 +14,7 @@ pub fn dict_keys(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliE
 }
 
 pub fn dict_contains(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("dict.contains expects 2 arguments"));
-    }
+    check_arity(args, 2, "dict.contains")?;
     match &args[0] {
         Value::Dict(d) => {
             // Convert key to string if needed
@@ -35,9 +32,7 @@ pub fn dict_contains(args: &[Value], pool: &mut StringPool) -> Result<Value, Lug
 }
 
 pub fn dict_values(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("values expects 1 argument"));
-    }
+    check_arity(args, 1, "values")?;
     match &args[0] {
         Value::Dict(d) => {
             let values: Vec<Value> = d.borrow().values().cloned().collect();
@@ -48,9 +43,7 @@ pub fn dict_values(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugl
 }
 
 pub fn dict_get(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() < 2 || args.len() > 3 {
-        return Err(LugliError::runtime("dict.get expects 2 or 3 arguments (dict, key, [default])"));
-    }
+    check_arity_range(args, 2, 3, "dict.get")?;
     match &args[0] {
         Value::Dict(d) => {
             // Convert key to string if needed
@@ -76,9 +69,7 @@ pub fn dict_get(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliErr
 }
 
 pub fn dict_len(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("dict.len expects 1 argument"));
-    }
+    check_arity(args, 1, "dict.len")?;
     match &args[0] {
         Value::Dict(d) => Ok(Value::Number(d.borrow().len() as f64)),
         _ => Err(LugliError::type_error("dict", args[0].type_name())),

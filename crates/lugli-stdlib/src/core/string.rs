@@ -1,10 +1,9 @@
+use crate::validation::*;
 use lugli_common::{LugliError, StringPool, Value};
 use std::{cell::RefCell, rc::Rc};
 
 pub fn string_length(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("string.len expects 1 argument"));
-    }
+    check_arity(args, 1, "string.len")?;
     match &args[0] {
         Value::String(id) => Ok(Value::Number(pool.resolve(*id).len() as f64)),
         _ => Err(LugliError::type_error("string", args[0].type_name())),
@@ -12,9 +11,7 @@ pub fn string_length(args: &[Value], pool: &mut StringPool) -> Result<Value, Lug
 }
 
 pub fn string_trim(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("string.trim expects 1 argument"));
-    }
+    check_arity(args, 1, "string.trim")?;
     match &args[0] {
         Value::String(id) => {
             let trimmed = pool.resolve(*id).trim().to_string();
@@ -25,9 +22,7 @@ pub fn string_trim(args: &[Value], pool: &mut StringPool) -> Result<Value, Lugli
 }
 
 pub fn string_lower(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("string.lower expects 1 argument"));
-    }
+    check_arity(args, 1, "string.lower")?;
     match &args[0] {
         Value::String(id) => {
             let lower = pool.resolve(*id).to_lowercase();
@@ -38,9 +33,7 @@ pub fn string_lower(args: &[Value], pool: &mut StringPool) -> Result<Value, Lugl
 }
 
 pub fn string_upper(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("string.upper expects 1 argument"));
-    }
+    check_arity(args, 1, "string.upper")?;
     match &args[0] {
         Value::String(id) => {
             let upper = pool.resolve(*id).to_uppercase();
@@ -51,9 +44,7 @@ pub fn string_upper(args: &[Value], pool: &mut StringPool) -> Result<Value, Lugl
 }
 
 pub fn string_chars(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("string.chars expects 1 argument"));
-    }
+    check_arity(args, 1, "string.chars")?;
     match &args[0] {
         Value::String(id) => {
             let s = pool.resolve(*id).to_string();
@@ -65,9 +56,7 @@ pub fn string_chars(args: &[Value], pool: &mut StringPool) -> Result<Value, Lugl
 }
 
 pub fn string_split(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.is_empty() || args.len() > 2 {
-        return Err(LugliError::runtime("string.split expects 1 or 2 arguments"));
-    }
+    check_arity_range(args, 1, 2, "string.split")?;
 
     let separator = if args.len() == 2 {
         match &args[1] {

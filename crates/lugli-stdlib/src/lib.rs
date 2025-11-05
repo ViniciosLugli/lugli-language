@@ -9,6 +9,7 @@ pub mod core;
 pub mod io;
 pub mod methods;
 pub mod time;
+pub mod validation;
 
 pub use methods::MethodRegistry;
 
