@@ -129,14 +129,61 @@ impl Machine {
         self.call_stack.clear();
         self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
 
-        // Keep only recent bytecodes to prevent memory leak (max 10)
-        const MAX_REPL_BYTECODES: usize = 10;
-        if self.bytecode_registry.len() > MAX_REPL_BYTECODES {
-            let keep_from_id = self.next_bytecode_id.saturating_sub(MAX_REPL_BYTECODES);
-            self.bytecode_registry.retain(|&id, _| id >= keep_from_id);
-        }
+        // GC bytecodes: only keep those referenced by globals
+        self.gc_bytecodes();
 
         self.open_upvalues.clear();
+    }
+
+    /// Garbage collect bytecodes that are no longer referenced by globals
+    fn gc_bytecodes(&mut self) {
+        use std::collections::HashSet;
+
+        // Mark phase: collect all bytecode IDs referenced by globals
+        let mut live_bytecodes = HashSet::new();
+
+        for value in self.globals.values() {
+            self.mark_bytecode_ids(value, &mut live_bytecodes);
+        }
+
+        // Sweep phase: remove unreferenced bytecodes
+        self.bytecode_registry.retain(|&id, _| live_bytecodes.contains(&id));
+    }
+
+    /// Recursively mark bytecode IDs referenced by a value
+    fn mark_bytecode_ids(&self, value: &Value, live_set: &mut std::collections::HashSet<usize>) {
+        match value {
+            Value::Function { bytecode_id, .. } => {
+                live_set.insert(*bytecode_id);
+            }
+            Value::Closure { bytecode_id, upvalues, .. } => {
+                live_set.insert(*bytecode_id);
+                for upvalue in upvalues {
+                    self.mark_bytecode_ids(&upvalue.borrow(), live_set);
+                }
+            }
+            Value::List(list) => {
+                for item in list.borrow().iter() {
+                    self.mark_bytecode_ids(item, live_set);
+                }
+            }
+            Value::Dict(dict) => {
+                for val in dict.borrow().values() {
+                    self.mark_bytecode_ids(val, live_set);
+                }
+            }
+            Value::StructInstance { fields, .. } => {
+                for val in fields.values() {
+                    self.mark_bytecode_ids(val, live_set);
+                }
+            }
+            Value::Module { exports, .. } => {
+                for val in exports.values() {
+                    self.mark_bytecode_ids(val, live_set);
+                }
+            }
+            _ => {}
+        }
     }
 
     pub fn format_value(&self, value: &Value) -> String {
