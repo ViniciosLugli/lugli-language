@@ -59,8 +59,7 @@ impl Compiler {
                 Ok(true) // Handled
             }
             Stmt::StructDecl {
-                data,
-                ..
+                data, ..
             } => {
                 let name = &data.name;
                 let fields = &data.fields;
@@ -199,10 +198,14 @@ impl Compiler {
 
                 // Add implicit return if needed
                 match body.last() {
-                    Some(Stmt::Return { .. }) => {
+                    Some(Stmt::Return {
+                        ..
+                    }) => {
                         // Explicit return already handled
                     }
-                    Some(Stmt::Expression { .. }) => {
+                    Some(Stmt::Expression {
+                        ..
+                    }) => {
                         // Expression result is on stack, just add Return instruction
                         self.emit_unknown(Instruction::Return);
                     }
@@ -271,10 +274,7 @@ impl Compiler {
                         let bind_name = if let Some(alias_name) = alias {
                             alias_name.clone()
                         } else {
-                            module_path
-                                .last()
-                                .ok_or_else(|| LugliError::runtime("Empty module path in import statement"))?
-                                .clone()
+                            module_path.last().ok_or_else(|| LugliError::runtime("Empty module path in import statement"))?.clone()
                         };
 
                         // ImportModule stores directly in globals with no stack effect

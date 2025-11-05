@@ -98,7 +98,9 @@ fn test_function_literal_in_call() {
     let expr = parse_expr(source);
 
     match expr {
-        Expr::Call { data, .. } => {
+        Expr::Call {
+            data, ..
+        } => {
             assert_eq!(data.arguments.len(), 1);
             match &data.arguments[0] {
                 Expr::Function {

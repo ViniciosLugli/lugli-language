@@ -1,7 +1,8 @@
 use lugli_common::{LugliError, StringPool, Value};
-use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::{HashMap, hash_map::DefaultHasher},
+    hash::{Hash, Hasher},
+};
 
 use crate::core::{dict, list, string};
 
@@ -65,7 +66,9 @@ impl MethodRegistry {
         self.register("dict", "keys", dict::dict_keys);
         self.register("dict", "values", dict::dict_values);
         self.register("dict", "contains", dict::dict_contains);
+        self.register("dict", "has_key", dict::dict_contains); // Alias for contains
         self.register("dict", "get", dict::dict_get);
+        self.register("dict", "len", dict::dict_len);
     }
 
     fn register(&mut self, type_name: &'static str, method: &'static str, func: MethodFunction) {
@@ -76,40 +79,27 @@ impl MethodRegistry {
     }
 
     pub fn call(&self, type_name: &str, method: &str, args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-        let func = self
-            .methods
-            .get(&(type_name, method))
-            .ok_or_else(|| LugliError::runtime(format!("{} has no method '{}'", type_name, method)))?;
+        let func = self.methods.get(&(type_name, method)).ok_or_else(|| LugliError::runtime(format!("{} has no method '{}'", type_name, method)))?;
 
         func(args, pool)
     }
 
     pub fn call_by_hash(&self, hash: u32, args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
         let func = self.hash_methods.get(&hash).ok_or_else(|| {
-            let name = self
-                .hash_names
-                .get(&hash)
-                .map(|(t, m)| format!("{}.{}", t, m))
-                .unwrap_or_else(|| format!("method#{}", hash));
+            let name = self.hash_names.get(&hash).map(|(t, m)| format!("{}.{}", t, m)).unwrap_or_else(|| format!("method#{}", hash));
             LugliError::runtime(format!("{} not found", name))
         })?;
 
         func(args, pool)
     }
 
-    pub fn has_method(&self, type_name: &str, method: &str) -> bool {
-        self.methods.contains_key(&(type_name, method))
-    }
+    pub fn has_method(&self, type_name: &str, method: &str) -> bool { self.methods.contains_key(&(type_name, method)) }
 
-    pub fn has_method_hash(&self, hash: u32) -> bool {
-        self.hash_methods.contains_key(&hash)
-    }
+    pub fn has_method_hash(&self, hash: u32) -> bool { self.hash_methods.contains_key(&hash) }
 }
 
 impl Default for MethodRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]

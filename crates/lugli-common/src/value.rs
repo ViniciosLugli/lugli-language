@@ -51,12 +51,33 @@ pub enum Value {
     List(Rc<RefCell<Vec<Value>>>),
     /// Dictionary with potential for circular references (see type docs)
     Dict(Rc<RefCell<HashMap<StringId, Value>>>),
-    Function { name: String, params: Vec<String>, body_start: usize, bytecode_id: usize },
-    Closure { name: String, params: Vec<String>, body_start: usize, bytecode_id: usize, upvalues: Vec<Rc<RefCell<Value>>> },
-    NativeFunction { name: String, callback: NativeFunction, arity: usize },
-    StructInstance { name: String, fields: HashMap<StringId, Value> },
+    Function {
+        name: String,
+        params: Vec<String>,
+        body_start: usize,
+        bytecode_id: usize,
+    },
+    Closure {
+        name: String,
+        params: Vec<String>,
+        body_start: usize,
+        bytecode_id: usize,
+        upvalues: Vec<Rc<RefCell<Value>>>,
+    },
+    NativeFunction {
+        name: String,
+        callback: NativeFunction,
+        arity: usize,
+    },
+    StructInstance {
+        name: String,
+        fields: HashMap<StringId, Value>,
+    },
     DateTime(i64),
-    Module { path: String, exports: HashMap<String, Value> },
+    Module {
+        path: String,
+        exports: HashMap<String, Value>,
+    },
 }
 
 impl PartialEq for Value {
@@ -67,17 +88,15 @@ impl PartialEq for Value {
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Null, Value::Null) => true,
             (Value::List(a), Value::List(b)) => Rc::ptr_eq(a, b),
-            (Value::Dict(a), Value::Dict(b)) => {
-                match (a.try_borrow(), b.try_borrow()) {
-                    (Ok(a_ref), Ok(b_ref)) => {
-                        if a_ref.len() != b_ref.len() {
-                            return false;
-                        }
-                        a_ref.iter().all(|(k, v)| b_ref.get(k).is_some_and(|v2| v.equals(v2)))
+            (Value::Dict(a), Value::Dict(b)) => match (a.try_borrow(), b.try_borrow()) {
+                (Ok(a_ref), Ok(b_ref)) => {
+                    if a_ref.len() != b_ref.len() {
+                        return false;
                     }
-                    _ => false,
+                    a_ref.iter().all(|(k, v)| b_ref.get(k).is_some_and(|v2| v.equals(v2)))
                 }
-            }
+                _ => false,
+            },
             (
                 Value::Function {
                     name: n1,
@@ -111,11 +130,9 @@ impl PartialEq for Value {
                 if n1 != n2 || p1 != p2 || b1 != b2 || id1 != id2 || u1.len() != u2.len() {
                     return false;
                 }
-                u1.iter().zip(u2.iter()).all(|(uv_a, uv_b)| {
-                    match (uv_a.try_borrow(), uv_b.try_borrow()) {
-                        (Ok(a_ref), Ok(b_ref)) => a_ref.equals(&b_ref),
-                        _ => false,
-                    }
+                u1.iter().zip(u2.iter()).all(|(uv_a, uv_b)| match (uv_a.try_borrow(), uv_b.try_borrow()) {
+                    (Ok(a_ref), Ok(b_ref)) => a_ref.equals(&b_ref),
+                    _ => false,
                 })
             }
             (
@@ -181,8 +198,14 @@ impl Hash for Value {
                     hash_acc.hash(state);
                 }
             }
-            Value::Function { bytecode_id, .. } => bytecode_id.hash(state),
-            Value::Closure { bytecode_id, upvalues, .. } => {
+            Value::Function {
+                bytecode_id, ..
+            } => bytecode_id.hash(state),
+            Value::Closure {
+                bytecode_id,
+                upvalues,
+                ..
+            } => {
                 bytecode_id.hash(state);
                 upvalues.len().hash(state);
                 for uv in upvalues {
@@ -191,10 +214,16 @@ impl Hash for Value {
                     }
                 }
             }
-            Value::NativeFunction { name, .. } => name.hash(state),
-            Value::StructInstance { name, .. } => name.hash(state),
+            Value::NativeFunction {
+                name, ..
+            } => name.hash(state),
+            Value::StructInstance {
+                name, ..
+            } => name.hash(state),
             Value::DateTime(ts) => ts.hash(state),
-            Value::Module { path, .. } => path.hash(state),
+            Value::Module {
+                path, ..
+            } => path.hash(state),
         }
     }
 }
@@ -331,12 +360,22 @@ impl Value {
             Value::Null => 3,
             Value::List(_) => 4,
             Value::Dict(_) => 5,
-            Value::Function { .. } => 6,
-            Value::Closure { .. } => 7,
-            Value::NativeFunction { .. } => 8,
-            Value::StructInstance { .. } => 9,
+            Value::Function {
+                ..
+            } => 6,
+            Value::Closure {
+                ..
+            } => 7,
+            Value::NativeFunction {
+                ..
+            } => 8,
+            Value::StructInstance {
+                ..
+            } => 9,
             Value::DateTime(_) => 10,
-            Value::Module { .. } => 11,
+            Value::Module {
+                ..
+            } => 11,
         }
     }
 
@@ -407,17 +446,15 @@ impl Value {
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Null, Value::Null) => true,
             (Value::List(a), Value::List(b)) => Rc::ptr_eq(a, b),
-            (Value::Dict(a), Value::Dict(b)) => {
-                match (a.try_borrow(), b.try_borrow()) {
-                    (Ok(a_ref), Ok(b_ref)) => {
-                        if a_ref.len() != b_ref.len() {
-                            return false;
-                        }
-                        a_ref.iter().all(|(k, v)| b_ref.get(k).is_some_and(|v2| v.equals(v2)))
+            (Value::Dict(a), Value::Dict(b)) => match (a.try_borrow(), b.try_borrow()) {
+                (Ok(a_ref), Ok(b_ref)) => {
+                    if a_ref.len() != b_ref.len() {
+                        return false;
                     }
-                    _ => false,
+                    a_ref.iter().all(|(k, v)| b_ref.get(k).is_some_and(|v2| v.equals(v2)))
                 }
-            }
+                _ => false,
+            },
             (
                 Value::Function {
                     name: n1,
@@ -451,11 +488,9 @@ impl Value {
                 if n1 != n2 || p1 != p2 || b1 != b2 || id1 != id2 || u1.len() != u2.len() {
                     return false;
                 }
-                u1.iter().zip(u2.iter()).all(|(uv_a, uv_b)| {
-                    match (uv_a.try_borrow(), uv_b.try_borrow()) {
-                        (Ok(a_ref), Ok(b_ref)) => a_ref.equals(&b_ref),
-                        _ => false,
-                    }
+                u1.iter().zip(u2.iter()).all(|(uv_a, uv_b)| match (uv_a.try_borrow(), uv_b.try_borrow()) {
+                    (Ok(a_ref), Ok(b_ref)) => a_ref.equals(&b_ref),
+                    _ => false,
                 })
             }
             (

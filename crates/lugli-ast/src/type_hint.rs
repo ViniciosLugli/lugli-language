@@ -10,9 +10,7 @@ pub enum TypeHint {
 }
 
 impl TypeHint {
-    pub fn simple(name: impl Into<String>) -> Self {
-        TypeHint::Simple(name.into())
-    }
+    pub fn simple(name: impl Into<String>) -> Self { TypeHint::Simple(name.into()) }
 
     pub fn list(element: TypeHint) -> Self {
         TypeHint::Generic {
@@ -28,16 +26,17 @@ impl TypeHint {
         }
     }
 
-    pub fn optional(inner: TypeHint) -> Self {
-        TypeHint::Optional(Box::new(inner))
-    }
+    pub fn optional(inner: TypeHint) -> Self { TypeHint::Optional(Box::new(inner)) }
 }
 
 impl fmt::Display for TypeHint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TypeHint::Simple(name) => write!(f, "{}", name),
-            TypeHint::Generic { base, args } => {
+            TypeHint::Generic {
+                base,
+                args,
+            } => {
                 write!(f, "{}<", base)?;
                 for (i, arg) in args.iter().enumerate() {
                     if i > 0 {
@@ -47,7 +46,10 @@ impl fmt::Display for TypeHint {
                 }
                 write!(f, ">")
             }
-            TypeHint::Function { params, return_type } => {
+            TypeHint::Function {
+                params,
+                return_type,
+            } => {
                 write!(f, "fn(")?;
                 for (i, param) in params.iter().enumerate() {
                     if i > 0 {
@@ -101,11 +103,7 @@ mod tests {
 
     #[test]
     fn test_union_type() {
-        let hint = TypeHint::Union(vec![
-            TypeHint::simple("num"),
-            TypeHint::simple("str"),
-            TypeHint::simple("null"),
-        ]);
+        let hint = TypeHint::Union(vec![TypeHint::simple("num"), TypeHint::simple("str"), TypeHint::simple("null")]);
         assert_eq!(hint.to_string(), "num | str | null");
     }
 

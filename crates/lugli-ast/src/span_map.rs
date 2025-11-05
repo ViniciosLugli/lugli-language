@@ -5,9 +5,7 @@ use std::collections::HashMap;
 pub struct NodeId(u32);
 
 impl NodeId {
-    pub fn new(id: usize) -> Self {
-        NodeId(id as u32)
-    }
+    pub fn new(id: usize) -> Self { NodeId(id as u32) }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -17,9 +15,7 @@ pub struct SpanMap {
 }
 
 impl SpanMap {
-    pub fn new() -> Self {
-        Self::default()
-    }
+    pub fn new() -> Self { Self::default() }
 
     pub fn alloc_id(&mut self) -> NodeId {
         let id = NodeId(self.next_id);
@@ -27,13 +23,9 @@ impl SpanMap {
         id
     }
 
-    pub fn insert(&mut self, id: NodeId, span: Span) {
-        self.spans.insert(id, span);
-    }
+    pub fn insert(&mut self, id: NodeId, span: Span) { self.spans.insert(id, span); }
 
-    pub fn get(&self, id: NodeId) -> Option<Span> {
-        self.spans.get(&id).copied()
-    }
+    pub fn get(&self, id: NodeId) -> Option<Span> { self.spans.get(&id).copied() }
 }
 
 #[cfg(test)]
@@ -54,7 +46,10 @@ mod tests {
     fn test_span_map_insert_get() {
         let mut map = SpanMap::new();
         let id = map.alloc_id();
-        let span = Span { start: 0, end: 10 };
+        let span = Span {
+            start: 0,
+            end: 10,
+        };
 
         map.insert(id, span);
         assert_eq!(map.get(id), Some(span));
