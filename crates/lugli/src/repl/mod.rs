@@ -34,11 +34,10 @@ pub fn start() -> Result<(), CliError> {
 
     // Load history from file
     let history_path = get_history_path();
-    if let Err(e) = editor.load_history(&history_path) {
-        if !matches!(e, ReadlineError::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::NotFound) {
+    if let Err(e) = editor.load_history(&history_path)
+        && !matches!(e, ReadlineError::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::NotFound) {
             eprintln!("{}: Failed to load history: {}", "Warning".yellow().bold(), e);
         }
-    }
 
     let mut vm = Machine::new();
     let mut bytecodes: Vec<lugli_vm::Bytecode> = Vec::new();

@@ -1,3 +1,8 @@
+//! Abstract Syntax Tree definitions for Lugli.
+//!
+//! Provides immutable AST nodes for expressions and statements, with visitor pattern support
+//! for traversal and transformation. All nodes include unique IDs for source location tracking.
+
 use lugli_common::Span;
 
 pub mod expr;

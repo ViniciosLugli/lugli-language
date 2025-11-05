@@ -67,13 +67,13 @@ impl InputValidator {
         }
 
         // Check if line ends with certain keywords that suggest continuation
-        let ends_with_continuation = trimmed.ends_with('{')
+        
+
+        trimmed.ends_with('{')
             || trimmed.ends_with('(')
             || trimmed.ends_with('[')
             || trimmed.ends_with(',')
-            || trimmed.ends_with('\\');
-
-        ends_with_continuation
+            || trimmed.ends_with('\\')
     }
 }
 

@@ -963,13 +963,12 @@ impl Machine {
                 if let Value::String(name_id) = prop_name {
                     if let Value::Dict(dict_ref) = &object {
                         // Detect potential circular reference (self-assignment)
-                        if let Value::Dict(value_dict_ref) = &value {
-                            if Rc::ptr_eq(dict_ref, value_dict_ref) {
+                        if let Value::Dict(value_dict_ref) = &value
+                            && Rc::ptr_eq(dict_ref, value_dict_ref) {
                                 eprintln!("⚠️  WARNING: Assigning dictionary to itself creates a circular reference");
                                 eprintln!("   This will cause a memory leak as Rc reference count never reaches 0");
                                 eprintln!("   Consider using weak references or avoid circular structures");
                             }
-                        }
 
                         dict_ref
                             .try_borrow_mut()
@@ -1466,7 +1465,7 @@ impl Machine {
                     (Value::Dict(dict), Value::String(key)) => {
                         dict.try_borrow_mut()
                             .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
-                            .insert(key.clone(), value.clone());
+                            .insert(*key, value.clone());
                         self.stack.push(value); // Return the assigned value
                     }
                     (Value::Dict(dict), Value::Number(num)) => {

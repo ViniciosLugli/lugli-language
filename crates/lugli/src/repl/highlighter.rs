@@ -1,4 +1,3 @@
-use lugli_lexer::TokenKind;
 use rustyline::highlight::Highlighter;
 use std::borrow::Cow;
 

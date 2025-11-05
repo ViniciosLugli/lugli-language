@@ -1,3 +1,8 @@
+//! Lexical analysis for Lugli source code.
+//!
+//! Tokenizes source code into a stream of tokens using the `logos` crate for performance.
+//! Supports string interning via `StringPool` to reduce memory usage.
+
 use logos::Logos;
 use lugli_common::StringPool;
 use thiserror::Error;

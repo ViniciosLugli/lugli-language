@@ -103,11 +103,10 @@ impl SourceLocation {
             self.span,
         );
 
-        if let Some(source) = source_code {
-            if let Some(source_line) = source.lines().nth(self.line.saturating_sub(1)) {
+        if let Some(source) = source_code
+            && let Some(source_line) = source.lines().nth(self.line.saturating_sub(1)) {
                 context = context.with_source(source_line.to_string());
             }
-        }
 
         context
     }

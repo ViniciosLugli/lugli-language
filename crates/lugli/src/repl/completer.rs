@@ -83,12 +83,12 @@ impl LugliCompleter {
         let before_cursor = &line[..pos];
 
         // Find the start of the current word
-        let start = before_cursor
+        
+
+        before_cursor
             .rfind(|c: char| !c.is_alphanumeric() && c != '_' && c != '!' && c != '?')
             .map(|i| i + 1)
-            .unwrap_or(0);
-
-        start
+            .unwrap_or(0)
     }
 }
 
