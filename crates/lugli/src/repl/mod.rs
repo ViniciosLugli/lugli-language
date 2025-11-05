@@ -133,14 +133,6 @@ fn get_history_path() -> PathBuf {
 }
 
 fn format_value(value: &lugli_common::Value, bytecode: &lugli_vm::Bytecode) -> String {
-    format_value_internal(value, bytecode)
-}
-
-pub fn format_value_with_bytecode(value: &lugli_common::Value, bytecode: &lugli_vm::Bytecode) -> String {
-    format_value_internal(value, bytecode)
-}
-
-fn format_value_internal(value: &lugli_common::Value, bytecode: &lugli_vm::Bytecode) -> String {
     use lugli_common::Value;
 
     match value {
@@ -153,7 +145,7 @@ fn format_value_internal(value: &lugli_common::Value, bytecode: &lugli_vm::Bytec
             match l.try_borrow() {
                 Ok(list_ref) => {
                     let items: Vec<String> = list_ref.iter()
-                        .map(|v| format_value_internal(v, bytecode))
+                        .map(|v| format_value(v, bytecode))
                         .collect();
                     format!("[{}]", items.join(", "))
                 }
@@ -167,7 +159,7 @@ fn format_value_internal(value: &lugli_common::Value, bytecode: &lugli_vm::Bytec
                     let items: Vec<String> = dict_ref.iter()
                         .map(|(k, v)| {
                             let key = pool.resolve(*k);
-                            format!("\"{}\": {}", key, format_value_internal(v, bytecode))
+                            format!("\"{}\": {}", key, format_value(v, bytecode))
                         })
                         .collect();
                     format!("{{ {} }}", items.join(", "))
@@ -193,10 +185,6 @@ impl ReplHelper {
             highlighter: LugliHighlighter::new(),
             validator: InputValidator::new(),
         }
-    }
-
-    fn update_completions(&mut self, vm: &Machine) {
-        self.completer.update_from_vm(vm);
     }
 }
 

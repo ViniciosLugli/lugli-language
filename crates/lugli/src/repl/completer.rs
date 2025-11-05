@@ -49,11 +49,6 @@ impl LugliCompleter {
         }
     }
 
-    pub fn update_from_vm(&mut self, vm: &lugli_vm::Machine) {
-        // Get variable names from VM globals
-        self.variables = vm.globals.keys().map(|k| k.clone()).collect();
-    }
-
     fn get_candidates(&self, prefix: &str) -> Vec<String> {
         let prefix_lower = prefix.to_lowercase();
         let mut candidates = HashSet::new();
