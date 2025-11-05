@@ -6,6 +6,7 @@
 use lugli_common::{LugliError, StringPool, Value};
 
 pub mod core;
+mod helpers;
 pub mod io;
 pub mod methods;
 pub mod time;
