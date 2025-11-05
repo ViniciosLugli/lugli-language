@@ -1,13 +1,10 @@
-use lugli_lexer::TokenKind;
 use rustyline::highlight::Highlighter;
 use std::borrow::Cow;
 
 pub struct LugliHighlighter;
 
 impl LugliHighlighter {
-    pub fn new() -> Self {
-        Self
-    }
+    pub fn new() -> Self { Self }
 }
 
 impl Highlighter for LugliHighlighter {

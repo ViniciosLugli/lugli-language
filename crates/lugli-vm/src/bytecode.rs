@@ -96,17 +96,12 @@ impl SourceLocation {
     pub fn to_source_context(&self, source_code: Option<&String>) -> lugli_common::SourceContext {
         use lugli_common::SourceContext;
 
-        let mut context = SourceContext::new(
-            self.file_path.clone(),
-            self.line,
-            self.column,
-            self.span,
-        );
+        let mut context = SourceContext::new(self.file_path.clone(), self.line, self.column, self.span);
 
-        if let Some(source) = source_code {
-            if let Some(source_line) = source.lines().nth(self.line.saturating_sub(1)) {
-                context = context.with_source(source_line.to_string());
-            }
+        if let Some(source) = source_code
+            && let Some(source_line) = source.lines().nth(self.line.saturating_sub(1))
+        {
+            context = context.with_source(source_line.to_string());
         }
 
         context

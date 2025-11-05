@@ -63,12 +63,9 @@ impl Compiler {
             } => {
                 // Try to optimize arithmetic with small constant on the right
                 let optimized = match operator {
-                    lugli_lexer::TokenKind::Plus
-                    | lugli_lexer::TokenKind::Minus
-                    | lugli_lexer::TokenKind::Star => {
+                    lugli_lexer::TokenKind::Plus | lugli_lexer::TokenKind::Minus | lugli_lexer::TokenKind::Star => {
                         if let Expr::Literal {
-                            value: LiteralValue::Number(n),
-                            ..
+                            value: LiteralValue::Number(n), ..
                         } = right.as_ref()
                         {
                             if n.fract() == 0.0 && *n >= -128.0 && *n <= 127.0 {
@@ -131,8 +128,7 @@ impl Compiler {
                 Ok(())
             }
             Expr::Call {
-                data,
-                ..
+                data, ..
             } => {
                 let callee = &data.callee;
                 let arguments = &data.arguments;
@@ -406,10 +402,14 @@ impl Compiler {
 
                 // Add implicit return if needed
                 match body.last() {
-                    Some(lugli_ast::Stmt::Return { .. }) => {
+                    Some(lugli_ast::Stmt::Return {
+                        ..
+                    }) => {
                         // Explicit return already handled
                     }
-                    Some(lugli_ast::Stmt::Expression { .. }) => {
+                    Some(lugli_ast::Stmt::Expression {
+                        ..
+                    }) => {
                         // Expression result is on stack, just add Return instruction
                         self.emit_unknown(Instruction::Return);
                     }
@@ -466,8 +466,7 @@ impl Compiler {
                 Ok(())
             }
             Expr::ListComprehension {
-                data,
-                ..
+                data, ..
             } => {
                 let element = &data.element;
                 let variable = &data.variable;
@@ -736,8 +735,7 @@ impl Compiler {
                 // No initializer, nothing to capture
             }
             Stmt::If {
-                data,
-                ..
+                data, ..
             } => {
                 self.find_captured_identifiers_in_expr(&data.condition, outer_locals, params, captures);
                 for s in &data.then_branch {
@@ -812,8 +810,7 @@ impl Compiler {
                 self.find_captured_identifiers_in_expr(operand, outer_locals, params, captures);
             }
             Expr::Call {
-                data,
-                ..
+                data, ..
             } => {
                 self.find_captured_identifiers_in_expr(&data.callee, outer_locals, params, captures);
                 for arg in &data.arguments {
@@ -874,8 +871,7 @@ impl Compiler {
                 }
             }
             Expr::ListComprehension {
-                data,
-                ..
+                data, ..
             } => {
                 self.find_captured_identifiers_in_expr(&data.element, outer_locals, params, captures);
                 self.find_captured_identifiers_in_expr(&data.iterable, outer_locals, params, captures);

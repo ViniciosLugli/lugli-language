@@ -7,8 +7,7 @@ impl Compiler {
     pub(super) fn compile_control_flow_stmt(&mut self, stmt: &Stmt) -> Result<bool, LugliError> {
         match stmt {
             Stmt::If {
-                data,
-                ..
+                data, ..
             } => {
                 // Compile condition
                 self.compile_expr(&data.condition)?;

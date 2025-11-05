@@ -18,103 +18,80 @@ pub struct CallData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Literal {
-        id: NodeId,
-        value: LiteralValue,
-    },
+    Literal { id: NodeId, value: LiteralValue },
 
-    Identifier {
-        id: NodeId,
-        name: String,
-    },
+    Identifier { id: NodeId, name: String },
 
-    Binary {
-        id: NodeId,
-        left: Box<Expr>,
-        operator: TokenKind,
-        right: Box<Expr>,
-    },
+    Binary { id: NodeId, left: Box<Expr>, operator: TokenKind, right: Box<Expr> },
 
-    Unary {
-        id: NodeId,
-        operator: TokenKind,
-        operand: Box<Expr>,
-    },
+    Unary { id: NodeId, operator: TokenKind, operand: Box<Expr> },
 
-    Call {
-        id: NodeId,
-        data: Box<CallData>,
-    },
+    Call { id: NodeId, data: Box<CallData> },
 
-    Get {
-        id: NodeId,
-        object: Box<Expr>,
-        name: String,
-    },
+    Get { id: NodeId, object: Box<Expr>, name: String },
 
-    Set {
-        id: NodeId,
-        object: Box<Expr>,
-        name: String,
-        value: Box<Expr>,
-    },
+    Set { id: NodeId, object: Box<Expr>, name: String, value: Box<Expr> },
 
-    List {
-        id: NodeId,
-        elements: Vec<Expr>,
-    },
+    List { id: NodeId, elements: Vec<Expr> },
 
-    Dict {
-        id: NodeId,
-        pairs: Vec<(Expr, Expr)>,
-    },
+    Dict { id: NodeId, pairs: Vec<(Expr, Expr)> },
 
-    Index {
-        id: NodeId,
-        object: Box<Expr>,
-        index: Box<Expr>,
-    },
+    Index { id: NodeId, object: Box<Expr>, index: Box<Expr> },
 
-    FString {
-        id: NodeId,
-        parts: Box<Vec<FStringPart>>,
-    },
+    FString { id: NodeId, parts: Box<Vec<FStringPart>> },
 
-    Function {
-        id: NodeId,
-        params: Vec<String>,
-        body: Vec<Stmt>,
-    },
+    Function { id: NodeId, params: Vec<String>, body: Vec<Stmt> },
 
-    ListComprehension {
-        id: NodeId,
-        data: Box<ListComprehensionData>,
-    },
+    ListComprehension { id: NodeId, data: Box<ListComprehensionData> },
 
-    Match {
-        id: NodeId,
-        value: Box<Expr>,
-        arms: Vec<MatchArm>,
-    },
+    Match { id: NodeId, value: Box<Expr>, arms: Vec<MatchArm> },
 }
 
 impl Expr {
     pub fn id(&self) -> NodeId {
         match self {
-            Expr::Literal { id, .. } => *id,
-            Expr::Identifier { id, .. } => *id,
-            Expr::Binary { id, .. } => *id,
-            Expr::Unary { id, .. } => *id,
-            Expr::Call { id, .. } => *id,
-            Expr::Get { id, .. } => *id,
-            Expr::Set { id, .. } => *id,
-            Expr::List { id, .. } => *id,
-            Expr::Dict { id, .. } => *id,
-            Expr::Index { id, .. } => *id,
-            Expr::FString { id, .. } => *id,
-            Expr::Function { id, .. } => *id,
-            Expr::ListComprehension { id, .. } => *id,
-            Expr::Match { id, .. } => *id,
+            Expr::Literal {
+                id, ..
+            } => *id,
+            Expr::Identifier {
+                id, ..
+            } => *id,
+            Expr::Binary {
+                id, ..
+            } => *id,
+            Expr::Unary {
+                id, ..
+            } => *id,
+            Expr::Call {
+                id, ..
+            } => *id,
+            Expr::Get {
+                id, ..
+            } => *id,
+            Expr::Set {
+                id, ..
+            } => *id,
+            Expr::List {
+                id, ..
+            } => *id,
+            Expr::Dict {
+                id, ..
+            } => *id,
+            Expr::Index {
+                id, ..
+            } => *id,
+            Expr::FString {
+                id, ..
+            } => *id,
+            Expr::Function {
+                id, ..
+            } => *id,
+            Expr::ListComprehension {
+                id, ..
+            } => *id,
+            Expr::Match {
+                id, ..
+            } => *id,
         }
     }
 }
@@ -148,7 +125,5 @@ pub enum LiteralValue {
 }
 
 impl AstNode for Expr {
-    fn span(&self) -> &Span {
-        panic!("AstNode::span() called on Expr after NodeId migration. Use SpanMap instead.")
-    }
+    fn span(&self) -> &Span { panic!("AstNode::span() called on Expr after NodeId migration. Use SpanMap instead.") }
 }
