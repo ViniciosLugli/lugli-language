@@ -17,29 +17,60 @@ pub fn handle_command(
     }
 
     match parts[0] {
-        ":help" | ":h" => show_help(),
-        ":vars" | ":v" => show_variables(vm, bytecodes),
-        ":clear" | ":cls" => clear_screen(),
-        ":reset" | ":r" => reset_vm(vm),
-        ":history" | ":hist" => show_history(editor),
+        ":help" | ":h" => {
+            show_help();
+            Ok(())
+        }
+        ":vars" | ":v" => {
+            show_variables(vm, bytecodes);
+            Ok(())
+        }
+        ":clear" | ":cls" => {
+            clear_screen();
+            Ok(())
+        }
+        ":reset" | ":r" => {
+            reset_vm(vm);
+            Ok(())
+        }
+        ":history" | ":hist" => {
+            show_history(editor);
+            Ok(())
+        }
+        ":type" | ":t" => {
+            if parts.len() < 2 {
+                return Err("Usage: :type <variable>".to_string());
+            }
+            show_type(vm, parts[1])?;
+            Ok(())
+        }
+        ":load" | ":l" => {
+            if parts.len() < 2 {
+                return Err("Usage: :load <file>".to_string());
+            }
+            load_file(vm, parts[1])?;
+            Ok(())
+        }
         ":quit" | ":q" | ":exit" => {
             println!("Goodbye!");
             std::process::exit(0);
         }
-        _ => return Err(format!("Unknown command: {}. Type :help for available commands.", parts[0])),
+        _ => Err(format!("Unknown command: {}. Type :help for available commands.", parts[0])),
     }
-
-    Ok(())
 }
 
 fn show_help() {
     println!("\n{}", "REPL Commands:".bright_cyan().bold());
     println!("  {}  - Show this help message", ":help, :h".bright_green());
     println!("  {}  - Show current variables", ":vars, :v".bright_green());
+    println!("  {} - Show variable type", ":type, :t <var>".bright_green());
+    println!("  {} - Load and execute a file", ":load, :l <file>".bright_green());
     println!("  {} - Clear the screen", ":clear, :cls".bright_green());
     println!("  {} - Reset VM state (clear all variables)", ":reset, :r".bright_green());
     println!("  {} - Show command history", ":history, :hist".bright_green());
     println!("  {} - Exit the REPL", ":quit, :q, :exit".bright_green());
+    println!("\n{}", "Special Variables:".bright_cyan().bold());
+    println!("  {}       - Last result", "_".bright_green());
     println!("\n{}", "Keyboard Shortcuts:".bright_cyan().bold());
     println!("  {} - Navigate command history", "Up/Down Arrow".bright_green());
     println!("  {}    - Tab completion", "Tab".bright_green());
@@ -65,10 +96,7 @@ fn show_variables(vm: &Machine, _bytecodes: &[lugli_vm::Bytecode]) {
             continue;
         }
 
-        // Note: Strings show as <string#N> because they reference string pools
-        // from previous REPL commands which are no longer available.
-        // The actual string values are correct and accessible in the VM.
-        println!("  {} = {}", name.bright_green(), value);
+        println!("  {} = {}", name.bright_green(), vm.format_value(value));
     }
     println!();
 }
@@ -110,4 +138,39 @@ fn show_history(editor: &Editor<super::ReplHelper, FileHistory>) {
         println!("  {} {}", format!("{}:", i + 1).bright_black(), entry);
     }
     println!();
+}
+
+fn show_type(vm: &Machine, var_name: &str) -> Result<(), String> {
+    match vm.globals.get(var_name) {
+        Some(value) => {
+            println!("{}: {}", var_name.bright_green(), value.type_name().bright_cyan());
+            Ok(())
+        }
+        None => Err(format!("Variable '{}' not found", var_name)),
+    }
+}
+
+fn load_file(vm: &mut Machine, file_path: &str) -> Result<(), String> {
+    use std::fs;
+
+    let source = fs::read_to_string(file_path)
+        .map_err(|e| format!("Failed to read file '{}': {}", file_path, e))?;
+
+    match lugli_parser::parse(&source) {
+        Ok((program, span_map)) => {
+            match lugli_vm::compile(&program, span_map) {
+                Ok(bytecode) => {
+                    match lugli_vm::run_with_vm(vm, &bytecode) {
+                        Ok(_) => {
+                            println!("{}", format!("Loaded '{}'", file_path).bright_green());
+                            Ok(())
+                        }
+                        Err(e) => Err(format!("Runtime error: {}", e)),
+                    }
+                }
+                Err(e) => Err(format!("Compilation error: {}", e)),
+            }
+        }
+        Err(e) => Err(format!("Parse error: {}", e)),
+    }
 }

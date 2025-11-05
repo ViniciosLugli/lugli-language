@@ -35,6 +35,10 @@ impl StringPool {
 
     pub fn resolve(&self, id: StringId) -> &str { &self.strings[id.0 as usize] }
 
+    pub fn try_resolve(&self, id: StringId) -> Option<&str> {
+        self.strings.get(id.0 as usize).map(|s| s.as_ref())
+    }
+
     pub fn len(&self) -> usize { self.strings.len() }
 
     pub fn is_empty(&self) -> bool { self.strings.is_empty() }
