@@ -22,8 +22,8 @@ impl PeepholeOptimizer {
     pub fn new() -> Self {
         Self {
             optimize_constants: true,
-            optimize_jumps: false,     // Temporarily disabled - may break jump targets
-            optimize_dead_code: false, // Temporarily disabled - too aggressive with closures
+            optimize_jumps: true,      // Re-enabled with offset tracking
+            optimize_dead_code: false, // Keep disabled - still too aggressive
         }
     }
 
