@@ -1,6 +1,5 @@
 use lugli_common::Value;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 #[test]
 fn test_value_equality_refactored() {
