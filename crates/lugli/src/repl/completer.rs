@@ -2,12 +2,12 @@ use rustyline::{
     Context,
     completion::{Completer, Pair},
 };
-use std::collections::HashSet;
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 pub struct LugliCompleter {
     keywords: Vec<String>,
     builtins: Vec<String>,
-    variables: Vec<String>,
+    variables: Rc<RefCell<Vec<String>>>,
 }
 
 impl LugliCompleter {
@@ -85,8 +85,14 @@ impl LugliCompleter {
         Self {
             keywords,
             builtins,
-            variables: Vec::new(),
+            variables: Rc::new(RefCell::new(Vec::new())),
         }
+    }
+
+    pub fn new_with_variables(variables: Rc<RefCell<Vec<String>>>) -> Self {
+        let mut completer = Self::new();
+        completer.variables = variables;
+        completer
     }
 
     fn get_candidates(&self, prefix: &str) -> Vec<String> {
@@ -108,7 +114,7 @@ impl LugliCompleter {
         }
 
         // Add matching variables
-        for var in &self.variables {
+        for var in self.variables.borrow().iter() {
             if var.to_lowercase().starts_with(&prefix_lower) {
                 candidates.insert(var.clone());
             }

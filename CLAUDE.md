@@ -208,24 +208,24 @@ import!("./module.lg")
 ### **Method Naming Conventions**
 
 ```lugli
-# Parser supports ! and ? suffixes for user-defined methods ✅
+# Standard method definitions
 struct Counter {
     value
 
-    fn increment!(self) {  # Mutating method
+    fn increment(self) {
         self.value = self.value + 1
     }
 
-    fn is_zero?(self) {  # Query method
+    fn is_zero(self) {
         return self.value == 0
     }
 }
 
 let counter = Counter { value: 0 }
-counter.increment!()
-let check = counter.is_zero?()
+counter.increment()
+let check = counter.is_zero()
 
-# Stdlib methods use plain names (no suffix convention)
+# Stdlib methods follow consistent naming
 list.push(item)  # ✅ Works
 text.upper()     # ✅ Works
 ```
@@ -364,15 +364,16 @@ lugli-common (Foundation)
 
 -   **Purpose**: High-performance bytecode virtual machine
 -   **Architecture**: Stack-based execution with integrated stdlib functions
--   **Features**: AST compilation, native function registry, error recovery
--   **Key files**: `machine.rs`, `compiler.rs`, `bytecode.rs`
+-   **Features**: AST compilation, native function registry, error recovery, partial optimization
+-   **Key files**: `machine.rs`, `compiler.rs`, `bytecode.rs`, `optimizer.rs`
 -   **Performance**: >1M instructions/second, sub-100ms startup
+-   **Optimizer Status**: Constant folding ✅ enabled, Jump optimization ❌ disabled (known bugs), Dead code elimination ❌ disabled (too aggressive with closures)
 
 #### `lugli-stdlib`
 
 -   **Purpose**: Native function implementations for VM
 -   **Architecture**: Function registry system with VM integration
--   **Method naming**: `!` for mutating, `?` for queries
+-   **Method naming**: Standard function names (e.g., `push`, `pop`, `upper`, `lower`)
 -   **Key modules**: `core/`, `io/`, `time/`
 -   **Integration**: Direct VM function calls via registry
 
