@@ -14,7 +14,7 @@ fn test_from_as_method_name() {
         let b = Builder {}
         b.from(10)
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'from' as method name: {:?}", result.err());
 }
@@ -30,7 +30,7 @@ fn test_where_as_method_name() {
         let q = Query {}
         q.where("x > 5")
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'where' as method name: {:?}", result.err());
 }
@@ -46,7 +46,7 @@ fn test_match_as_method_name() {
         let r = Router {}
         r.match("/users")
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'match' as method name: {:?}", result.err());
 }
@@ -62,7 +62,7 @@ fn test_if_as_method_name() {
         let c = Conditional {}
         c.if(true)
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'if' as method name: {:?}", result.err());
 }
@@ -78,7 +78,7 @@ fn test_for_as_method_name() {
         let i = Iterator {}
         i.for(42)
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'for' as method name: {:?}", result.err());
 }
@@ -94,7 +94,7 @@ fn test_while_as_method_name() {
         let l = Looper {}
         l.while(true)
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'while' as method name: {:?}", result.err());
 }
@@ -110,7 +110,7 @@ fn test_loop_as_method_name() {
         let r = Repeater {}
         r.loop(5)
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'loop' as method name: {:?}", result.err());
 }
@@ -126,7 +126,7 @@ fn test_return_as_method_name() {
         let r = Returner {}
         r.return(100)
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'return' as method name: {:?}", result.err());
 }
@@ -142,7 +142,7 @@ fn test_import_as_method_name() {
         let i = Importer {}
         i.import("math")
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'import' as method name: {:?}", result.err());
 }
@@ -158,7 +158,7 @@ fn test_export_as_method_name() {
         let e = Exporter {}
         e.export("result")
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'export' as method name: {:?}", result.err());
 }
@@ -190,7 +190,7 @@ fn test_await_as_method_name() {
         let p = Promise {}
         p.await()
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'await' as method name: {:?}", result.err());
 }
@@ -206,7 +206,7 @@ fn test_try_as_method_name() {
         let e = ErrorHandler {}
         e.try(fn() { return 1 })
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'try' as method name: {:?}", result.err());
 }
@@ -222,7 +222,7 @@ fn test_catch_as_method_name() {
         let e = ErrorHandler {}
         e.catch(fn() { return 0 })
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'catch' as method name: {:?}", result.err());
 }
@@ -238,7 +238,7 @@ fn test_struct_as_method_name() {
         let b = Builder {}
         b.struct("User")
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'struct' as method name: {:?}", result.err());
 }
@@ -254,7 +254,7 @@ fn test_fn_as_method_name() {
         let f = FunctionBuilder {}
         f.fn("return 42")
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'fn' as method name: {:?}", result.err());
 }
@@ -270,7 +270,7 @@ fn test_let_as_method_name() {
         let v = Variable {}
         v.let(10)
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse 'let' as method name: {:?}", result.err());
 }
@@ -299,7 +299,7 @@ fn test_multiple_keyword_methods_in_chain() {
         let api = FluentAPI {}
         api.from("table").where("id > 0").select("*").import("helpers")
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Should parse multiple keyword methods in chain: {:?}", result.err());
 }
@@ -310,7 +310,7 @@ fn test_keyword_stays_reserved_in_language_context() {
     let source = r#"
         from math import pi
     "#;
-    
+
     let result = parse(source);
     // This should parse successfully as an import statement
     assert!(result.is_ok(), "Should parse 'from' as import keyword");
@@ -326,7 +326,7 @@ fn test_keyword_stays_reserved_for_control_flow() {
             }
         }
     "#;
-    
+
     let result = parse(source);
     assert!(result.is_ok(), "Keywords should still work in language context");
 }
