@@ -1,7 +1,7 @@
 # Lugli Language - AI Assistant Development Guide
 
 **Version:** 0.4.0
-**Status:** Stable foundation with 651 passing tests
+**Status:** Stable foundation with 674 passing tests
 **Last Updated:** 2025-11-05
 
 ## 🎯 Project Objective & Language Philosophy
@@ -201,8 +201,10 @@ loop {
 ### **Import System (Basic)**
 
 ```lugli
-# Dynamic imports ✅
-import!("./module.lg")
+# Python-style imports ✅
+import math
+from stdlib import List, Dict
+from utils import helper_function
 ```
 
 ### **Method Naming Conventions**
@@ -806,10 +808,10 @@ cargo flamegraph --bin lugli -- run large_program.lg
 -   Format output → Use f-strings (fully working)
 -   Create objects → Use structs with methods (fully working)
 -   Build closures → Capture variables from outer scope (fully working)
--   Import code → Use `import!("path")` for basic imports only
+-   Import code → Use Python-style imports (`import module`, `from module import item`)
 
 **Test expectations:**
--   All 651 tests must pass after changes
+-   All 674 tests must pass after changes
 -   Run `cargo test --workspace` to verify
 -   Run `cargo bench --workspace` to check performance regressions
 -   Every new feature needs comprehensive tests

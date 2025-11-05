@@ -1,10 +1,9 @@
+use crate::validation::*;
 use lugli_common::{LugliError, StringPool, Value};
 use std::{cell::RefCell, rc::Rc};
 
 pub fn list_length(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("list.len expects 1 argument"));
-    }
+    check_arity(args, 1, "list.len")?;
     match &args[0] {
         Value::List(l) => Ok(Value::Number(l.borrow().len() as f64)),
         _ => Err(LugliError::type_error("list", args[0].type_name())),
@@ -12,9 +11,7 @@ pub fn list_length(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugl
 }
 
 pub fn list_push(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("list.push expects 2 arguments (list, item)"));
-    }
+    check_arity(args, 2, "list.push")?;
     match &args[0] {
         Value::List(l) => {
             l.borrow_mut().push(args[1].clone());
@@ -25,9 +22,7 @@ pub fn list_push(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliE
 }
 
 pub fn list_pop(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("list.pop expects 1 argument"));
-    }
+    check_arity(args, 1, "list.pop")?;
     match &args[0] {
         Value::List(l) => match l.borrow_mut().pop() {
             Some(val) => Ok(val),
@@ -38,9 +33,7 @@ pub fn list_pop(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliEr
 }
 
 pub fn list_join(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.is_empty() || args.len() > 2 {
-        return Err(LugliError::runtime("list.join expects 1 or 2 arguments"));
-    }
+    check_arity_range(args, 1, 2, "list.join")?;
 
     let separator = if args.len() == 2 {
         match &args[1] {
