@@ -68,6 +68,7 @@ pub struct Machine {
     open_upvalues: HashMap<usize, Rc<RefCell<Value>>>,
     method_registry: lugli_stdlib::MethodRegistry,
     method_cache: HashMap<(usize, usize), u32>,
+    gc: lugli_common::GarbageCollector,
 }
 
 impl Machine {
@@ -103,6 +104,7 @@ impl Machine {
             open_upvalues: HashMap::new(),
             method_registry: lugli_stdlib::MethodRegistry::new(),
             method_cache: HashMap::new(),
+            gc: lugli_common::GarbageCollector::new(),
         }
     }
 
@@ -148,6 +150,11 @@ impl Machine {
 
         // Sweep phase: remove unreferenced bytecodes
         self.bytecode_registry.retain(|&id, _| live_bytecodes.contains(&id));
+    }
+
+    /// Get current GC statistics
+    pub fn gc_stats(&self) -> lugli_common::GCStats {
+        self.gc.stats()
     }
 
     /// Recursively mark bytecode IDs referenced by a value
@@ -590,10 +597,20 @@ impl Machine {
             return Err(LugliError::runtime(format!("Maximum recursion depth exceeded: {} nested calls", MAX_CALL_DEPTH)));
         }
 
+        // Increment instruction counter for GC and debugging
+        self.debug.instruction_count += 1;
+
         // Debug tracing
         if self.debug.trace_execution {
             eprintln!("[TRACE] IP:{:04} | {:?}", self.ip, instruction);
-            self.debug.instruction_count += 1;
+        }
+
+        // Periodic garbage collection every 10,000 instructions
+        if self.debug.instruction_count % 10_000 == 0 {
+            let mut roots = Vec::with_capacity(self.globals.len() + self.stack.len());
+            roots.extend(self.globals.values().cloned());
+            roots.extend(self.stack.iter().cloned());
+            self.gc.collect(&roots);
         }
 
         if self.debug.trace_stack && !self.stack.is_empty() {
