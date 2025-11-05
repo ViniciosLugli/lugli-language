@@ -1,28 +1,16 @@
-use lugli_common::{LugliError, StringId, StringPool, Value};
 use hashbrown::HashMap;
-use std::cell::RefCell;
-use std::rc::Rc;
+use lugli_common::{LugliError, StringId, StringPool, Value};
+use std::{cell::RefCell, rc::Rc};
 
 macro_rules! validate_arity {
     ($args:expr, $expected:expr, $func:expr) => {
         if $args.len() != $expected {
-            return Err(LugliError::runtime(format!(
-                "{} expects {} argument(s), got {}",
-                $func,
-                $expected,
-                $args.len()
-            )));
+            return Err(LugliError::runtime(format!("{} expects {} argument(s), got {}", $func, $expected, $args.len())));
         }
     };
     ($args:expr, $min:expr, $max:expr, $func:expr) => {
         if $args.len() < $min || $args.len() > $max {
-            return Err(LugliError::runtime(format!(
-                "{} expects {}-{} argument(s), got {}",
-                $func,
-                $min,
-                $max,
-                $args.len()
-            )));
+            return Err(LugliError::runtime(format!("{} expects {}-{} argument(s), got {}", $func, $min, $max, $args.len())));
         }
     };
 }
