@@ -198,10 +198,20 @@ impl Compiler {
                 }
 
                 // Add implicit return if needed
-                if !matches!(body.last(), Some(Stmt::Return { .. })) {
-                    let null_index = self.add_constant(Value::Null);
-                    self.emit_unknown(Instruction::Constant(null_index));
-                    self.emit_unknown(Instruction::Return);
+                match body.last() {
+                    Some(Stmt::Return { .. }) => {
+                        // Explicit return already handled
+                    }
+                    Some(Stmt::Expression { .. }) => {
+                        // Expression result is on stack, just add Return instruction
+                        self.emit_unknown(Instruction::Return);
+                    }
+                    _ => {
+                        // No expression or other statement, return null
+                        let null_index = self.add_constant(Value::Null);
+                        self.emit_unknown(Instruction::Constant(null_index));
+                        self.emit_unknown(Instruction::Return);
+                    }
                 }
 
                 self.patch_jump(jump_over_body)?;

@@ -204,9 +204,14 @@ impl Machine {
     }
 
     fn list_filter(&mut self, list: Rc<RefCell<Vec<Value>>>, predicate: &Value, bytecode: &Bytecode) -> Result<Value, LugliError> {
-        let mut filtered = Vec::new();
-        let items = list.borrow().clone();
+        let items = {
+            let borrowed = list.borrow();
+            let mut items_vec = Vec::with_capacity(borrowed.len());
+            items_vec.extend(borrowed.iter().cloned());
+            items_vec
+        };
 
+        let mut filtered = Vec::new();
         for item in items {
             let result = self.call_user_function(predicate, std::slice::from_ref(&item), bytecode)?;
             if result.is_truthy() {
@@ -218,9 +223,14 @@ impl Machine {
     }
 
     fn list_map(&mut self, list: Rc<RefCell<Vec<Value>>>, mapper: &Value, bytecode: &Bytecode) -> Result<Value, LugliError> {
-        let mut mapped = Vec::new();
-        let items = list.borrow().clone();
+        let items = {
+            let borrowed = list.borrow();
+            let mut items_vec = Vec::with_capacity(borrowed.len());
+            items_vec.extend(borrowed.iter().cloned());
+            items_vec
+        };
 
+        let mut mapped = Vec::new();
         for item in items {
             let result = self.call_user_function(mapper, std::slice::from_ref(&item), bytecode)?;
             mapped.push(result);
@@ -694,7 +704,14 @@ impl Machine {
                         if self.debug.trace_calls {
                             eprintln!("[CALL] Executing native function: {}", name);
                         }
-                        let args_start_index = self.stack.len() - arg_count - 1;
+                        let args_start_index = self.stack.len()
+                            .checked_sub(arg_count + 1)
+                            .ok_or_else(|| {
+                                LugliError::runtime(format!(
+                                    "Stack underflow: need {} arguments but stack only has {} elements",
+                                    arg_count, self.stack.len()
+                                ))
+                            })?;
                         let args_end_index = self.stack.len() - 1;
                         let args = self.stack.get(args_start_index..args_end_index).ok_or_else(|| {
                             LugliError::runtime(format!(
@@ -702,8 +719,11 @@ impl Machine {
                                 args_start_index, args_end_index, name
                             ))
                         })?;
-                        let result = callback(args, &mut bytecode.string_pool.borrow_mut())?;
-                        self.stack.truncate(self.stack.len() - arg_count - 1); // Pop args and function
+                        let result = {
+                            let mut pool = bytecode.string_pool.borrow_mut();
+                            callback(args, &mut pool)?
+                        };
+                        self.stack.truncate(self.stack.len() - arg_count - 1);
                         self.stack.push(result);
                     }
                     Value::Function {

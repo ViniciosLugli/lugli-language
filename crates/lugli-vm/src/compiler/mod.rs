@@ -122,54 +122,12 @@ impl Compiler {
     // Helper methods used by submodules
     pub(crate) fn add_constant(&mut self, value: Value) -> usize { self.bytecode.add_constant(value) }
 
-    pub(crate) fn get_span(&self, id: lugli_ast::NodeId) -> Span {
-        self.span_map.get(id).unwrap_or_else(|| Span::new(0, 0))
-    }
-
-    pub(crate) fn emit(&mut self, instruction: Instruction, span: Span) {
-        if self.debug.trace_emit {
-            eprintln!("[COMPILE] Emit {:04}: {:?} at {:?}", self.bytecode.instructions.len(), instruction, span);
-        }
-        self.debug.instruction_count += 1;
-        let location = self.span_to_location(span);
-        self.bytecode.emit_with_location(instruction, location);
-    }
-
-    // Emit without span for backwards compatibility during migration
     pub(crate) fn emit_unknown(&mut self, instruction: Instruction) {
         if self.debug.trace_emit {
             eprintln!("[COMPILE] Emit {:04}: {:?}", self.bytecode.instructions.len(), instruction);
         }
         self.debug.instruction_count += 1;
         self.bytecode.emit(instruction);
-    }
-
-    fn span_to_location(&self, span: Span) -> SourceLocation {
-        if let Some(ref source) = self.source_code {
-            let (line, column) = self.calculate_line_column(source, span.start);
-            SourceLocation::new(self.file_path.clone(), span, line, column)
-        } else {
-            SourceLocation::unknown()
-        }
-    }
-
-    fn calculate_line_column(&self, source: &str, offset: usize) -> (usize, usize) {
-        let mut line = 1;
-        let mut column = 1;
-
-        for (i, ch) in source.chars().enumerate() {
-            if i >= offset {
-                break;
-            }
-            if ch == '\n' {
-                line += 1;
-                column = 1;
-            } else {
-                column += 1;
-            }
-        }
-
-        (line, column)
     }
 
     pub(crate) fn declare_local(&mut self, name: String) -> usize {
