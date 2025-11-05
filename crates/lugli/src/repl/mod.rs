@@ -135,7 +135,7 @@ fn get_history_path() -> PathBuf { if let Some(home) = dirs::home_dir() { home.j
 
 fn update_completion_variables(vm: &Machine, variables: &Rc<RefCell<Vec<String>>>) {
     let user_vars: Vec<String> =
-        vm.globals.keys().filter(|k| !matches!(vm.globals.get(*k), Some(lugli_common::Value::NativeFunction { .. }))).map(|k| k.clone()).collect();
+        vm.globals.keys().filter(|k| !matches!(vm.globals.get(*k), Some(lugli_common::Value::NativeFunction { .. }))).cloned().collect();
     *variables.borrow_mut() = user_vars;
 }
 

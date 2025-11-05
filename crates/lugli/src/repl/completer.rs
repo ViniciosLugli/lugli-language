@@ -95,10 +95,6 @@ impl LugliCompleter {
         completer
     }
 
-    pub fn update_variables(&self, vars: Vec<String>) { *self.variables.borrow_mut() = vars; }
-
-    pub fn get_variables_ref(&self) -> Rc<RefCell<Vec<String>>> { self.variables.clone() }
-
     fn get_candidates(&self, prefix: &str) -> Vec<String> {
         let prefix_lower = prefix.to_lowercase();
         let mut candidates = HashSet::new();
