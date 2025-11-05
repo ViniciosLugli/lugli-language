@@ -19,21 +19,12 @@ struct CallFrame {
 }
 
 impl CallFrame {
-    fn new(function_name: String, return_ip: usize, stack_base: usize) -> Self {
+    fn new(function_name: String, return_ip: usize, stack_base: usize, upvalues: Option<Vec<Rc<RefCell<Value>>>>) -> Self {
         Self {
             function_name,
             return_ip,
             stack_base,
-            closure_upvalues: None,
-        }
-    }
-
-    fn new_closure(function_name: String, return_ip: usize, stack_base: usize, upvalues: Vec<Rc<RefCell<Value>>>) -> Self {
-        Self {
-            function_name,
-            return_ip,
-            stack_base,
-            closure_upvalues: Some(upvalues),
+            closure_upvalues: upvalues,
         }
     }
 }
@@ -102,7 +93,7 @@ impl Machine {
             stack: Vec::with_capacity(256),
             globals,
             ip: 0,
-            call_stack: vec![CallFrame::new("<script>".to_string(), 0, 0)],
+            call_stack: vec![CallFrame::new("<script>".to_string(), 0, 0, None)],
             debug,
             module_cache: ModuleCache::new(),
             module_resolver: ModuleResolver::new(),
@@ -120,7 +111,7 @@ impl Machine {
         self.globals.clear();
         self.ip = 0;
         self.call_stack.clear();
-        self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0));
+        self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
         self.debug = DebugContext::default();
         if self.debug.trace_execution || self.debug.trace_stack || self.debug.trace_calls {
             self.debug.start_time = Some(Instant::now());
@@ -136,7 +127,7 @@ impl Machine {
         self.stack.clear();
         self.ip = 0;
         self.call_stack.clear();
-        self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0));
+        self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
         self.bytecode_registry.clear();
         self.next_bytecode_id = 1;
         self.open_upvalues.clear();
@@ -288,7 +279,7 @@ impl Machine {
 
                 // Set up call frame - stack_base points to first argument (after function)
                 let stack_base = saved_stack_len + 1; // +1 to skip the function itself
-                let frame = CallFrame::new(name.clone(), usize::MAX, stack_base);
+                let frame = CallFrame::new(name.clone(), usize::MAX, stack_base, None);
                 self.call_stack.push(frame);
 
                 // Jump to function body
@@ -749,7 +740,7 @@ impl Machine {
 
                             let saved_call_stack_len = self.call_stack.len();
                             let stack_base = self.stack.len() - arg_count - 1;
-                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base);
+                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
                             self.call_stack.push(frame);
 
                             let saved_ip = self.ip;
@@ -763,7 +754,7 @@ impl Machine {
                         } else {
                             // Same-bytecode call - normal path
                             let stack_base = self.stack.len() - arg_count - 1;
-                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base);
+                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
                             self.call_stack.push(frame);
                             self.ip = body_start;
                             return Ok(true);
@@ -792,7 +783,7 @@ impl Machine {
 
                             let saved_call_stack_len = self.call_stack.len();
                             let stack_base = self.stack.len() - arg_count - 1;
-                            let frame = CallFrame::new_closure(name.clone(), self.ip + 1, stack_base, upvalues.clone());
+                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, Some(upvalues.clone()));
                             self.call_stack.push(frame);
 
                             let saved_ip = self.ip;
@@ -806,7 +797,7 @@ impl Machine {
                         } else {
                             // Same-bytecode call - normal path
                             let stack_base = self.stack.len() - arg_count - 1;
-                            let frame = CallFrame::new_closure(name.clone(), self.ip + 1, stack_base, upvalues.clone());
+                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, Some(upvalues.clone()));
                             self.call_stack.push(frame);
                             self.ip = body_start;
                             return Ok(true);
@@ -1166,7 +1157,7 @@ impl Machine {
 
                                         let saved_call_stack_len = self.call_stack.len();
                                         let stack_base = self.stack.len() - arg_count;
-                                        let frame = CallFrame::new("".to_string(), self.ip + 1, stack_base);
+                                        let frame = CallFrame::new("".to_string(), self.ip + 1, stack_base, None);
                                         self.call_stack.push(frame);
 
                                         let saved_ip = self.ip;
@@ -1179,7 +1170,7 @@ impl Machine {
                                     } else {
                                         // Same-bytecode call
                                         let stack_base = self.stack.len() - arg_count;
-                                        let frame = CallFrame::new("".to_string(), self.ip + 1, stack_base);
+                                        let frame = CallFrame::new("".to_string(), self.ip + 1, stack_base, None);
                                         self.call_stack.push(frame);
                                         self.ip = *body_start;
                                         return Ok(true);
@@ -1222,7 +1213,7 @@ impl Machine {
 
                                     // Set up call frame and invoke function
                                     let stack_base = self.stack.len() - arg_count - 1; // Include the object
-                                    let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base);
+                                    let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
                                     self.call_stack.push(frame);
                                     self.ip = *body_start;
                                     return Ok(true); // Function call will handle stack management
