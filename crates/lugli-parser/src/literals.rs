@@ -15,6 +15,34 @@ fn is_pascal_case(s: &str) -> bool {
 }
 
 impl<'a> Parser<'a> {
+    pub(crate) fn block_expression(&mut self) -> Result<Expr, ParseError> {
+        let start_span = self.current_span();
+        self.consume(&TokenKind::LeftBrace, "Expected '{'")?;
+        self.skip_newlines();
+
+        let mut statements = Vec::new();
+
+        while !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
+            self.skip_newlines();
+
+            if !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
+                statements.push(self.statement()?);
+            }
+        }
+
+        self.consume(&TokenKind::RightBrace, "Expected '}' after block")?;
+        let end_span = self.previous_span();
+
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
+        Ok(Expr::Block {
+            id,
+            statements,
+        })
+    }
+
     fn parse_dict_key(&mut self) -> Result<Expr, ParseError> {
         match self.peek_kind() {
             Some(TokenKind::String(id)) => {
@@ -268,7 +296,85 @@ impl<'a> Parser<'a> {
         }
 
         if self.check(&TokenKind::LeftBrace) {
-            return self.dict_literal();
+            // Disambiguate between dictionary literal and block expression
+            // Dictionary: { key: value, ... } or {}
+            // Block: { statements... } or { expr }
+            //
+            // Decision rules (with 1-token lookahead limitation):
+            // 1. {} -> empty dict
+            // 2. { <statement-keyword> ... -> block (clear indicator)
+            // 3. { <newline> ... -> try dict (for multiline dict support)
+            // 4. { "string" ... -> dict (quoted strings are keys)
+            // 5. { <number>/<identifier> ... -> try dict (ambiguous)
+            //
+            // Limitation: Without full lookahead past newlines, some patterns are ambiguous:
+            // - `{ <newline> <statement-keyword> }` is parsed as dict (fails with clear error)
+            // - `{ <number> }` or `{ <identifier> }` is parsed as dict (ambiguous)
+            // - `{ { expr } }` works (nested blocks detected)
+            //
+            // Recommended syntax:
+            // - Block with statement: `{ if cond { a } else { b } }` (no newline after {)
+            // - Block with expression: Use `{ let x = expr; x }` (not `{ return expr }` - has issues)
+            // - Nested blocks: `{ { if cond { a } else { b } } }` works
+            // - Dict: Use quoted keys `{ "key": value }` or inline `{ key: value }`
+            // - Multiline dict: `{<newline> "key": value }` works fine
+            //
+            // Known Issue: `{ return expr }` in block expressions causes early program termination
+
+            // Disambiguation with 1-token lookahead
+            // For better accuracy with newlines, we need to check if there's a statement keyword
+            // after the newline. We'll do this by temporarily saving state and peeking.
+
+            // First check: is the immediate next token a statement keyword or nested block?
+            let next = self.scanner.peek();
+            let is_definitely_block = next
+                .as_ref()
+                .map(|t| {
+                    matches!(
+                        t.kind,
+                        TokenKind::If
+                            | TokenKind::For
+                            | TokenKind::While
+                            | TokenKind::Loop
+                            | TokenKind::Let
+                            | TokenKind::Mut
+                            | TokenKind::Const
+                            | TokenKind::Return
+                            | TokenKind::Break
+                            | TokenKind::Continue
+                            | TokenKind::Fn
+                            | TokenKind::Struct
+                            | TokenKind::Match
+                            | TokenKind::LeftBrace // Nested block like { { expr } }
+                    )
+                })
+                .unwrap_or(false);
+
+            if is_definitely_block {
+                return self.block_expression();
+            }
+
+            // For newlines: need to check what comes after
+            // We'll use a simple trick: try parsing as dict, and on failure with specific
+            // error pattern (statement keyword found), retry as block
+            // This is pragmatic and handles most cases correctly
+            let is_newline_next = next.as_ref().map(|t| matches!(t.kind, TokenKind::Newline)).unwrap_or(false);
+
+            if is_newline_next {
+                // For multiline constructs, try dict first (most common case)
+                // dict_literal will fail cleanly if it encounters a statement keyword
+                return self.dict_literal();
+            }
+
+            // Empty or other tokens -> try dict
+            let is_empty = next.as_ref().map(|t| matches!(t.kind, TokenKind::RightBrace)).unwrap_or(true);
+            let is_dict = is_empty || next.is_some(); // If there's any token that's not a statement keyword, try dict
+
+            if is_dict {
+                return self.dict_literal();
+            } else {
+                return self.block_expression();
+            }
         }
 
         if self.check(&TokenKind::Fn) {
@@ -279,7 +385,50 @@ impl<'a> Parser<'a> {
             return self.match_expression();
         }
 
+        if self.check(&TokenKind::If) {
+            return self.if_expression();
+        }
+
         Err(self.unexpected_token_error("in expression context"))
+    }
+
+    pub(crate) fn if_expression(&mut self) -> Result<Expr, ParseError> {
+        let start_span = self.current_span();
+        self.consume(&TokenKind::If, "Expected 'if'")?;
+
+        let condition = Box::new(self.expression()?);
+
+        let then_branch = Box::new(
+            if self.check(&TokenKind::LeftBrace) {
+                self.block_expression()?
+            } else {
+                return Err(self.expected_error("'{' after if condition in expression context"));
+            },
+        );
+
+        let else_branch = if self.match_any(&[TokenKind::Else]) {
+            if self.check(&TokenKind::If) {
+                Some(Box::new(self.if_expression()?))
+            } else if self.check(&TokenKind::LeftBrace) {
+                Some(Box::new(self.block_expression()?))
+            } else {
+                return Err(self.expected_error("'{' or 'if' after 'else' in expression context"));
+            }
+        } else {
+            None
+        };
+
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
+        Ok(Expr::If {
+            id,
+            condition,
+            then_branch,
+            else_branch,
+        })
     }
 
     pub(crate) fn match_expression(&mut self) -> Result<Expr, ParseError> {
@@ -329,7 +478,7 @@ impl<'a> Parser<'a> {
 
             self.consume(&TokenKind::FatArrow, "Expected '=>' after pattern")?;
 
-            let body = Box::new(self.expression()?);
+            let body = if self.check(&TokenKind::LeftBrace) { Box::new(self.block_expression()?) } else { Box::new(self.expression()?) };
 
             arms.push(MatchArm {
                 pattern,
@@ -374,22 +523,33 @@ impl<'a> Parser<'a> {
 
         let first_element = self.expression()?;
 
-        // Check for list comprehension: [expr for var in iterable if condition]
+        // Check for list comprehension: [expr for var in iterable if condition for var2 in iterable2 ...]
         if self.check(&TokenKind::For) {
-            self.advance(); // consume 'for'
+            use lugli_ast::ComprehensionClause;
+            let mut clauses = Vec::new();
 
-            let variable = self.consume_identifier("Expected variable name after 'for'")?;
+            while self.check(&TokenKind::For) {
+                self.advance(); // consume 'for'
 
-            self.consume(&TokenKind::In, "Expected 'in' after variable in list comprehension")?;
+                let variable = self.consume_identifier("Expected variable name after 'for'")?;
 
-            let iterable = self.expression()?;
+                self.consume(&TokenKind::In, "Expected 'in' after variable in list comprehension")?;
 
-            let condition = if self.check(&TokenKind::If) {
-                self.advance(); // consume 'if'
-                Some(self.expression()?)
-            } else {
-                None
-            };
+                let iterable = self.expression()?;
+
+                let condition = if self.check(&TokenKind::If) {
+                    self.advance(); // consume 'if'
+                    Some(self.expression()?)
+                } else {
+                    None
+                };
+
+                clauses.push(ComprehensionClause {
+                    variable,
+                    iterable,
+                    condition,
+                });
+            }
 
             self.consume_closing(&TokenKind::RightBracket, "Expected ']' after list comprehension")?;
             let end_span = self.previous_span();
@@ -402,9 +562,7 @@ impl<'a> Parser<'a> {
                 id,
                 data: Box::new(ListComprehensionData {
                     element: first_element,
-                    variable,
-                    iterable,
-                    condition,
+                    clauses,
                 }),
             });
         }

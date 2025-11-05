@@ -469,104 +469,120 @@ impl Compiler {
                 data, ..
             } => {
                 let element = &data.element;
-                let variable = &data.variable;
-                let iterable = &data.iterable;
-                let condition = &data.condition;
-                // Desugar [expr for var in iterable if condition] into indexed iteration:
-                // 1. Create empty result list
-                // 2. Store iterable in local
-                // 3. Initialize index to 0
-                // 4. While index < len(iterable):
-                //    - Get iterable[index]
-                //    - Bind to variable
-                //    - If condition (optional), check it
-                //    - If passes, append expr to result
-                //    - Increment index
-                // 5. Leave result on stack
+                let clauses = &data.clauses;
 
-                // Create empty list []
+                // Desugar nested comprehensions [expr for x in iter1 for y in iter2]
+                // into nested loops with indexed iteration
+
+                // Create empty result list
                 self.emit_unknown(Instruction::MakeList(0));
-
-                // Store result list in temporary local
                 let depth = self.loop_depth;
                 let result_local = self.declare_local(format!("__comp_result_{}", depth));
                 self.emit_unknown(Instruction::Store(result_local));
 
-                // Compile and store the iterable
-                self.compile_expr(iterable)?;
-                let iterable_local = self.declare_local(format!("__comp_iter_{}", depth));
-                self.emit_unknown(Instruction::Store(iterable_local));
+                // Track loop structures for each clause
+                struct LoopInfo {
+                    _iterable_local: usize, // Reserved for future filtered nested comprehensions
+                    index_local: usize,
+                    _var_local: usize, // Reserved for future filtered nested comprehensions
+                    loop_start: usize,
+                    exit_jump: usize,
+                    _skip_jump: Option<usize>, // Reserved for future filtered nested comprehensions
+                }
+                let mut loops: Vec<LoopInfo> = Vec::new();
+                let mut var_names: Vec<String> = Vec::new();
 
-                // Initialize index to 0
-                let index_local = self.declare_local(format!("__comp_idx_{}", depth));
-                let zero_constant = self.add_constant(Value::Number(0.0));
-                self.emit_unknown(Instruction::Constant(zero_constant));
-                self.emit_unknown(Instruction::Store(index_local));
+                // Generate nested loops for each clause
+                for (clause_idx, clause) in clauses.iter().enumerate() {
+                    // Compile and store the iterable
+                    self.compile_expr(&clause.iterable)?;
+                    let iterable_local = self.declare_local(format!("__comp_iter_{}_{}", depth, clause_idx));
+                    self.emit_unknown(Instruction::Store(iterable_local));
 
-                // Declare the loop variable
-                let var_local = self.declare_local(variable.clone());
+                    // Initialize index to 0
+                    let index_local = self.declare_local(format!("__comp_idx_{}_{}", depth, clause_idx));
+                    let zero_constant = self.add_constant(Value::Number(0.0));
+                    self.emit_unknown(Instruction::Constant(zero_constant));
+                    self.emit_unknown(Instruction::Store(index_local));
 
-                // Loop start
-                let loop_start = self.current_instruction();
+                    // Declare the loop variable
+                    let var_local = self.declare_local(clause.variable.clone());
+                    var_names.push(clause.variable.clone());
 
-                // Check if index < len(iterable)
-                self.emit_unknown(Instruction::Load(index_local));
-                self.emit_unknown(Instruction::Load(iterable_local));
-                let len_id = self.bytecode.string_pool.borrow_mut().intern("len");
-                let len_name = self.add_constant(Value::String(len_id));
-                self.emit_unknown(Instruction::CallMethod(len_name, 0));
-                self.emit_unknown(Instruction::Less);
-                let exit_jump = self.emit_jump(Instruction::JumpIfFalse(0));
+                    // Loop start
+                    let loop_start = self.current_instruction();
 
-                // Get element at current index
-                self.emit_unknown(Instruction::Load(iterable_local));
-                self.emit_unknown(Instruction::Load(index_local));
-                self.emit_unknown(Instruction::GetIndex);
-                self.emit_unknown(Instruction::Store(var_local));
+                    // Check if index < len(iterable)
+                    self.emit_unknown(Instruction::Load(index_local));
+                    self.emit_unknown(Instruction::Load(iterable_local));
+                    let len_id = self.bytecode.string_pool.borrow_mut().intern("len");
+                    let len_name = self.add_constant(Value::String(len_id));
+                    self.emit_unknown(Instruction::CallMethod(len_name, 0));
+                    self.emit_unknown(Instruction::Less);
+                    let exit_jump = self.emit_jump(Instruction::JumpIfFalse(0));
 
-                // Optional condition check
-                if let Some(cond) = condition.as_ref() {
-                    self.compile_expr(cond)?;
-                    let skip_append = self.emit_jump(Instruction::JumpIfFalse(0));
+                    // Get element at current index
+                    self.emit_unknown(Instruction::Load(iterable_local));
+                    self.emit_unknown(Instruction::Load(index_local));
+                    self.emit_unknown(Instruction::GetIndex);
+                    self.emit_unknown(Instruction::Store(var_local));
 
-                    // Append element to result list
-                    self.emit_unknown(Instruction::Load(result_local));
-                    self.compile_expr(element)?;
-                    let push_id = self.bytecode.string_pool.borrow_mut().intern("push");
-                    let push_const = self.add_constant(Value::String(push_id));
-                    self.emit_unknown(Instruction::CallMethod(push_const, 1));
-                    self.emit_unknown(Instruction::Pop); // Pop return value from push
+                    // Optional condition check for this clause
+                    let skip_jump = if let Some(cond) = &clause.condition {
+                        self.compile_expr(cond)?;
+                        Some(self.emit_jump(Instruction::JumpIfFalse(0)))
+                    } else {
+                        None
+                    };
 
-                    self.patch_jump(skip_append)?;
-                } else {
-                    // No condition - always append
-                    self.emit_unknown(Instruction::Load(result_local));
-                    self.compile_expr(element)?;
-                    let push_id = self.bytecode.string_pool.borrow_mut().intern("push");
-                    let push_const = self.add_constant(Value::String(push_id));
-                    self.emit_unknown(Instruction::CallMethod(push_const, 1));
-                    self.emit_unknown(Instruction::Pop); // Pop return value from push
+                    loops.push(LoopInfo {
+                        _iterable_local: iterable_local,
+                        index_local,
+                        _var_local: var_local,
+                        loop_start,
+                        exit_jump,
+                        _skip_jump: skip_jump,
+                    });
+
+                    // If this is the last clause, append the element
+                    if clause_idx == clauses.len() - 1 {
+                        self.emit_unknown(Instruction::Load(result_local));
+                        self.compile_expr(element)?;
+                        let push_id = self.bytecode.string_pool.borrow_mut().intern("push");
+                        let push_const = self.add_constant(Value::String(push_id));
+                        self.emit_unknown(Instruction::CallMethod(push_const, 1));
+                        self.emit_unknown(Instruction::Pop); // Pop return value from push
+                    }
+
+                    // Patch skip jump if condition was present
+                    if let Some(skip) = skip_jump {
+                        self.patch_jump(skip)?;
+                    }
                 }
 
-                // Increment index
-                self.emit_unknown(Instruction::Load(index_local));
-                let one_constant = self.add_constant(Value::Number(1.0));
-                self.emit_unknown(Instruction::Constant(one_constant));
-                self.emit_unknown(Instruction::Add);
-                self.emit_unknown(Instruction::Store(index_local));
+                // Close all nested loops (in reverse order)
+                for loop_info in loops.iter().rev() {
+                    // Increment index
+                    self.emit_unknown(Instruction::Load(loop_info.index_local));
+                    let one_constant = self.add_constant(Value::Number(1.0));
+                    self.emit_unknown(Instruction::Constant(one_constant));
+                    self.emit_unknown(Instruction::Add);
+                    self.emit_unknown(Instruction::Store(loop_info.index_local));
 
-                // Jump back to loop start
-                self.emit_unknown(Instruction::Loop(loop_start));
+                    // Jump back to this loop's start
+                    self.emit_unknown(Instruction::Loop(loop_info.loop_start));
 
-                // Patch exit jump
-                self.patch_jump(exit_jump)?;
+                    // Patch exit jump
+                    self.patch_jump(loop_info.exit_jump)?;
+                }
 
                 // Load result list onto stack
                 self.emit_unknown(Instruction::Load(result_local));
 
-                // Clean up locals (4 locals: result, iterable, index, variable)
-                self.local_count -= 4;
-                self.locals.retain(|name, _| !name.starts_with("__comp_") && name != variable);
+                // Clean up locals
+                let locals_created = 1 + clauses.len() * 3; // result + (iterable, index, var) per clause
+                self.local_count -= locals_created;
+                self.locals.retain(|name, _| !name.starts_with("__comp_") && !var_names.contains(name));
 
                 Ok(())
             }
@@ -669,6 +685,80 @@ impl Compiler {
                     self.patch_jump(jump)?;
                 }
                 // Stack: [body_result] from whichever arm matched
+
+                Ok(())
+            }
+            Expr::Block {
+                statements, ..
+            } => {
+                for (i, stmt) in statements.iter().enumerate() {
+                    let is_last = i == statements.len() - 1;
+
+                    if is_last {
+                        match stmt {
+                            lugli_ast::Stmt::Expression {
+                                expr, ..
+                            } => {
+                                // Check if the expression is an assignment (Set)
+                                // Assignments shouldn't be the return value of a block
+                                if matches!(expr, lugli_ast::Expr::Set { .. }) {
+                                    self.compile_expr(expr)?;
+                                    self.emit_unknown(Instruction::Pop);
+                                    self.emit_unknown(Instruction::LoadNull);
+                                } else {
+                                    self.compile_expr(expr)?;
+                                }
+                            }
+                            lugli_ast::Stmt::If {
+                                ..
+                            } => {
+                                // If-statements leave a value on the stack (from compile_branch_as_expr)
+                                self.compile_stmt(stmt)?;
+                            }
+                            _ => {
+                                self.compile_stmt(stmt)?;
+                                self.emit_unknown(Instruction::LoadNull);
+                            }
+                        }
+                    } else {
+                        self.compile_stmt(stmt)?;
+                        // Pop intermediate values from expression statements and if-statements
+                        if matches!(stmt, lugli_ast::Stmt::Expression { .. } | lugli_ast::Stmt::If { .. }) {
+                            self.emit_unknown(Instruction::Pop);
+                        }
+                    }
+                }
+
+                if statements.is_empty() {
+                    self.emit_unknown(Instruction::LoadNull);
+                }
+
+                Ok(())
+            }
+            Expr::If {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                self.compile_expr(condition)?;
+
+                // JumpIfFalse pops the condition automatically
+                let else_jump = self.emit_jump(Instruction::JumpIfFalse(0));
+
+                self.compile_expr(then_branch)?;
+
+                let end_jump = self.emit_jump(Instruction::Jump(0));
+
+                self.patch_jump(else_jump)?;
+
+                if let Some(else_expr) = else_branch {
+                    self.compile_expr(else_expr)?;
+                } else {
+                    self.emit_unknown(Instruction::LoadNull);
+                }
+
+                self.patch_jump(end_jump)?;
 
                 Ok(())
             }
@@ -874,9 +964,30 @@ impl Compiler {
                 data, ..
             } => {
                 self.find_captured_identifiers_in_expr(&data.element, outer_locals, params, captures);
-                self.find_captured_identifiers_in_expr(&data.iterable, outer_locals, params, captures);
-                if let Some(cond) = &data.condition {
-                    self.find_captured_identifiers_in_expr(cond, outer_locals, params, captures);
+                for clause in &data.clauses {
+                    self.find_captured_identifiers_in_expr(&clause.iterable, outer_locals, params, captures);
+                    if let Some(cond) = &clause.condition {
+                        self.find_captured_identifiers_in_expr(cond, outer_locals, params, captures);
+                    }
+                }
+            }
+            Expr::Block {
+                statements, ..
+            } => {
+                for stmt in statements {
+                    self.find_captured_identifiers(stmt, outer_locals, params, captures);
+                }
+            }
+            Expr::If {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                self.find_captured_identifiers_in_expr(condition, outer_locals, params, captures);
+                self.find_captured_identifiers_in_expr(then_branch, outer_locals, params, captures);
+                if let Some(else_expr) = else_branch {
+                    self.find_captured_identifiers_in_expr(else_expr, outer_locals, params, captures);
                 }
             }
             _ => {}

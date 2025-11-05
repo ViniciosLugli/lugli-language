@@ -224,7 +224,8 @@ impl<'a> Parser<'a> {
                     index: Box::new(index),
                 };
             } else if self.match_any(&[TokenKind::Dot]) {
-                let mut name = self.consume_identifier("Expected property name after '.'")?;
+                // Allow keywords as property/method names after dot
+                let mut name = self.consume_identifier_or_keyword("Expected property name after '.'")?;
 
                 // Check for ! suffix (mutating method indicator)
                 if self.check(&TokenKind::Bang) && self.peek_next_kind() == Some(TokenKind::LeftParen) {
