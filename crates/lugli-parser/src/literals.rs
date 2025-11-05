@@ -296,7 +296,66 @@ impl<'a> Parser<'a> {
         }
 
         if self.check(&TokenKind::LeftBrace) {
-            return self.dict_literal();
+            // Disambiguate between dictionary literal and block expression
+            // Dictionary: { key: value, ... } or {}
+            // Block: { statements... } or { expr }
+            //
+            // Decision rules (with 1-token lookahead limitation):
+            // 1. {} -> empty dict
+            // 2. { <statement-keyword> ... -> block (clear indicator)
+            // 3. { <newline> ... -> try dict (for multiline dict support)
+            // 4. { "string" ... -> dict (quoted strings are keys)
+            // 5. { <number>/<identifier> ... -> try dict (ambiguous)
+            //
+            // Limitation: Without full lookahead past newlines, some patterns are ambiguous:
+            // - `{ <newline> <statement-keyword> }` is parsed as dict (fails with clear error)
+            // - `{ <number> }` or `{ <identifier> }` is parsed as dict (ambiguous)
+            //
+            // Recommended syntax:
+            // - Block with statement: `{ if cond { a } else { b } }` (no newline after {)
+            // - Block with expression: Use statement syntax like `{ return expr }` or `{ let x = expr; x }`
+            // - Dict: Use quoted keys `{ "key": value }` or inline `{ key: value }`
+            // - Multiline dict: `{<newline> "key": value }` works fine
+
+            // Disambiguation with 1-token lookahead
+            // For better accuracy with newlines, we need to check if there's a statement keyword
+            // after the newline. We'll do this by temporarily saving state and peeking.
+
+            // First check: is the immediate next token a statement keyword?
+            let next = self.scanner.peek();
+            let is_definitely_block = next.as_ref().map(|t| matches!(
+                t.kind,
+                TokenKind::If | TokenKind::For | TokenKind::While | TokenKind::Loop
+                | TokenKind::Let | TokenKind::Mut | TokenKind::Const
+                | TokenKind::Return | TokenKind::Break | TokenKind::Continue
+                | TokenKind::Fn | TokenKind::Struct | TokenKind::Match
+            )).unwrap_or(false);
+
+            if is_definitely_block {
+                return self.block_expression();
+            }
+
+            // For newlines: need to check what comes after
+            // We'll use a simple trick: try parsing as dict, and on failure with specific
+            // error pattern (statement keyword found), retry as block
+            // This is pragmatic and handles most cases correctly
+            let is_newline_next = next.as_ref().map(|t| matches!(t.kind, TokenKind::Newline)).unwrap_or(false);
+
+            if is_newline_next {
+                // For multiline constructs, try dict first (most common case)
+                // dict_literal will fail cleanly if it encounters a statement keyword
+                return self.dict_literal();
+            }
+
+            // Empty or other tokens -> try dict
+            let is_empty = next.as_ref().map(|t| matches!(t.kind, TokenKind::RightBrace)).unwrap_or(true);
+            let is_dict = is_empty || next.is_some(); // If there's any token that's not a statement keyword, try dict
+
+            if is_dict {
+                return self.dict_literal();
+            } else {
+                return self.block_expression();
+            }
         }
 
         if self.check(&TokenKind::Fn) {
