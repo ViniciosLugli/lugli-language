@@ -108,152 +108,38 @@ impl<'a> Parser<'a> {
     /// This allows keywords like `from`, `where`, `match`, `if`, etc. to be used
     /// as method/property names in contexts where they're unambiguous.
     pub(crate) fn consume_identifier_or_keyword(&mut self, message: &str) -> Result<String, ParseError> {
-        if let Some(kind) = self.peek_kind() {
-            match kind {
-                TokenKind::Identifier(id) => {
-                    let name = self.scanner.pool().resolve(*id).to_string();
-                    self.advance();
-                    Ok(name)
+        macro_rules! keyword_as_ident {
+            ($($variant:ident => $str:literal),* $(,)?) => {
+                match self.peek_kind() {
+                    Some(TokenKind::Identifier(id)) => {
+                        let name = self.scanner.pool().resolve(*id).to_string();
+                        self.advance();
+                        return Ok(name);
+                    }
+                    $(
+                        Some(TokenKind::$variant) => {
+                            self.advance();
+                            return Ok($str.to_string());
+                        }
+                    )*
+                    _ => {}
                 }
-                // Allow all keywords as identifiers in this context
-                TokenKind::From => {
-                    self.advance();
-                    Ok("from".to_string())
-                }
-                TokenKind::Where => {
-                    self.advance();
-                    Ok("where".to_string())
-                }
-                TokenKind::Match => {
-                    self.advance();
-                    Ok("match".to_string())
-                }
-                TokenKind::If => {
-                    self.advance();
-                    Ok("if".to_string())
-                }
-                TokenKind::Else => {
-                    self.advance();
-                    Ok("else".to_string())
-                }
-                TokenKind::For => {
-                    self.advance();
-                    Ok("for".to_string())
-                }
-                TokenKind::While => {
-                    self.advance();
-                    Ok("while".to_string())
-                }
-                TokenKind::Loop => {
-                    self.advance();
-                    Ok("loop".to_string())
-                }
-                TokenKind::In => {
-                    self.advance();
-                    Ok("in".to_string())
-                }
-                TokenKind::Break => {
-                    self.advance();
-                    Ok("break".to_string())
-                }
-                TokenKind::Continue => {
-                    self.advance();
-                    Ok("continue".to_string())
-                }
-                TokenKind::Return => {
-                    self.advance();
-                    Ok("return".to_string())
-                }
-                TokenKind::Fn => {
-                    self.advance();
-                    Ok("fn".to_string())
-                }
-                TokenKind::Struct => {
-                    self.advance();
-                    Ok("struct".to_string())
-                }
-                TokenKind::Impl => {
-                    self.advance();
-                    Ok("impl".to_string())
-                }
-                TokenKind::Trait => {
-                    self.advance();
-                    Ok("trait".to_string())
-                }
-                TokenKind::Type => {
-                    self.advance();
-                    Ok("type".to_string())
-                }
-                TokenKind::Enum => {
-                    self.advance();
-                    Ok("enum".to_string())
-                }
-                TokenKind::Class => {
-                    self.advance();
-                    Ok("class".to_string())
-                }
-                TokenKind::Let => {
-                    self.advance();
-                    Ok("let".to_string())
-                }
-                TokenKind::Mut => {
-                    self.advance();
-                    Ok("mut".to_string())
-                }
-                TokenKind::Const => {
-                    self.advance();
-                    Ok("const".to_string())
-                }
-                TokenKind::Import => {
-                    self.advance();
-                    Ok("import".to_string())
-                }
-                TokenKind::Export => {
-                    self.advance();
-                    Ok("export".to_string())
-                }
-                TokenKind::As => {
-                    self.advance();
-                    Ok("as".to_string())
-                }
-                TokenKind::Pub => {
-                    self.advance();
-                    Ok("pub".to_string())
-                }
-                TokenKind::Async => {
-                    self.advance();
-                    Ok("async".to_string())
-                }
-                TokenKind::Await => {
-                    self.advance();
-                    Ok("await".to_string())
-                }
-                TokenKind::Try => {
-                    self.advance();
-                    Ok("try".to_string())
-                }
-                TokenKind::Catch => {
-                    self.advance();
-                    Ok("catch".to_string())
-                }
-                TokenKind::Throw => {
-                    self.advance();
-                    Ok("throw".to_string())
-                }
-                TokenKind::Panic => {
-                    self.advance();
-                    Ok("panic".to_string())
-                }
-                TokenKind::Not => {
-                    self.advance();
-                    Ok("not".to_string())
-                }
-                // Note: we don't allow 'self' as a regular identifier since it has special semantics
-                _ => Err(self.expected_error(message)),
-            }
-        } else {
-            Err(self.expected_error(message))
+            };
         }
+
+        keyword_as_ident! {
+            From => "from", Where => "where", Match => "match", If => "if",
+            Else => "else", For => "for", While => "while", Loop => "loop",
+            In => "in", Break => "break", Continue => "continue", Return => "return",
+            Fn => "fn", Struct => "struct", Impl => "impl", Trait => "trait",
+            Type => "type", Enum => "enum", Class => "class", Let => "let",
+            Mut => "mut", Const => "const", Import => "import", Export => "export",
+            As => "as", Pub => "pub", Async => "async", Await => "await",
+            Try => "try", Catch => "catch", Throw => "throw", Panic => "panic",
+            Not => "not",
+        }
+
+        Err(self.expected_error(message))
     }
 
     pub(crate) fn consume_statement_terminator(&mut self) -> Result<(), ParseError> {
