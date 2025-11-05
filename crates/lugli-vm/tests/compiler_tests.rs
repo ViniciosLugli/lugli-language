@@ -12,7 +12,7 @@
 mod helpers;
 
 use helpers::assert_value_eq;
-use lugli_ast::{CallData, Expr, IfData, LiteralValue, NodeId, Program, SpanMap, Stmt};
+use lugli_ast::{Expr, LiteralValue, NodeId, Program, SpanMap, Stmt};
 use lugli_common::{Span, Value};
 use lugli_lexer::TokenKind;
 use lugli_vm::compile_and_run;

@@ -1,4 +1,5 @@
 // Test helper functions for VM integration tests
+#![allow(dead_code)]
 
 use lugli_common::Value;
 use lugli_parser::Parser;
