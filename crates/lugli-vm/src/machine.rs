@@ -165,7 +165,9 @@ impl Machine {
                 Ok(dict_ref) => {
                     let mut items = Vec::new();
                     for (k, v) in dict_ref.iter() {
-                        let key_str = self.bytecode_registry.values()
+                        let key_str = self
+                            .bytecode_registry
+                            .values()
                             .find_map(|bc| bc.string_pool.borrow().try_resolve(*k).map(|s| s.to_string()))
                             .unwrap_or_else(|| format!("<string#{}>", k.as_u32()));
                         items.push(format!("\"{}\": {}", key_str, self.format_value(v)));
