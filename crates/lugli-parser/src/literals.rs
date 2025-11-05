@@ -3,11 +3,10 @@ use lugli_ast::{Expr, ListComprehensionData, LiteralValue};
 use lugli_lexer::TokenKind;
 
 fn is_pascal_case(s: &str) -> bool {
-    if s.is_empty() {
-        return false;
-    }
-
-    let first_char = s.chars().next().unwrap();
+    let first_char = match s.chars().next() {
+        Some(c) => c,
+        None => return false,
+    };
     if !first_char.is_uppercase() {
         return false;
     }

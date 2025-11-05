@@ -69,6 +69,15 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Get the span for an expression ID from the span map.
+    /// This should never fail as all parsed expressions must have spans.
+    /// If this panics, it indicates a compiler bug.
+    pub(crate) fn get_expr_span(&self, node_id: lugli_ast::NodeId) -> Span {
+        self.span_map
+            .get(node_id)
+            .expect("BUG: Expression missing from span map - all parsed expressions must have spans")
+    }
+
     pub(crate) fn peek_kind(&self) -> Option<&TokenKind> { self.scanner.current().map(|token| &token.kind) }
 
     pub(crate) fn peek_next_kind(&self) -> Option<TokenKind> { self.scanner.peek().map(|token| token.kind.clone()) }
@@ -318,32 +327,6 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    pub(crate) fn skip_type_hint_if_present(&mut self) -> Result<(), ParseError> {
-        if !self.match_any(&[TokenKind::Colon]) {
-            return Ok(());
-        }
-
-        let terminals = [
-            TokenKind::Equal,
-            TokenKind::Comma,
-            TokenKind::RightParen,
-            TokenKind::LeftBrace,
-            TokenKind::Newline,
-            TokenKind::Semicolon,
-            TokenKind::RightBrace,
-        ];
-
-        while !self.scanner.is_at_end() && !self.check_any(&terminals) {
-            self.advance();
-        }
-
-        Ok(())
-    }
-
-    fn check_any(&self, kinds: &[TokenKind]) -> bool {
-        kinds.iter().any(|k| self.check(k))
-    }
-
     pub(crate) fn parse_delimited<T, F>(
         &mut self,
         end_token: &TokenKind,
@@ -483,22 +466,6 @@ mod tests {
         assert_eq!(params.len(), 2);
         assert_eq!(params[0].name, "x");
         assert_eq!(params[1].name, "y");
-    }
-
-    #[test]
-    fn test_skip_type_hint_with_colon() {
-        let source = ": num = 42";
-        let mut parser = Parser::new(source).unwrap();
-        parser.skip_type_hint_if_present().unwrap();
-        assert!(parser.check(&TokenKind::Equal));
-    }
-
-    #[test]
-    fn test_skip_type_hint_without_colon() {
-        let source = "= 42";
-        let mut parser = Parser::new(source).unwrap();
-        parser.skip_type_hint_if_present().unwrap();
-        assert!(parser.check(&TokenKind::Equal));
     }
 
     #[test]
