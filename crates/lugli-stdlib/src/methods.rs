@@ -66,7 +66,9 @@ impl MethodRegistry {
         self.register("dict", "keys", dict::dict_keys);
         self.register("dict", "values", dict::dict_values);
         self.register("dict", "contains", dict::dict_contains);
+        self.register("dict", "has_key", dict::dict_contains); // Alias for contains
         self.register("dict", "get", dict::dict_get);
+        self.register("dict", "len", dict::dict_len);
     }
 
     fn register(&mut self, type_name: &'static str, method: &'static str, func: MethodFunction) {

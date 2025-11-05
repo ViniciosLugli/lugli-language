@@ -44,7 +44,21 @@ impl<'a> Parser<'a> {
                     value: LiteralValue::String(key),
                 })
             }
-            _ => Err(self.expected_error("string or identifier for dictionary key")),
+            Some(TokenKind::Number(n)) => {
+                // Support numeric keys (converted to strings for storage)
+                let key = n.to_string();
+                let span = self.current_span();
+                self.advance();
+
+                let node_id = self.span_map.alloc_id();
+                self.span_map.insert(node_id, span);
+
+                Ok(Expr::Literal {
+                    id: node_id,
+                    value: LiteralValue::String(key),
+                })
+            }
+            _ => Err(self.expected_error("string, identifier, or number for dictionary key")),
         }
     }
 
