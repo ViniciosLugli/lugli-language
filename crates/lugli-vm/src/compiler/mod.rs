@@ -77,17 +77,17 @@ impl Compiler {
         for (i, stmt) in program.statements.iter().enumerate() {
             self.compile_stmt(stmt)?;
 
-            // Pop intermediate expression results except for the last statement
-            if i < stmt_count - 1 && matches!(stmt, lugli_ast::Stmt::Expression { .. }) {
+            // Pop intermediate expression results and if-statement results except for the last statement
+            if i < stmt_count - 1 && matches!(stmt, lugli_ast::Stmt::Expression { .. } | lugli_ast::Stmt::If { .. }) {
                 self.emit_unknown(Instruction::Pop);
             }
         }
 
         // Ensure there's always a return instruction at the end
         if self.bytecode.instructions.is_empty() || !matches!(self.bytecode.instructions.last(), Some(Instruction::Return)) {
-            // If the last statement wasn't an expression or return, add null
+            // If the last statement wasn't an expression, if-statement, or return, add null
             if stmt_count == 0
-                || !matches!(program.statements.last(), Some(lugli_ast::Stmt::Expression { .. }) | Some(lugli_ast::Stmt::Return { .. }))
+                || !matches!(program.statements.last(), Some(lugli_ast::Stmt::Expression { .. }) | Some(lugli_ast::Stmt::Return { .. }) | Some(lugli_ast::Stmt::If { .. }))
             {
                 let null_index = self.add_constant(Value::Null);
                 self.emit_unknown(Instruction::Constant(null_index));
