@@ -1,5 +1,9 @@
 # Lugli Language - AI Assistant Development Guide
 
+**Version:** 0.4.0
+**Status:** Stable foundation with 651 passing tests
+**Last Updated:** 2025-11-05
+
 ## 🎯 Project Objective & Language Philosophy
 
 **Lugli** is the "child of Python and Rust" - a high-performance, high-level programming language that marries **Python's simplicity and readability** with **Rust's performance and modern syntax**.
@@ -33,11 +37,11 @@ Lugli combines the best of both worlds:
 
 ## 🌊 Lugli Syntax Guide
 
-> **Note**: This guide is divided into **Current Syntax** (v0.3.2, fully implemented) and **Future Syntax** (v0.4.0+, planned features).
+> **Note**: This guide is divided into **Current Syntax** (v0.4.0, fully implemented) and **Future Syntax** (planned features).
 
 ---
 
-## ✅ Current Syntax (v0.3.2 - Fully Implemented)
+## ✅ Current Syntax (v0.4.0 - Fully Implemented)
 
 ### **Variable Declaration**
 
@@ -220,7 +224,7 @@ text.upper()     # ✅ Works
 
 ---
 
-## 🔮 Future Syntax (v0.4.0+ - Planned)
+## 🔮 Future Syntax (Planned)
 
 ### **Advanced Features** ❌ NOT YET IMPLEMENTED
 
@@ -288,7 +292,7 @@ let result = process.run("ls", ["-la"])
 
 ## 🏗️ Architecture Overview
 
-The project is organized as a **Rust workspace** with **7 professional crates** in the `crates/` directory:
+The project is organized as a **Rust workspace** with **8 professional crates** in the `crates/` directory:
 
 ### Crate Dependencies
 
@@ -296,6 +300,8 @@ The project is organized as a **Rust workspace** with **7 professional crates** 
 
 ```
 lugli (CLI) → all crates
+    ↓
+lugli-benchmarks → lugli-vm + lugli-parser + lugli-lexer (testing only)
     ↓
 lugli-vm → lugli-common + lugli-lexer + lugli-ast + lugli-parser + lugli-stdlib
     ↓
@@ -313,6 +319,7 @@ lugli-common (Foundation)
 **Key Characteristics:**
 - `lugli-common` is a foundational crate imported by all others (shared types)
 - `lugli` CLI depends directly on all crates for maximum flexibility
+- `lugli-benchmarks` provides performance regression testing
 - Each layer depends on all layers below it, not just the immediate neighbor
 - No circular dependencies (clean dependency tree)
 
@@ -364,8 +371,15 @@ lugli-common (Foundation)
 #### `lugli` (main)
 
 -   **Purpose**: CLI tool and REPL
--   **Technology**: `clap` for CLI, custom REPL with syntax highlighting
--   **Commands**: `run`, `repl`, `check`, `fmt`, `test`
+-   **Technology**: `clap` for CLI, `rustyline` for enhanced REPL with history
+-   **Commands**: `run`, `repl`, `check`, `disassemble`, `version`
+
+#### `lugli-benchmarks`
+
+-   **Purpose**: Performance benchmarking and regression testing
+-   **Technology**: `criterion` for statistical benchmarks
+-   **Features**: Lexer, parser, and VM execution benchmarks
+-   **Integration**: Workspace development tool for performance tracking
 
 ---
 
@@ -551,99 +565,6 @@ fn lexer_benchmark(c: &mut Criterion) {
 
 ---
 
-## 🔄 Syntax Implementation Guide
-
-### **Priority Implementation Order**
-
-#### Phase 2.1: Core Syntax Updates
-
-1. **Lexer Updates**:
-
-    - Add `let` and `mut` keywords
-    - Support both `#` and `//` comments
-    - Add `match` keyword for pattern matching
-    - Add f-string tokenization (`f"..."`)
-
-2. **Parser Updates**:
-
-    - Replace `create` with `let`/`mut` in variable declarations
-    - Update struct methods to use `self` instead of `this`
-    - Add pattern matching syntax parsing
-    - Support optional type hints syntax
-
-3. **Example Updates**:
-    - Convert all examples to new syntax
-    - Add new examples for modern features
-    - Update REPL prompts and error messages
-
-#### Phase 2.2: Modern Features
-
-1. **String Interpolation**: F-string support
-2. **List Comprehensions**: Python-style syntax
-3. **Pattern Matching**: Rust-inspired match expressions
-4. **Type Hints**: Optional typing for better tooling
-
-#### Phase 2.3: Standard Library
-
-1. **Pythonic APIs**: `print()`, `len()`, `str()`, `int()`
-2. **Enumerate Function**: For indexed iteration
-3. **Range Function**: For numeric iteration
-4. **Modern Collections**: Enhanced dict and list APIs
-
-### **Syntax Migration Strategy**
-
-#### Backward Compatibility
-
--   Keep `create` as alias for `let` during transition
--   Support both comment styles (`#` and `//`)
--   Maintain `println!` alongside new `print()`
--   Keep current method naming (`!` and `?`) working
-
-#### Migration Path
-
-1. **Phase 1**: Add new syntax alongside old
-2. **Phase 2**: Update all examples to new style
-3. **Phase 3**: Deprecate old syntax with warnings
-4. **Phase 4**: Remove deprecated syntax
-
-### **Testing Each Syntax Feature**
-
-For each new syntax element:
-
-1. **Lexer tests**: Tokenization correctness
-2. **Parser tests**: AST generation
-3. **Runtime tests**: Execution behavior
-4. **Example files**: Usage demonstration
-5. **Error tests**: Helpful error messages
-6. **Performance tests**: No regressions
-
-### **Example File Organization**
-
-```
-examples/
-├── syntax/
-│   ├── 01_variables.lg       # let, mut, const
-│   ├── 02_functions.lg       # fn with type hints
-│   ├── 03_structs.lg         # struct with self
-│   ├── 04_control_flow.lg    # if/elif/else, match
-│   ├── 05_collections.lg     # lists, dicts, comprehensions
-│   ├── 06_strings.lg         # f-strings, formatting
-│   ├── 07_loops.lg           # for/while/loop
-│   ├── 08_imports.lg         # import system
-│   ├── 09_comments.lg        # comment styles
-│   └── 10_types.lg           # type hints
-├── tutorials/
-│   ├── hello_world.lg        # First program
-│   ├── calculator.lg         # Basic arithmetic
-│   └── todo_list.lg          # Data structures
-└── samples/
-    ├── hangman.lg            # Game implementation
-    ├── web_server.lg         # Async example
-    └── data_analysis.lg      # List comprehensions
-```
-
----
-
 ## 🚀 Development Workflow
 
 ### Adding New Language Features
@@ -690,7 +611,10 @@ cargo test --workspace
 cargo test -p lugli-lexer
 
 # Run benchmarks
-cargo bench
+cargo bench --workspace
+
+# Run specific benchmark
+cargo bench -p lugli-benchmarks
 
 # Check for issues
 cargo clippy --workspace
@@ -820,36 +744,72 @@ cargo flamegraph --bin lugli -- run large_program.lg
 
 ---
 
-## 🔄 Development Status
+## ✅ Feature Status
 
-### ✅ v0.3.2 - Production-Safe VM
+### Fully Implemented Features (v0.4.0)
 
--   **Tests**: 385 passing, 5 ignored (390 total)
--   **VM**: Stack-based bytecode execution, panic-safe
--   **Features**: F-strings, list comprehensions, pattern matching, closures, structs
--   **Safety**: All RefCell panics fixed, bounds checks, proper error handling
-
-### ✅ Complete Features
-
--   7-crate workspace with clean architecture
--   VM-only execution (no tree-walking interpreter)
--   Pattern matching with guards
+**Core Language:**
+-   Variables, functions, structs with methods
+-   Control flow: `if/elif/else`, `while`, `for`, `loop`, `break`, `continue`
+-   Pattern matching with guards and wildcards
 -   List comprehensions with filters
 -   F-string interpolation
 -   Closures with upvalue capture
--   Struct methods and properties
--   Enhanced error messages
+-   Collections: lists and dictionaries
 
-### 📋 Next (see [Roadmap](docs/development/IMPLEMENTATION_ROADMAP.md))
+**Standard Library:**
+-   String methods: `upper()`, `lower()`, `len()`, `contains()`, `split()`, etc.
+-   List methods: `push()`, `pop()`, `len()`, `contains()`, `reverse()`, etc.
+-   Dictionary methods: `keys()`, `values()`, `len()`, `contains()`
+-   Utility functions: `print()`, `input()`, `len()`, `type()`
+-   Advanced functions: `enumerate()`, `zip()`, `sum()`, `min()`, `max()`, `all()`, `any()`, `sorted()`, `reversed()`
 
--   Module system (file-based imports)
--   REPL enhancements (rustyline, multiline)
--   Performance optimizations
+**Infrastructure:**
+-   8-crate workspace with clean architecture
+-   VM-based bytecode execution (>1M instructions/second)
+-   Enhanced REPL with history and multiline support
+-   Comprehensive benchmark suite
+-   651 passing tests with full coverage
 
----
+### Not Implemented (Do Not Use)
 
-**Version**: 0.3.2
-**Last Updated**: 2025-10-28
+**Language Features:**
+-   ❌ Module system / file-based imports
+-   ❌ Type inference
+-   ❌ Assignment operators (`+=`, `-=`, etc.)
+-   ❌ Multiple assignment / destructuring
+-   ❌ Spread operators
+-   ❌ Generic types
+-   ❌ Inheritance
+-   ❌ Result/Option types
+-   ❌ Nested f-strings
+
+**Tooling:**
+-   ❌ LSP server
+-   ❌ Package manager
+-   ❌ Debugger protocol
+-   ❌ VS Code extension
+
+### Quick Reference for AI Assistants
+
+**When a user wants to:**
+-   Add pattern matching → Use `match` with guards (fully working)
+-   Filter/transform lists → Use list comprehensions (fully working)
+-   Format output → Use f-strings (fully working)
+-   Create objects → Use structs with methods (fully working)
+-   Build closures → Capture variables from outer scope (fully working)
+-   Import code → Use `import!("path")` for basic imports only
+
+**Test expectations:**
+-   All 651 tests must pass after changes
+-   Run `cargo test --workspace` to verify
+-   Run `cargo bench --workspace` to check performance regressions
+-   Every new feature needs comprehensive tests
+
+**Performance expectations:**
+-   VM execution: >1M instructions/second
+-   Startup time: <100ms
+-   Memory usage: <10MB for basic programs
 
 ---
 
