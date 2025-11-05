@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_numbers() {
-        let numbers = vec![("42", 42.0), ("3.14", 3.14), ("-5", -5.0), ("0.0", 0.0)];
+        let numbers = vec![("42", 42.0), ("2.5", 2.5), ("-5", -5.0), ("0.0", 0.0)];
 
         for (input, expected) in numbers {
             let tokens = tokenize(input).unwrap();

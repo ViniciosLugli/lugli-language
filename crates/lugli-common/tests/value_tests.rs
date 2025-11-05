@@ -424,6 +424,7 @@ mod hash_tests {
     use std::collections::HashSet;
 
     #[test]
+    #[allow(clippy::mutable_key_type)] // Test only - Values are not mutated during hashing
     fn test_value_hash_basic() {
         let mut set = HashSet::new();
         set.insert(Value::Number(42.0));
@@ -436,6 +437,7 @@ mod hash_tests {
     }
 
     #[test]
+    #[allow(clippy::mutable_key_type)] // Test only - Values are not mutated during hashing
     fn test_value_hash_strings() {
         let mut pool = StringPool::new();
         let id1 = pool.intern("hello");

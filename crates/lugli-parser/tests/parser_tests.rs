@@ -78,8 +78,7 @@ fn test_expressions() {
     ];
 
     for expr_source in test_cases {
-        let source = format!("{}", expr_source);
-        let result = parse(&source);
+        let result = parse(expr_source);
         assert!(result.is_ok(), "Failed to parse expression: {}", expr_source);
     }
 }
