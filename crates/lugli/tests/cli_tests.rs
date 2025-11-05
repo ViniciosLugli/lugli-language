@@ -12,8 +12,7 @@ mod cli_error_tests {
     fn test_run_nonexistent_file() {
         // Test that running a non-existent file produces appropriate error behavior
         // This tests the error handling path of the CLI
-        let result =
-            std::process::Command::new("cargo").args(&["run", "--bin", "lugli", "--", "run", "nonexistent.lg"]).current_dir("../..").output();
+        let result = std::process::Command::new("cargo").args(["run", "--bin", "lugli", "--", "run", "nonexistent.lg"]).current_dir("../..").output();
 
         match result {
             Ok(output) => {
@@ -38,7 +37,7 @@ mod cli_error_tests {
         writeln!(temp_file, "let x = 42").expect("Failed to write to temp file");
 
         let result = std::process::Command::new("cargo")
-            .args(&["run", "--bin", "lugli", "--", "check", temp_file.path().to_str().unwrap()])
+            .args(["run", "--bin", "lugli", "--", "check", temp_file.path().to_str().unwrap()])
             .current_dir("../..")
             .output();
 
@@ -61,7 +60,7 @@ mod cli_error_tests {
 
     #[test]
     fn test_version_command() {
-        let result = std::process::Command::new("cargo").args(&["run", "--bin", "lugli", "--", "version"]).current_dir("../..").output();
+        let result = std::process::Command::new("cargo").args(["run", "--bin", "lugli", "--", "version"]).current_dir("../..").output();
 
         match result {
             Ok(output) => {
@@ -79,7 +78,7 @@ mod cli_error_tests {
 
     #[test]
     fn test_help_command() {
-        let result = std::process::Command::new("cargo").args(&["run", "--bin", "lugli", "--", "--help"]).current_dir("../..").output();
+        let result = std::process::Command::new("cargo").args(["run", "--bin", "lugli", "--", "--help"]).current_dir("../..").output();
 
         match result {
             Ok(output) => {
@@ -101,7 +100,7 @@ mod cli_error_tests {
 
     #[test]
     fn test_invalid_command() {
-        let result = std::process::Command::new("cargo").args(&["run", "--bin", "lugli", "--", "invalid-command"]).current_dir("../..").output();
+        let result = std::process::Command::new("cargo").args(["run", "--bin", "lugli", "--", "invalid-command"]).current_dir("../..").output();
 
         match result {
             Ok(output) => {
@@ -124,7 +123,7 @@ mod file_handling_tests {
         let temp_file = NamedTempFile::new().expect("Failed to create temp file");
 
         let result = std::process::Command::new("cargo")
-            .args(&["run", "--bin", "lugli", "--", "check", temp_file.path().to_str().unwrap()])
+            .args(["run", "--bin", "lugli", "--", "check", temp_file.path().to_str().unwrap()])
             .current_dir("../..")
             .output();
 
@@ -148,7 +147,7 @@ mod file_handling_tests {
         writeln!(temp_file, "let 123invalid = function{{{{").expect("Failed to write to temp file");
 
         let result = std::process::Command::new("cargo")
-            .args(&["run", "--bin", "lugli", "--", "check", temp_file.path().to_str().unwrap()])
+            .args(["run", "--bin", "lugli", "--", "check", temp_file.path().to_str().unwrap()])
             .current_dir("../..")
             .output();
 
@@ -183,7 +182,7 @@ mod file_handling_tests {
         writeln!(temp_file, "42").expect("Failed to write to temp file");
 
         let result = std::process::Command::new("cargo")
-            .args(&["run", "--bin", "lugli", "--", "run", temp_file.path().to_str().unwrap()])
+            .args(["run", "--bin", "lugli", "--", "run", temp_file.path().to_str().unwrap()])
             .current_dir("../..")
             .output();
 
