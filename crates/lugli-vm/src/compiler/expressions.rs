@@ -482,12 +482,10 @@ impl Compiler {
 
                 // Track loop structures for each clause
                 struct LoopInfo {
-                    _iterable_local: usize, // Reserved for future filtered nested comprehensions
                     index_local: usize,
-                    _var_local: usize, // Reserved for future filtered nested comprehensions
                     loop_start: usize,
                     exit_jump: usize,
-                    _skip_jump: Option<usize>, // Reserved for future filtered nested comprehensions
+                    skip_jump: Option<usize>,
                 }
                 let mut loops: Vec<LoopInfo> = Vec::new();
                 let mut var_names: Vec<String> = Vec::new();
@@ -536,12 +534,10 @@ impl Compiler {
                     };
 
                     loops.push(LoopInfo {
-                        _iterable_local: iterable_local,
                         index_local,
-                        _var_local: var_local,
                         loop_start,
                         exit_jump,
-                        _skip_jump: skip_jump,
+                        skip_jump,
                     });
 
                     // If this is the last clause, append the element
@@ -553,15 +549,15 @@ impl Compiler {
                         self.emit_unknown(Instruction::CallMethod(push_const, 1));
                         self.emit_unknown(Instruction::Pop); // Pop return value from push
                     }
-
-                    // Patch skip jump if condition was present
-                    if let Some(skip) = skip_jump {
-                        self.patch_jump(skip)?;
-                    }
                 }
 
                 // Close all nested loops (in reverse order)
                 for loop_info in loops.iter().rev() {
+                    // Patch skip jump to point here (increment of this specific loop)
+                    if let Some(skip) = loop_info.skip_jump {
+                        self.patch_jump(skip)?;
+                    }
+
                     // Increment index
                     self.emit_unknown(Instruction::Load(loop_info.index_local));
                     let one_constant = self.add_constant(Value::Number(1.0));

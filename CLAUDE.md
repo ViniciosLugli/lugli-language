@@ -54,6 +54,14 @@ const PI = 3.14             # ✅ Works now
 # With type hints (ignored at runtime) ✅
 let score: f64 = 95.5
 let items: List = []
+
+# Assignment operators ✅
+mut x = 10
+x += 5   # ✅ Works now
+x -= 3   # ✅ Works now
+x *= 2   # ✅ Works now
+x /= 4   # ✅ Works now
+x %= 3   # ✅ Works now
 ```
 
 ### **Comments**
@@ -776,7 +784,6 @@ cargo flamegraph --bin lugli -- run large_program.lg
 **Language Features:**
 -   ❌ Module system / file-based imports
 -   ❌ Type inference
--   ❌ Assignment operators (`+=`, `-=`, etc.)
 -   ❌ Multiple assignment / destructuring
 -   ❌ Spread operators
 -   ❌ Generic types

@@ -255,11 +255,7 @@ mod nested_list_comprehensions {
         assert_eq!(result, 4.0); // 2 * 2 * 1 = 4 combinations
     }
 
-    // TODO: Fix filter logic in nested comprehensions
-    // The skip jump logic needs to be refactored to properly skip to the next iteration
-    // of the current loop level, not just continue to the next statement
     #[test]
-    #[ignore]
     fn test_nested_comprehension_with_filter_first_clause() {
         let source = r#"
             let result = [x*y for x in [1,2,3,4] if x > 2 for y in [10,20]]
@@ -270,7 +266,6 @@ mod nested_list_comprehensions {
     }
 
     #[test]
-    #[ignore]
     fn test_nested_comprehension_with_filter_second_clause() {
         let source = r#"
             let result = [x*y for x in [2,3] for y in [10,20,30] if y < 25]
@@ -281,7 +276,6 @@ mod nested_list_comprehensions {
     }
 
     #[test]
-    #[ignore]
     fn test_nested_comprehension_with_filters_both() {
         let source = r#"
             let result = [x*y for x in range(1,5) if x > 1 for y in range(1,5) if y > 1]

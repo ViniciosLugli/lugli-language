@@ -724,7 +724,6 @@ dependencies = [
  "lugli-common",
  "pretty_assertions",
  "proptest",
- "regex",
  "thiserror",
 ]
 
