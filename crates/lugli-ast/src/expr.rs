@@ -3,11 +3,16 @@ use lugli_common::Span;
 use lugli_lexer::TokenKind;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ListComprehensionData {
-    pub element: Expr,
+pub struct ComprehensionClause {
     pub variable: String,
     pub iterable: Expr,
     pub condition: Option<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ListComprehensionData {
+    pub element: Expr,
+    pub clauses: Vec<ComprehensionClause>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -45,6 +50,10 @@ pub enum Expr {
     ListComprehension { id: NodeId, data: Box<ListComprehensionData> },
 
     Match { id: NodeId, value: Box<Expr>, arms: Vec<MatchArm> },
+
+    Block { id: NodeId, statements: Vec<Stmt> },
+
+    If { id: NodeId, condition: Box<Expr>, then_branch: Box<Expr>, else_branch: Option<Box<Expr>> },
 }
 
 impl Expr {
@@ -90,6 +99,12 @@ impl Expr {
                 id, ..
             } => *id,
             Expr::Match {
+                id, ..
+            } => *id,
+            Expr::Block {
+                id, ..
+            } => *id,
+            Expr::If {
                 id, ..
             } => *id,
         }

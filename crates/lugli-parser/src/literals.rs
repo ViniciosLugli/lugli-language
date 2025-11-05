@@ -15,6 +15,34 @@ fn is_pascal_case(s: &str) -> bool {
 }
 
 impl<'a> Parser<'a> {
+    pub(crate) fn block_expression(&mut self) -> Result<Expr, ParseError> {
+        let start_span = self.current_span();
+        self.consume(&TokenKind::LeftBrace, "Expected '{'")?;
+        self.skip_newlines();
+
+        let mut statements = Vec::new();
+
+        while !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
+            self.skip_newlines();
+
+            if !self.check(&TokenKind::RightBrace) && !self.scanner.is_at_end() {
+                statements.push(self.statement()?);
+            }
+        }
+
+        self.consume(&TokenKind::RightBrace, "Expected '}' after block")?;
+        let end_span = self.previous_span();
+
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
+        Ok(Expr::Block {
+            id,
+            statements,
+        })
+    }
+
     fn parse_dict_key(&mut self) -> Result<Expr, ParseError> {
         match self.peek_kind() {
             Some(TokenKind::String(id)) => {
@@ -279,7 +307,48 @@ impl<'a> Parser<'a> {
             return self.match_expression();
         }
 
+        if self.check(&TokenKind::If) {
+            return self.if_expression();
+        }
+
         Err(self.unexpected_token_error("in expression context"))
+    }
+
+    pub(crate) fn if_expression(&mut self) -> Result<Expr, ParseError> {
+        let start_span = self.current_span();
+        self.consume(&TokenKind::If, "Expected 'if'")?;
+
+        let condition = Box::new(self.expression()?);
+
+        let then_branch = Box::new(if self.check(&TokenKind::LeftBrace) {
+            self.block_expression()?
+        } else {
+            return Err(self.expected_error("'{' after if condition in expression context"));
+        });
+
+        let else_branch = if self.match_any(&[TokenKind::Else]) {
+            if self.check(&TokenKind::If) {
+                Some(Box::new(self.if_expression()?))
+            } else if self.check(&TokenKind::LeftBrace) {
+                Some(Box::new(self.block_expression()?))
+            } else {
+                return Err(self.expected_error("'{' or 'if' after 'else' in expression context"));
+            }
+        } else {
+            None
+        };
+
+        let end_span = self.previous_span();
+        let span = self.merge_spans(start_span, end_span);
+        let id = self.span_map.alloc_id();
+        self.span_map.insert(id, span);
+
+        Ok(Expr::If {
+            id,
+            condition,
+            then_branch,
+            else_branch,
+        })
     }
 
     pub(crate) fn match_expression(&mut self) -> Result<Expr, ParseError> {
@@ -329,7 +398,11 @@ impl<'a> Parser<'a> {
 
             self.consume(&TokenKind::FatArrow, "Expected '=>' after pattern")?;
 
-            let body = Box::new(self.expression()?);
+            let body = if self.check(&TokenKind::LeftBrace) {
+                Box::new(self.block_expression()?)
+            } else {
+                Box::new(self.expression()?)
+            };
 
             arms.push(MatchArm {
                 pattern,
@@ -374,22 +447,33 @@ impl<'a> Parser<'a> {
 
         let first_element = self.expression()?;
 
-        // Check for list comprehension: [expr for var in iterable if condition]
+        // Check for list comprehension: [expr for var in iterable if condition for var2 in iterable2 ...]
         if self.check(&TokenKind::For) {
-            self.advance(); // consume 'for'
+            use lugli_ast::ComprehensionClause;
+            let mut clauses = Vec::new();
 
-            let variable = self.consume_identifier("Expected variable name after 'for'")?;
+            while self.check(&TokenKind::For) {
+                self.advance(); // consume 'for'
 
-            self.consume(&TokenKind::In, "Expected 'in' after variable in list comprehension")?;
+                let variable = self.consume_identifier("Expected variable name after 'for'")?;
 
-            let iterable = self.expression()?;
+                self.consume(&TokenKind::In, "Expected 'in' after variable in list comprehension")?;
 
-            let condition = if self.check(&TokenKind::If) {
-                self.advance(); // consume 'if'
-                Some(self.expression()?)
-            } else {
-                None
-            };
+                let iterable = self.expression()?;
+
+                let condition = if self.check(&TokenKind::If) {
+                    self.advance(); // consume 'if'
+                    Some(self.expression()?)
+                } else {
+                    None
+                };
+
+                clauses.push(ComprehensionClause {
+                    variable,
+                    iterable,
+                    condition,
+                });
+            }
 
             self.consume_closing(&TokenKind::RightBracket, "Expected ']' after list comprehension")?;
             let end_span = self.previous_span();
@@ -402,9 +486,7 @@ impl<'a> Parser<'a> {
                 id,
                 data: Box::new(ListComprehensionData {
                     element: first_element,
-                    variable,
-                    iterable,
-                    condition,
+                    clauses,
                 }),
             });
         }
