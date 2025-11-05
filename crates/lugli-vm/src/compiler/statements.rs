@@ -192,8 +192,14 @@ impl Compiler {
                 }
 
                 // Compile function body
-                for stmt in body {
+                for (i, stmt) in body.iter().enumerate() {
+                    let is_last = i == body.len() - 1;
                     self.compile_stmt(stmt)?;
+
+                    // Pop intermediate values from if-statements and expressions (except last statement)
+                    if !is_last && matches!(stmt, Stmt::Expression { .. } | Stmt::If { .. }) {
+                        self.emit_unknown(Instruction::Pop);
+                    }
                 }
 
                 // Add implicit return if needed
@@ -204,6 +210,9 @@ impl Compiler {
                         // Explicit return already handled
                     }
                     Some(Stmt::Expression {
+                        ..
+                    })
+                    | Some(Stmt::If {
                         ..
                     }) => {
                         // Expression result is on stack, just add Return instruction

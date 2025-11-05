@@ -197,9 +197,11 @@ where T: Default {
                 data, ..
             } => {
                 self.visit_expr(&data.element);
-                self.visit_expr(&data.iterable);
-                if let Some(cond) = &data.condition {
-                    self.visit_expr(cond);
+                for clause in &data.clauses {
+                    self.visit_expr(&clause.iterable);
+                    if let Some(cond) = &clause.condition {
+                        self.visit_expr(cond);
+                    }
                 }
             }
             Expr::Match {
@@ -213,6 +215,25 @@ where T: Default {
                         self.visit_expr(guard);
                     }
                     self.visit_expr(&arm.body);
+                }
+            }
+            Expr::Block {
+                statements, ..
+            } => {
+                for stmt in statements {
+                    self.visit_stmt(stmt);
+                }
+            }
+            Expr::If {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                self.visit_expr(condition);
+                self.visit_expr(then_branch);
+                if let Some(else_expr) = else_branch {
+                    self.visit_expr(else_expr);
                 }
             }
             Expr::Literal {
@@ -423,9 +444,11 @@ where T: Default {
                 data, ..
             } => {
                 self.visit_expr_mut(&mut data.element);
-                self.visit_expr_mut(&mut data.iterable);
-                if let Some(cond) = &mut data.condition {
-                    self.visit_expr_mut(cond);
+                for clause in &mut data.clauses {
+                    self.visit_expr_mut(&mut clause.iterable);
+                    if let Some(cond) = &mut clause.condition {
+                        self.visit_expr_mut(cond);
+                    }
                 }
             }
             Expr::Match {
@@ -439,6 +462,25 @@ where T: Default {
                         self.visit_expr_mut(guard);
                     }
                     self.visit_expr_mut(&mut arm.body);
+                }
+            }
+            Expr::Block {
+                statements, ..
+            } => {
+                for stmt in statements {
+                    self.visit_stmt_mut(stmt);
+                }
+            }
+            Expr::If {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                self.visit_expr_mut(condition);
+                self.visit_expr_mut(then_branch);
+                if let Some(else_expr) = else_branch {
+                    self.visit_expr_mut(else_expr);
                 }
             }
             Expr::Literal {

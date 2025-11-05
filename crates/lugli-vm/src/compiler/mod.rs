@@ -77,17 +77,20 @@ impl Compiler {
         for (i, stmt) in program.statements.iter().enumerate() {
             self.compile_stmt(stmt)?;
 
-            // Pop intermediate expression results except for the last statement
-            if i < stmt_count - 1 && matches!(stmt, lugli_ast::Stmt::Expression { .. }) {
+            // Pop intermediate expression results and if-statement results except for the last statement
+            if i < stmt_count - 1 && matches!(stmt, lugli_ast::Stmt::Expression { .. } | lugli_ast::Stmt::If { .. }) {
                 self.emit_unknown(Instruction::Pop);
             }
         }
 
         // Ensure there's always a return instruction at the end
         if self.bytecode.instructions.is_empty() || !matches!(self.bytecode.instructions.last(), Some(Instruction::Return)) {
-            // If the last statement wasn't an expression or return, add null
+            // If the last statement wasn't an expression, if-statement, or return, add null
             if stmt_count == 0
-                || !matches!(program.statements.last(), Some(lugli_ast::Stmt::Expression { .. }) | Some(lugli_ast::Stmt::Return { .. }))
+                || !matches!(
+                    program.statements.last(),
+                    Some(lugli_ast::Stmt::Expression { .. }) | Some(lugli_ast::Stmt::Return { .. }) | Some(lugli_ast::Stmt::If { .. })
+                )
             {
                 let null_index = self.add_constant(Value::Null);
                 self.emit_unknown(Instruction::Constant(null_index));
@@ -163,6 +166,35 @@ impl Compiler {
             Some(_) => Err(LugliError::runtime("Internal compiler error: Expected jump instruction for patching")),
             None => Err(LugliError::runtime("Internal compiler error: Invalid jump index")),
         }
+    }
+
+    pub(crate) fn compile_branch_as_expr(&mut self, stmts: &[Stmt]) -> Result<(), LugliError> {
+        for (i, stmt) in stmts.iter().enumerate() {
+            let is_last = i == stmts.len() - 1;
+
+            if is_last {
+                if let Stmt::Expression {
+                    expr, ..
+                } = stmt
+                {
+                    self.compile_expr(expr)?;
+                } else {
+                    self.compile_stmt(stmt)?;
+                    self.emit_unknown(Instruction::LoadNull);
+                }
+            } else {
+                self.compile_stmt(stmt)?;
+                if matches!(stmt, Stmt::Expression { .. }) {
+                    self.emit_unknown(Instruction::Pop);
+                }
+            }
+        }
+
+        if stmts.is_empty() {
+            self.emit_unknown(Instruction::LoadNull);
+        }
+
+        Ok(())
     }
 
     #[allow(clippy::only_used_in_recursion)]
