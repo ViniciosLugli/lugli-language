@@ -116,6 +116,9 @@ pub fn list_append(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugl
     }
     match (&args[0], &args[1]) {
         (Value::List(l1), Value::List(l2)) => {
+            if Rc::ptr_eq(l1, l2) {
+                return Err(LugliError::runtime("Cannot append a list to itself (would create circular reference)"));
+            }
             let items = l2.try_borrow().map_err(|_| LugliError::runtime("Cannot append list while it's being modified"))?.clone();
             l1.borrow_mut().extend(items);
             Ok(Value::Null)
@@ -131,7 +134,17 @@ pub fn list_get(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliEr
     }
     match (&args[0], &args[1]) {
         (Value::List(l), Value::Number(idx)) => {
-            let index = *idx as usize;
+            if !idx.is_finite() {
+                return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+            }
+            if idx.fract() != 0.0 {
+                return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
+            }
+            let idx_i64 = *idx as i64;
+            if idx_i64 < 0 {
+                return Err(LugliError::runtime(format!("Negative index {} not allowed in list.get", idx)));
+            }
+            let index = idx_i64 as usize;
             let list = l.borrow();
             if index < list.len() { Ok(list[index].clone()) } else { Ok(Value::Null) }
         }
@@ -146,13 +159,23 @@ pub fn list_set(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliEr
     }
     match (&args[0], &args[1]) {
         (Value::List(l), Value::Number(idx)) => {
-            let index = *idx as usize;
+            if !idx.is_finite() {
+                return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+            }
+            if idx.fract() != 0.0 {
+                return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
+            }
+            let idx_i64 = *idx as i64;
+            if idx_i64 < 0 {
+                return Err(LugliError::runtime(format!("Negative index {} not allowed in list.set", idx)));
+            }
+            let index = idx_i64 as usize;
             let mut list = l.borrow_mut();
             if index < list.len() {
                 list[index] = args[2].clone();
                 Ok(Value::Null)
             } else {
-                Err(LugliError::runtime(format!("Index {} out of bounds", index)))
+                Err(LugliError::runtime(format!("Index {} out of bounds (list length {})", index, list.len())))
             }
         }
         (Value::List(_), _) => Err(LugliError::type_error("number", args[1].type_name())),
@@ -181,7 +204,6 @@ pub fn list_sorted(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugl
 
     match &args[0] {
         Value::List(list) => {
-            let mut items = list.borrow().clone();
             let reverse = if args.len() == 2 {
                 match &args[1] {
                     Value::Bool(b) => *b,
@@ -189,6 +211,13 @@ pub fn list_sorted(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugl
                 }
             } else {
                 false
+            };
+
+            let mut items = {
+                let borrowed = list.borrow();
+                let mut new_items = Vec::with_capacity(borrowed.len());
+                new_items.extend(borrowed.iter().cloned());
+                new_items
             };
 
             items.sort_by(|a, b| match (a, b) {
@@ -222,8 +251,12 @@ pub fn list_reversed(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lu
 
     match &args[0] {
         Value::List(list) => {
-            let mut items = list.borrow().clone();
-            items.reverse();
+            let items = {
+                let borrowed = list.borrow();
+                let mut new_items = Vec::with_capacity(borrowed.len());
+                new_items.extend(borrowed.iter().rev().cloned());
+                new_items
+            };
             Ok(Value::List(Rc::new(RefCell::new(items))))
         }
         _ => Err(LugliError::type_error("list", args[0].type_name())),
