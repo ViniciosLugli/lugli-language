@@ -80,7 +80,8 @@ impl<'a> Parser<'a> {
         let start_span = self.current_span();
         self.consume(&TokenKind::Fn, "Expected 'fn'")?;
 
-        let mut name = self.consume_identifier("Expected function name")?;
+        // Allow keywords as method names in struct definitions
+        let mut name = self.consume_identifier_or_keyword("Expected function name")?;
 
         if self.match_any(&[TokenKind::Bang]) {
             name.push('!');

@@ -473,7 +473,7 @@ mod builder_patterns {
 
     #[test]
     fn test_query_builder() {
-        // SQL-like query builder pattern
+        // SQL-like query builder pattern - now with keyword method names!
         let source = r#"
             struct QueryBuilder {
                 table
@@ -485,12 +485,12 @@ mod builder_patterns {
                     return self
                 }
 
-                fn from_table(self, table) {
+                fn from(self, table) {
                     self.table = table
                     return self
                 }
 
-                fn where_clause(self, condition) {
+                fn where(self, condition) {
                     self.conditions = condition
                     return self
                 }
@@ -505,7 +505,7 @@ mod builder_patterns {
             }
 
             let qb = QueryBuilder { table: "", fields: "", conditions: "" }
-            let query = qb.select("*").from_table("users").where_clause("age > 18").build()
+            let query = qb.select("*").from("users").where("age > 18").build()
 
             if query.contains("SELECT") && query.contains("FROM users") && query.contains("WHERE") {
                 1
