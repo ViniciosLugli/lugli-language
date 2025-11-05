@@ -7,7 +7,7 @@ use crate::cli::CliError;
 use colored::Colorize;
 use lugli_vm::Machine;
 use rustyline::{Config, Editor, error::ReadlineError};
-use std::{path::PathBuf, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use commands::handle_command;
 use completer::LugliCompleter;
@@ -23,11 +23,7 @@ pub fn start() -> Result<(), CliError> {
     println!("Type 'exit', 'quit', or press Ctrl+D to quit");
     println!("Type ':help' for available commands\n");
 
-    let config = Config::builder()
-        .max_history_size(MAX_HISTORY_SIZE)?
-        .auto_add_history(true)
-        .bracketed_paste(true)
-        .build();
+    let config = Config::builder().max_history_size(MAX_HISTORY_SIZE)?.auto_add_history(true).bracketed_paste(true).build();
 
     let variables = Rc::new(RefCell::new(Vec::new()));
     let helper = ReplHelper::new_with_variables(variables.clone());
@@ -138,10 +134,8 @@ pub fn start() -> Result<(), CliError> {
 fn get_history_path() -> PathBuf { if let Some(home) = dirs::home_dir() { home.join(HISTORY_FILE) } else { PathBuf::from(HISTORY_FILE) } }
 
 fn update_completion_variables(vm: &Machine, variables: &Rc<RefCell<Vec<String>>>) {
-    let user_vars: Vec<String> = vm.globals.keys()
-        .filter(|k| !matches!(vm.globals.get(*k), Some(lugli_common::Value::NativeFunction { .. })))
-        .map(|k| k.clone())
-        .collect();
+    let user_vars: Vec<String> =
+        vm.globals.keys().filter(|k| !matches!(vm.globals.get(*k), Some(lugli_common::Value::NativeFunction { .. }))).map(|k| k.clone()).collect();
     *variables.borrow_mut() = user_vars;
 }
 

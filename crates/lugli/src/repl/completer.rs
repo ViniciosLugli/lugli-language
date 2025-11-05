@@ -2,7 +2,7 @@ use rustyline::{
     Context,
     completion::{Completer, Pair},
 };
-use std::{collections::HashSet, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 pub struct LugliCompleter {
     keywords: Vec<String>,
@@ -95,13 +95,9 @@ impl LugliCompleter {
         completer
     }
 
-    pub fn update_variables(&self, vars: Vec<String>) {
-        *self.variables.borrow_mut() = vars;
-    }
+    pub fn update_variables(&self, vars: Vec<String>) { *self.variables.borrow_mut() = vars; }
 
-    pub fn get_variables_ref(&self) -> Rc<RefCell<Vec<String>>> {
-        self.variables.clone()
-    }
+    pub fn get_variables_ref(&self) -> Rc<RefCell<Vec<String>>> { self.variables.clone() }
 
     fn get_candidates(&self, prefix: &str) -> Vec<String> {
         let prefix_lower = prefix.to_lowercase();

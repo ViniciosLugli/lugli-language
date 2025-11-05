@@ -153,24 +153,19 @@ fn show_type(vm: &Machine, var_name: &str) -> Result<(), String> {
 fn load_file(vm: &mut Machine, file_path: &str) -> Result<(), String> {
     use std::fs;
 
-    let source = fs::read_to_string(file_path)
-        .map_err(|e| format!("Failed to read file '{}': {}", file_path, e))?;
+    let source = fs::read_to_string(file_path).map_err(|e| format!("Failed to read file '{}': {}", file_path, e))?;
 
     match lugli_parser::parse(&source) {
-        Ok((program, span_map)) => {
-            match lugli_vm::compile(&program, span_map) {
-                Ok(bytecode) => {
-                    match lugli_vm::run_with_vm(vm, &bytecode) {
-                        Ok(_) => {
-                            println!("{}", format!("Loaded '{}'", file_path).bright_green());
-                            Ok(())
-                        }
-                        Err(e) => Err(format!("Runtime error: {}", e)),
-                    }
+        Ok((program, span_map)) => match lugli_vm::compile(&program, span_map) {
+            Ok(bytecode) => match lugli_vm::run_with_vm(vm, &bytecode) {
+                Ok(_) => {
+                    println!("{}", format!("Loaded '{}'", file_path).bright_green());
+                    Ok(())
                 }
-                Err(e) => Err(format!("Compilation error: {}", e)),
-            }
-        }
+                Err(e) => Err(format!("Runtime error: {}", e)),
+            },
+            Err(e) => Err(format!("Compilation error: {}", e)),
+        },
         Err(e) => Err(format!("Parse error: {}", e)),
     }
 }

@@ -1,5 +1,5 @@
-use lugli_vm::Machine;
 use lugli_common::Value;
+use lugli_vm::Machine;
 
 #[test]
 fn test_repl_variable_persistence() {

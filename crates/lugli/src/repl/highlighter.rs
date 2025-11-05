@@ -1,6 +1,6 @@
+use colored::Colorize;
 use rustyline::highlight::Highlighter;
 use std::borrow::Cow;
-use colored::Colorize;
 
 pub struct LugliHighlighter {
     keywords: Vec<&'static str>,
@@ -10,16 +10,13 @@ impl LugliHighlighter {
     pub fn new() -> Self {
         Self {
             keywords: vec![
-                "let", "mut", "const", "fn", "struct", "impl", "if", "elif", "else",
-                "match", "for", "while", "loop", "break", "continue", "return",
+                "let", "mut", "const", "fn", "struct", "impl", "if", "elif", "else", "match", "for", "while", "loop", "break", "continue", "return",
                 "import", "from", "as", "true", "false", "null",
             ],
         }
     }
 
-    fn is_keyword(&self, word: &str) -> bool {
-        self.keywords.contains(&word)
-    }
+    fn is_keyword(&self, word: &str) -> bool { self.keywords.contains(&word) }
 }
 
 impl Highlighter for LugliHighlighter {
@@ -102,17 +99,9 @@ impl Highlighter for LugliHighlighter {
         Cow::Owned(result)
     }
 
-    fn highlight_char(&self, _line: &str, _pos: usize, _forced: rustyline::highlight::CmdKind) -> bool {
-        true
-    }
+    fn highlight_char(&self, _line: &str, _pos: usize, _forced: rustyline::highlight::CmdKind) -> bool { true }
 }
 
 impl LugliHighlighter {
-    fn highlight_word(&self, word: &str) -> String {
-        if self.is_keyword(word) {
-            word.blue().to_string()
-        } else {
-            word.to_string()
-        }
-    }
+    fn highlight_word(&self, word: &str) -> String { if self.is_keyword(word) { word.blue().to_string() } else { word.to_string() } }
 }
