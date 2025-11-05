@@ -40,11 +40,9 @@ impl Highlighter for LugliHighlighter {
                         if next_ch == '"' {
                             break;
                         }
-                        if next_ch == '\\' {
-                            if let Some(&escaped) = chars.peek() {
-                                chars.next();
-                                string_lit.push(escaped);
-                            }
+                        if next_ch == '\\' && let Some(&escaped) = chars.peek() {
+                            chars.next();
+                            string_lit.push(escaped);
                         }
                     }
                     result.push_str(&string_lit.green().to_string());
