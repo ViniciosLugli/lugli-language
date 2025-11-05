@@ -1,0 +1,179 @@
+# 08 - List Comprehensions
+# Demonstrates Python-style list comprehensions with filters
+
+# ============================================
+# BASIC COMPREHENSIONS
+# ============================================
+
+# Transform each element
+let numbers = [1, 2, 3, 4, 5]
+let squares = [x * x for x in numbers]
+# squares = [1, 4, 9, 16, 25]
+
+let doubles = [x * 2 for x in numbers]
+# doubles = [2, 4, 6, 8, 10]
+
+# Work with strings (length method coming in v0.4)
+# let words = ["hello", "world", "lugli"]
+# let lengths = [w.len() for w in words]
+# lengths = [5, 5, 5]
+
+# ============================================
+# COMPREHENSIONS WITH FILTERS
+# ============================================
+
+# Filter even numbers
+let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let evens = [x for x in nums if x % 2 == 0]
+# evens = [2, 4, 6, 8, 10]
+
+# Filter odd numbers
+let odds = [x for x in nums if x % 2 == 1]
+# odds = [1, 3, 5, 7, 9]
+
+# Filter with threshold
+let values = [5, 15, 25, 35, 45]
+let large = [v for v in values if v > 20]
+# large = [25, 35, 45]
+
+# Filter and transform
+let data = [1, 2, 3, 4, 5, 6]
+let big_squares = [x * x for x in data if x > 3]
+# big_squares = [16, 25, 36]
+
+# ============================================
+# COMPLEX EXPRESSIONS
+# ============================================
+
+# Arithmetic operations
+let prices = [10, 20, 30, 40]
+let with_tax = [p * 1.1 for p in prices]
+# with_tax = [11.0, 22.0, 33.0, 44.0]
+
+let discounted = [p * 0.9 for p in prices]
+# discounted = [9.0, 18.0, 27.0, 36.0]
+
+# Multiple operations
+let base = [1, 2, 3, 4]
+let formula = [x * 2 + 1 for x in base]
+# formula = [3, 5, 7, 9]
+
+# Division and modulo
+let dividends = [10, 20, 30, 40, 50]
+let halved = [d / 2 for d in dividends]
+# halved = [5, 10, 15, 20, 25]
+
+# ============================================
+# WORKING WITH RANGES
+# ============================================
+
+# Create range-like lists (manual for now)
+let range_10 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+let cubes = [n * n * n for n in range_10]
+# cubes = [0, 1, 8, 27, 64, 125, 216, 343, 512, 729]
+
+# Filter range
+let small_range = [n for n in range_10 if n < 5]
+# small_range = [0, 1, 2, 3, 4]
+
+# ============================================
+# NESTED DATA STRUCTURES
+# ============================================
+
+# Extract from nested lists
+let pairs = [[1, 2], [3, 4], [5, 6]]
+let first_elements = [pair[0] for pair in pairs]
+# first_elements = [1, 3, 5]
+
+let second_elements = [pair[1] for pair in pairs]
+# second_elements = [2, 4, 6]
+
+# Sum of pairs
+let pair_sums = [p[0] + p[1] for p in pairs]
+# pair_sums = [3, 7, 11]
+
+# ============================================
+# PRACTICAL EXAMPLES
+# ============================================
+
+# Data processing
+let temperatures = [20, 22, 19, 25, 23, 21]
+let above_twenty = [t for t in temperatures if t > 20]
+# above_twenty = [22, 25, 23, 21]
+
+# Celsius to Fahrenheit
+let celsius = [0, 10, 20, 30, 40]
+let fahrenheit = [c * 9 / 5 + 32 for c in celsius]
+# fahrenheit = [32, 50, 68, 86, 104]
+
+# Grade filtering
+let scores = [45, 67, 89, 23, 91, 56, 78, 34, 95]
+let passing = [s for s in scores if s >= 60]
+# passing = [67, 89, 91, 78, 95]
+
+let failing = [s for s in scores if s < 60]
+# failing = [45, 23, 56, 34]
+
+# Price calculations
+let items = [15, 25, 35, 45, 55]
+let expensive = [item for item in items if item > 30]
+# expensive = [35, 45, 55]
+
+let affordable = [item for item in items if item <= 30]
+# affordable = [15, 25]
+
+# Double the expensive items
+let premium_doubled = [item * 2 for item in items if item > 30]
+# premium_doubled = [70, 90, 110]
+
+# ============================================
+# BOOLEAN CONDITIONS
+# ============================================
+
+# Filter by multiple conditions
+let ages = [15, 22, 17, 30, 12, 25, 8, 19]
+let adults = [age for age in ages if age >= 18]
+# adults = [22, 30, 25, 19]
+
+let minors = [age for age in ages if age < 18]
+# minors = [15, 17, 12, 8]
+
+# Complex boolean logic
+let inventory = [0, 5, 10, 15, 20, 25]
+let restock_needed = [qty for qty in inventory if qty < 10]
+# restock_needed = [0, 5]
+
+let well_stocked = [qty for qty in inventory if qty >= 15]
+# well_stocked = [15, 20, 25]
+
+# ============================================
+# STRING OPERATIONS
+# ============================================
+
+# Filter strings by length (coming in v0.4)
+# let names = ["Jo", "Alice", "Bob", "Charlotte", "Eve"]
+# let short_names = [name for name in names if name.len() <= 3]
+# short_names = ["Jo", "Bob", "Eve"]
+
+# let long_names = [name for name in names if name.len() > 5]
+# long_names = ["Charlotte"]
+
+# ============================================
+# PERFORMANCE TIPS
+# ============================================
+
+# List comprehensions are compiled to efficient bytecode
+# They're as fast as manual loops but more readable
+
+# Instead of:
+# let result = []
+# for x in numbers {
+#     if x > 5 {
+#         result.push(x * 2)
+#     }
+# }
+
+# Use:
+let result = [x * 2 for x in numbers if x > 5]
+
+# Both produce the same result, but comprehension is clearer!

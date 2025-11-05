@@ -1,0 +1,60 @@
+# Advanced Features in Lugli v0.3.0
+
+# Complex struct with nested collections
+struct TodoList {
+    name: "My Tasks"
+    items: []
+    
+    fn add_task!(self, task) {
+        self.items.push(task)
+        print(f"Added: {task}")
+    }
+    
+    fn show(self) {
+        print("")
+        print(f"{self.name}:")
+        print("====================")
+
+        let index = 0
+        for task in self.items {
+            index = index + 1
+            print(f"{index}. {task}")
+        }
+
+        print("")
+        print(f"Total tasks: {self.items.len()}")
+    }
+}
+
+# Create and use todo list
+let todos = TodoList { name: "Shopping List" }
+
+todos.add_task!("Buy milk")
+todos.add_task!("Get bread")
+todos.add_task!("Purchase eggs")
+
+todos.show()
+
+# Complex data structures
+let data = {
+    "project": "Lugli",
+    "version": "0.3.0",
+    "features": ["f-strings", "structs", "negative indexing"],
+    "stats": {
+        "tests": 273,
+        "pass_rate": "100%"
+    }
+}
+
+let project = data["project"]
+let version = data["version"]
+let stats = data["stats"]
+let features = data["features"]
+
+print("")
+print(f"Project: {project} v{version}")
+
+let tests_count = stats["tests"]
+let pass_rate = stats["pass_rate"]
+print(f"Tests: {tests_count} ({pass_rate} passing)")
+print(f"Top feature: {features[0]}")

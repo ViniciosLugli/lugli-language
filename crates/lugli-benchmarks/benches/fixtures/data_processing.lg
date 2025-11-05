@@ -1,0 +1,30 @@
+# Data processing benchmark
+fn process_data(size) {
+    # List operations
+    let numbers = []
+    mut i = 0
+    while i < size {
+        numbers.push(i)
+        i = i + 1
+    }
+
+    # List comprehension with filter
+    let evens = [x for x in numbers if x % 2 == 0]
+    let squares = [x * x for x in evens]
+
+    # Dictionary operations
+    let data_map = {}
+    for num in numbers {
+        data_map[num] = num * 2
+    }
+
+    # String operations
+    let text = "hello world"
+    let upper_text = text.upper()
+    let words = text.split(" ")
+
+    return squares.len()
+}
+
+# Benchmark target
+process_data(1000)

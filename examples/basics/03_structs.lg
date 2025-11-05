@@ -1,0 +1,36 @@
+# Structs and Methods
+
+# Define a struct with default values (NEW in v0.3.0!)
+struct Point {
+    x: 0
+    y: 0
+    
+    fn distance_from_origin(self) {
+        let dx = self.x * self.x
+        let dy = self.y * self.y
+        return dx + dy  # Simplified (no sqrt in v0.3.0)
+    }
+    
+    fn describe(self) {
+        return f"Point({self.x}, {self.y})"
+    }
+}
+
+# Create instances with defaults
+let origin = Point {}
+print(origin.describe())
+
+# Override some defaults
+let p1 = Point { x: 3, y: 4 }
+print(p1.describe())
+print(f"Distance²: {p1.distance_from_origin()}")
+
+# Struct with all fields specified
+let p2 = Point { x: 10, y: 20 }
+print(f"Point 2: {p2.describe()}")
+
+# Reference equality (NEW in v0.3.0!)
+let p3 = p1
+if p3 == p1 {
+    print("p3 and p1 reference the same object")
+}

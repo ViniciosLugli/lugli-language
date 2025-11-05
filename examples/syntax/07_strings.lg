@@ -1,0 +1,334 @@
+# String Operations Examples
+# Demonstrates string manipulation in Python+Rust hybrid syntax
+
+# Basic string creation
+let greeting = "Hello, World!"
+let name = "Alice"
+let empty_str = ""
+
+# String interpolation (f-strings)
+let age = 25
+let message = f"Hello, {name}! You are {age} years old."
+print(message)
+
+# Multi-line strings
+let poem = """
+Roses are red,
+Violets are blue,
+Lugli is awesome,
+And so are you!
+"""
+print(poem)
+
+# Raw strings (no escape sequences)
+let regex_pattern = r"\d{3}-\d{2}-\d{4}"
+let file_path = r"C:\Users\Alice\Documents\file.txt"
+print(f"Regex: {regex_pattern}")
+print(f"Path: {file_path}")
+
+# String concatenation
+let first = "Hello"
+let second = "World"
+let combined = first + ", " + second + "!"
+print(combined)
+
+# String repetition
+let stars = "*" * 10
+let dashes = "-" * 20
+print(stars)
+print(dashes)
+
+# String methods - Length and basic properties
+print(f"Length of greeting: {greeting.len()}")
+print(f"Is empty: {empty_str.is_empty()}")
+print(f"Is not empty: {greeting.is_not_empty()}")
+
+# Case operations
+let text = "Hello World"
+print(f"Original: {text}")
+print(f"Uppercase: {text.upper()}")
+print(f"Lowercase: {text.lower()}")
+print(f"Title case: {text.title()}")
+print(f"Capitalize: {text.capitalize()}")
+print(f"Swap case: {text.swapcase()}")
+
+# String searching
+let sentence = "The quick brown fox jumps over the lazy dog"
+print(f"Contains 'fox': {sentence.contains('fox')}")
+print(f"Starts with 'The': {sentence.starts_with('The')}")
+print(f"Ends with 'dog': {sentence.ends_with('dog')}")
+print(f"Index of 'fox': {sentence.find('fox')}")
+print(f"Last index of 'o': {sentence.rfind('o')}")
+
+# Counting occurrences
+print(f"Count of 'o': {sentence.count('o')}")
+print(f"Count of 'the': {sentence.lower().count('the')}")
+
+# String slicing
+let word = "programming"
+print(f"Original: {word}")
+print(f"First 4 chars: {word[0:4]}")
+print(f"Last 4 chars: {word[-4:]}")
+print(f"Middle: {word[3:8]}")
+print(f"Every 2nd char: {word[::2]}")
+print(f"Reversed: {word[::-1]}")
+
+# Character access
+print(f"First character: {word[0]}")
+print(f"Last character: {word[-1]}")
+
+# String splitting
+let csv_data = "apple,banana,cherry,date"
+let fruits = csv_data.split(",")
+print(f"Fruits: {fruits}")
+
+let paragraph = "This is a sentence. This is another one! And a question?"
+let sentences = paragraph.split(". ")
+print(f"Sentences: {sentences}")
+
+# Split with limit
+let limited_split = csv_data.split(",", 2)
+print(f"Limited split: {limited_split}")
+
+# Split lines
+let multiline = "Line 1\nLine 2\nLine 3"
+let lines = multiline.split_lines()
+print(f"Lines: {lines}")
+
+# Split whitespace
+let spaced_text = "  hello   world   python  "
+let words = spaced_text.split_whitespace()
+print(f"Words: {words}")
+
+# String joining
+let word_list = ["Hello", "beautiful", "world"]
+let joined = " ".join(word_list)
+print(f"Joined: {joined}")
+
+let csv_line = ",".join(["apple", "banana", "cherry"])
+print(f"CSV: {csv_line}")
+
+# String trimming
+let padded = "   Hello World   "
+print(f"Original: '{padded}'")
+print(f"Trimmed: '{padded.trim()}'")
+print(f"Left trim: '{padded.trim_start()}'")
+print(f"Right trim: '{padded.trim_end()}'")
+
+# Custom character trimming
+let special_padded = "---Hello World---"
+print(f"Trim dashes: '{special_padded.trim_matches('-')}'")
+
+# String replacement
+let text_with_typos = "Helo Wrold! This is a tset."
+let corrected = text_with_typos.replace("Helo", "Hello")
+                                .replace("Wrold", "World")
+                                .replace("tset", "test")
+print(f"Corrected: {corrected}")
+
+# Replace with limit
+let repeated = "apple apple apple apple"
+let limited_replace = repeated.replace("apple", "orange", 2)
+print(f"Limited replace: {limited_replace}")
+
+# Regular expressions
+import regex
+
+let email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+let email_text = "Contact us at info@example.com or support@test.org"
+
+match regex.find_all(email_pattern, email_text) {
+    Ok(emails) => {
+        print("Found emails:")
+        for email in emails {
+            print(f"  {email}")
+        }
+    },
+    Err(error) => print(f"Regex error: {error}")
+}
+
+# Regex replacement
+let phone_text = "Call me at 123-456-7890 or 987-654-3210"
+let phone_pattern = r"(\d{3})-(\d{3})-(\d{4})"
+let replacement = r"($1) $2-$3"
+
+match regex.replace_all(phone_pattern, phone_text, replacement) {
+    Ok(formatted) => print(f"Formatted phones: {formatted}"),
+    Err(error) => print(f"Regex error: {error}")
+}
+
+# String validation
+fn is_valid_email(email: str) -> bool {
+    let pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    regex.is_match(pattern, email).unwrap_or(false)
+}
+
+fn is_valid_phone(phone: str) -> bool {
+    let pattern = r"^\d{3}-\d{3}-\d{4}$"
+    regex.is_match(pattern, phone).unwrap_or(false)
+}
+
+let test_emails = ["alice@example.com", "invalid-email", "bob@test.org"]
+let test_phones = ["123-456-7890", "invalid-phone", "987-654-3210"]
+
+for email in test_emails {
+    print(f"{email}: {is_valid_email(email)}")
+}
+
+for phone in test_phones {
+    print(f"{phone}: {is_valid_phone(phone)}")
+}
+
+# String encoding and decoding
+let unicode_text = "Hello 🌍 World! こんにちは"
+print(f"Unicode text: {unicode_text}")
+print(f"Byte length: {unicode_text.byte_len()}")
+print(f"Character count: {unicode_text.char_count()}")
+
+# String formatting with padding
+let numbers = [1, 22, 333, 4444]
+print("Right-aligned numbers:")
+for num in numbers {
+    print(f"{num:>6}")
+}
+
+print("Left-aligned numbers:")
+for num in numbers {
+    print(f"{num:<6}")
+}
+
+print("Center-aligned numbers:")
+for num in numbers {
+    print(f"{num:^6}")
+}
+
+# Zero-padded numbers
+print("Zero-padded numbers:")
+for num in numbers {
+    print(f"{num:06}")
+}
+
+# Decimal formatting
+let prices = [19.99, 1234.5, 0.99, 10000.0]
+print("Formatted prices:")
+for price in prices {
+    print(f"${price:8.2f}")
+}
+
+# String templates
+struct Person {
+    name: str,
+    age: i32,
+    city: str
+}
+
+let people = [
+    Person { name: "Alice", age: 25, city: "New York" },
+    Person { name: "Bob", age: 30, city: "San Francisco" },
+    Person { name: "Charlie", age: 35, city: "Chicago" }
+]
+
+let template = "Name: {name}, Age: {age}, City: {city}"
+
+for person in people {
+    let formatted = template.format({
+        "name": person.name,
+        "age": person.age,
+        "city": person.city
+    })
+    print(formatted)
+}
+
+# String comparison
+let str1 = "apple"
+let str2 = "Apple"
+let str3 = "banana"
+
+print(f"'{str1}' == '{str2}': {str1 == str2}")
+print(f"'{str1}' < '{str3}': {str1 < str3}")
+print(f"Case-insensitive compare: {str1.to_lowercase() == str2.to_lowercase()}")
+
+# Natural sorting
+let versions = ["v1.10", "v1.2", "v1.9", "v2.0", "v1.1"]
+let sorted_versions = versions.sort_natural()
+print(f"Natural sort: {sorted_versions}")
+
+# String iteration
+print("Character iteration:")
+for char in "Hello".chars() {
+    print(f"  '{char}' (code: {char.code()})")
+}
+
+print("Byte iteration:")
+for byte in "Hello".bytes() {
+    print(f"  {byte} (0x{byte:02x})")
+}
+
+# String builder for efficient concatenation
+let mut builder = StringBuilder::new()
+builder.append("Hello")
+builder.append(", ")
+builder.append("World")
+builder.append("!")
+
+let result = builder.to_string()
+print(f"Built string: {result}")
+
+# Performance comparison
+import time
+
+# Inefficient string concatenation
+let start = time.now()
+mut slow_result = ""
+for i in range(1000) {
+    slow_result += f"Item {i} "
+}
+let slow_time = time.now() - start
+
+# Efficient string building
+let start = time.now()
+let mut fast_builder = StringBuilder::new()
+for i in range(1000) {
+    fast_builder.append(f"Item {i} ")
+}
+let fast_result = fast_builder.to_string()
+let fast_time = time.now() - start
+
+print(f"Slow concatenation: {slow_time:.4f}s")
+print(f"Fast building: {fast_time:.4f}s")
+print(f"Speedup: {slow_time / fast_time:.2f}x")
+
+# String hashing
+import hash
+
+let passwords = ["password123", "secret", "admin"]
+for password in passwords {
+    let hashed = hash.sha256(password)
+    print(f"'{password}' -> {hashed}")
+}
+
+# String compression
+import compress
+
+let long_text = "This is a long string that repeats. " * 100
+let compressed = compress.gzip(long_text)
+let decompressed = compress.gunzip(compressed)
+
+print(f"Original size: {long_text.len()} bytes")
+print(f"Compressed size: {compressed.len()} bytes")
+print(f"Compression ratio: {long_text.len() as f64 / compressed.len() as f64:.2f}:1")
+print(f"Decompression matches: {long_text == decompressed}")
+
+# Fuzzy string matching
+import fuzzy
+
+let search_term = "python"
+let candidates = ["Python", "pythn", "java", "javascript", "c++", "pyton"]
+
+print(f"Fuzzy matches for '{search_term}':")
+for candidate in candidates {
+    let similarity = fuzzy.ratio(search_term, candidate.lower())
+    if similarity > 0.6 {
+        print(f"  {candidate}: {similarity:.2f}")
+    }
+}

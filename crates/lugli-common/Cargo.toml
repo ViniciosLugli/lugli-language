@@ -1,0 +1,18 @@
+[package]
+name = "lugli-common"
+version.workspace = true
+description = "Common types and utilities for the Lugli programming language"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+hashbrown.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+pretty_assertions.workspace = true

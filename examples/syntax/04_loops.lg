@@ -1,0 +1,172 @@
+# Loop Constructs Examples
+# Demonstrates all loop types in Python+Rust hybrid syntax
+
+# For loops with ranges
+for i in range(5) {
+    print(f"Count: {i}")
+}
+
+for i in range(1, 6) {
+    print(f"Number: {i}")
+}
+
+for i in range(0, 10, 2) {
+    print(f"Even: {i}")
+}
+
+# For loops with collections
+let numbers = [1, 2, 3, 4, 5]
+for num in numbers {
+    print(f"Item: {num}")
+}
+
+let words = ["hello", "world", "rust", "python"]
+for word in words {
+    print(f"Word: {word}")
+}
+
+# For loops with dictionaries
+let scores = {"Alice": 95, "Bob": 87, "Charlie": 92}
+for name, score in scores.items() {
+    print(f"{name}: {score}")
+}
+
+for name in scores.keys() {
+    print(f"Student: {name}")
+}
+
+for score in scores.values() {
+    print(f"Score: {score}")
+}
+
+# Enumerate for index and value
+let items = ["apple", "banana", "cherry"]
+for i, item in enumerate(items) {
+    print(f"{i}: {item}")
+}
+
+# While loops
+mut count = 0
+while count < 5 {
+    print(f"Count: {count}")
+    count += 1
+}
+
+# While with condition
+mut x = 1
+while x < 100 {
+    print(f"Power of 2: {x}")
+    x *= 2
+}
+
+# Infinite loops with break
+mut i = 1
+loop {
+    print(f"Iteration: {i}")
+    i += 1
+    if i > 5 {
+        break
+    }
+}
+
+# Loop with continue
+for i in range(10) {
+    if i % 2 == 0 {
+        continue  # Skip even numbers
+    }
+    print(f"Odd: {i}")
+}
+
+# Nested loops
+for i in range(3) {
+    for j in range(3) {
+        print(f"({i}, {j})")
+    }
+}
+
+# Loop with early termination
+let matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+mut found = false
+for row in matrix {
+    for col in row {
+        if col == 5 {
+            print(f"Found 5 at value {col}")
+            found = true
+            break
+        }
+    }
+    if found {
+        break
+    }
+}
+
+# Loop over string characters
+let text = "Hello"
+for char in text {
+    print(f"Character: {char}")
+}
+
+# Loop with step control
+mut step = 1
+while step <= 16 {
+    print(f"Step: {step}")
+    step *= 2
+}
+
+# Loop with else (Python-style)
+for i in range(5) {
+    if i == 10 {  # This won't be found
+        print("Found 10!")
+        break
+    }
+    print(f"Checking: {i}")
+} else {
+    print("10 was not found in range")
+}
+
+# Range variations
+print("Countdown:")
+for i in range(5, 0, -1) {
+    print(f"{i}...")
+}
+print("Blast off!")
+
+# Complex loop example: finding primes
+fn is_prime(n: i32) -> bool {
+    if n < 2 { return false }
+    for i in range(2, int(sqrt(n)) + 1) {
+        if n % i == 0 {
+            return false
+        }
+    }
+    return true
+}
+
+print("Prime numbers up to 20:")
+for num in range(2, 21) {
+    if is_prime(num) {
+        print(f"{num} is prime")
+    }
+}
+
+# Loop with filtering
+let data = [1, -2, 3, -4, 5, -6, 7]
+for num in data {
+    if num < 0 {
+        continue  # Skip negative numbers
+    }
+    print(f"Positive: {num}")
+}
+
+# Infinite counter with break condition
+mut counter = 0
+loop {
+    counter += 1
+    if counter % 1000 == 0 {
+        print(f"Reached {counter}")
+    }
+    if counter >= 5000 {
+        print("Breaking at 5000")
+        break
+    }
+}
