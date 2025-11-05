@@ -310,18 +310,22 @@ impl<'a> Parser<'a> {
             // Limitation: Without full lookahead past newlines, some patterns are ambiguous:
             // - `{ <newline> <statement-keyword> }` is parsed as dict (fails with clear error)
             // - `{ <number> }` or `{ <identifier> }` is parsed as dict (ambiguous)
+            // - `{ { expr } }` works (nested blocks detected)
             //
             // Recommended syntax:
             // - Block with statement: `{ if cond { a } else { b } }` (no newline after {)
-            // - Block with expression: Use statement syntax like `{ return expr }` or `{ let x = expr; x }`
+            // - Block with expression: Use `{ let x = expr; x }` (not `{ return expr }` - has issues)
+            // - Nested blocks: `{ { if cond { a } else { b } } }` works
             // - Dict: Use quoted keys `{ "key": value }` or inline `{ key: value }`
             // - Multiline dict: `{<newline> "key": value }` works fine
+            //
+            // Known Issue: `{ return expr }` in block expressions causes early program termination
 
             // Disambiguation with 1-token lookahead
             // For better accuracy with newlines, we need to check if there's a statement keyword
             // after the newline. We'll do this by temporarily saving state and peeking.
 
-            // First check: is the immediate next token a statement keyword?
+            // First check: is the immediate next token a statement keyword or nested block?
             let next = self.scanner.peek();
             let is_definitely_block = next.as_ref().map(|t| matches!(
                 t.kind,
@@ -329,6 +333,7 @@ impl<'a> Parser<'a> {
                 | TokenKind::Let | TokenKind::Mut | TokenKind::Const
                 | TokenKind::Return | TokenKind::Break | TokenKind::Continue
                 | TokenKind::Fn | TokenKind::Struct | TokenKind::Match
+                | TokenKind::LeftBrace // Nested block like { { expr } }
             )).unwrap_or(false);
 
             if is_definitely_block {
