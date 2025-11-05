@@ -554,26 +554,6 @@ impl<'a> Parser<'a> {
 
         Ok(args)
     }
-
-    pub(crate) fn track_binary_span(&mut self, left: lugli_ast::NodeId, right: lugli_ast::NodeId) -> lugli_ast::NodeId {
-        let span = self.merge_spans(self.get_expr_span(left), self.get_expr_span(right));
-        let id = self.span_map.alloc_id();
-        self.span_map.insert(id, span);
-        id
-    }
-
-    pub(crate) fn track_unary_span(&mut self, token_span: Span, operand: lugli_ast::NodeId) -> lugli_ast::NodeId {
-        let span = self.merge_spans(token_span, self.get_expr_span(operand));
-        let id = self.span_map.alloc_id();
-        self.span_map.insert(id, span);
-        id
-    }
-
-    pub(crate) fn track_span(&mut self, span: Span) -> lugli_ast::NodeId {
-        let id = self.span_map.alloc_id();
-        self.span_map.insert(id, span);
-        id
-    }
 }
 
 #[cfg(test)]
