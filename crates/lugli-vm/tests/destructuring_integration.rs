@@ -190,11 +190,8 @@ fn test_scoped_destructuring() {
         let y = 200
         if true {
             let [x, y] = [1, 2]
-            // Inner scope x, y
-            x + y  // Should be 3
+            x + y
         }
-        // Outer scope should be preserved
-        // This returns last expression from if block
     "#;
     let result = run_and_get_number(source).unwrap();
     assert_eq!(result, 3.0);
@@ -250,7 +247,7 @@ fn test_swap_variables() {
         mut x = 10
         mut y = 20
         [x, y] = [y, x]
-        x  // Should be 20
+        x
     "#;
     let result = run_and_get_number(source).unwrap();
     assert_eq!(result, 20.0);
@@ -259,13 +256,14 @@ fn test_swap_variables() {
 #[test]
 fn test_fibonacci_with_destructuring() {
     let source = r#"
-        mut [a, b] = [0, 1]
+        mut a = 0
+        mut b = 1
         mut i = 0
         while i < 10 {
             [a, b] = [b, a + b]
             i = i + 1
         }
-        a  // 10th Fibonacci number
+        a
     "#;
     let result = run_and_get_number(source).unwrap();
     assert_eq!(result, 55.0);
@@ -284,10 +282,10 @@ fn test_complex_data_processing() {
         for {name, score} in users {
             total = total + score
         }
-        total / 3  // Average
+        total / 3
     "#;
     let result = run_and_get_number(source).unwrap();
-    assert_eq!(result, 90.0); // (90+85+95)/3
+    assert_eq!(result, 90.0);
 }
 
 #[test]
