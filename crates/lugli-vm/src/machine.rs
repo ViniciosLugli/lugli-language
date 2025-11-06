@@ -64,6 +64,7 @@ pub struct Machine {
     module_resolver: ModuleResolver,
     current_file: Option<PathBuf>,
     bytecode_registry: HashMap<usize, Rc<Bytecode>>,
+    module_globals: HashMap<usize, HashMap<String, Value>>,
     next_bytecode_id: usize,
     open_upvalues: HashMap<usize, Rc<RefCell<Value>>>,
     method_registry: lugli_stdlib::MethodRegistry,
@@ -100,6 +101,7 @@ impl Machine {
             module_resolver: ModuleResolver::new(),
             current_file: None,
             bytecode_registry: HashMap::new(),
+            module_globals: HashMap::new(),
             next_bytecode_id: 1,
             open_upvalues: HashMap::new(),
             method_registry: lugli_stdlib::MethodRegistry::new(),
@@ -391,14 +393,23 @@ impl Machine {
                 let frame = CallFrame::new(name.clone(), usize::MAX, stack_base, None);
                 self.call_stack.push(frame);
 
+                // Save and restore module globals for cross-bytecode execution
+                let saved_globals = self.globals.clone();
+                if bytecode_id != &0 {
+                    if let Some(module_globals) = self.module_globals.get(bytecode_id) {
+                        self.globals = module_globals.clone();
+                    }
+                }
+
                 // Jump to function body
                 self.ip = *body_start;
 
                 // Execute function body and handle result/errors - use the correct bytecode!
                 let execution_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
 
-                // Always restore IP, even on error
+                // Always restore IP and globals, even on error
                 self.ip = saved_ip;
+                self.globals = saved_globals;
 
                 // Handle execution result
                 match execution_result {
@@ -546,6 +557,9 @@ impl Machine {
             }
         }
 
+        // Store module globals for cross-bytecode function calls
+        self.module_globals.insert(module_bytecode_id, module_exports.clone());
+
         self.globals = saved_globals;
         self.current_file = saved_file;
         self.stack.truncate(saved_stack_len);
@@ -554,11 +568,11 @@ impl Machine {
 
         self.module_cache.unmark_loading(&resolved_path);
 
-        let module = crate::module::Module {
-            path: resolved_path.clone(),
-            bytecode: module_bytecode,
-            exports: module_exports.clone(),
-        };
+        let module = crate::module::Module::with_globals(
+            resolved_path.clone(),
+            module_bytecode,
+            module_exports.clone(),
+        );
 
         self.module_cache.insert(resolved_path, module);
 
@@ -871,11 +885,18 @@ impl Machine {
                             let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
                             self.call_stack.push(frame);
 
+                            // Save and restore module globals for cross-bytecode execution
+                            let saved_globals = self.globals.clone();
+                            if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
+                                self.globals = module_globals.clone();
+                            }
+
                             let saved_ip = self.ip;
                             self.ip = body_start;
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
                             self.ip = saved_ip; // Restore IP; execute_instruction will increment it
+                            self.globals = saved_globals; // Restore original globals
                             exec_result?;
 
                             // Return value is now on stack
@@ -914,11 +935,18 @@ impl Machine {
                             let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, Some(upvalues.clone()));
                             self.call_stack.push(frame);
 
+                            // Save and restore module globals for cross-bytecode execution
+                            let saved_globals = self.globals.clone();
+                            if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
+                                self.globals = module_globals.clone();
+                            }
+
                             let saved_ip = self.ip;
                             self.ip = body_start;
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
                             self.ip = saved_ip; // Restore IP; execute_instruction will increment it
+                            self.globals = saved_globals; // Restore original globals
                             exec_result?;
 
                             // Return value is now on stack
@@ -1387,15 +1415,27 @@ impl Machine {
                                         let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
                                         self.call_stack.push(frame);
 
+                                        // Save and restore module globals for cross-bytecode execution
+                                        let saved_globals = self.globals.clone();
+                                        if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
+                                            self.globals = module_globals.clone();
+                                        }
+
                                         let saved_ip = self.ip;
                                         self.ip = body_start;
 
                                         let exec_result = self.execute_function_until_return(&method_bytecode, saved_call_stack_len);
+
+                                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+                                            eprintln!("[DEBUG] Method execute_function_until_return completed, IP now: {}", self.ip);
+                                        }
+
                                         self.ip = saved_ip; // Restore IP; execute_instruction will increment it
+                                        self.globals = saved_globals; // Restore original globals
                                         exec_result?;
 
                                         if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                                            eprintln!("[DEBUG] Method executed successfully");
+                                            eprintln!("[DEBUG] Method executed successfully, restored IP to: {}", self.ip);
                                             eprintln!("[DEBUG] Stack size: {}, object_index: {}", self.stack.len(), object_index);
                                         }
 
@@ -1407,9 +1447,11 @@ impl Machine {
                                         self.stack.push(return_value);
 
                                         if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                                            eprintln!("[DEBUG] Stack cleaned up, returning");
+                                            eprintln!("[DEBUG] Stack cleaned up, advancing IP and returning");
                                         }
 
+                                        // Manually increment IP since we're returning early
+                                        self.ip += 1;
                                         return Ok(true); // Cross-bytecode method call complete
                                     } else {
                                         // Same-bytecode call - normal path
@@ -1433,6 +1475,8 @@ impl Machine {
                                     // Pop arguments and object, push result
                                     self.stack.truncate(object_index);
                                     self.stack.push(result);
+                                    // Manually increment IP since we're returning early
+                                    self.ip += 1;
                                     return Ok(true);
                                 }
                                 _ => {
@@ -1800,7 +1844,13 @@ impl Machine {
             }
         }
 
+        let old_ip = self.ip;
         self.ip += 1;
+
+        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+            eprintln!("[DEBUG] execute_instruction END: IP {} -> {}", old_ip, self.ip);
+        }
+
         Ok(true)
     }
 }
