@@ -105,7 +105,6 @@ let global_counter = make_counter()
 }
 
 #[test]
-#[ignore] // TODO: Method chaining on function returns needs investigation
 fn test_module_with_structs() {
     let person_content = r#"
 struct Person {
@@ -390,7 +389,6 @@ fn add(a, b) {
 }
 
 #[test]
-#[ignore] // TODO: Module scope isolation test needs refinement
 fn test_module_scope_isolation() {
     let a_content = r#"
 let shared_name = "Module A"
