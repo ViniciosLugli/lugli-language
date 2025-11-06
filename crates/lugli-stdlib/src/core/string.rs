@@ -90,50 +90,30 @@ pub fn string_is_alphabetic(args: &[Value], pool: &mut StringPool) -> Result<Val
 
 pub fn string_starts_with(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity(args, 2, "string.starts_with")?;
-    match (&args[0], &args[1]) {
-        (Value::String(id1), Value::String(id2)) => {
-            let s = pool.resolve(*id1);
-            let prefix = pool.resolve(*id2);
-            Ok(Value::Bool(s.starts_with(prefix)))
-        }
-        _ => Err(LugliError::runtime("string.starts_with expects string arguments")),
-    }
+    let s = expect_string(&args[0], pool, "string.starts_with", 1)?;
+    let prefix = expect_string(&args[1], pool, "string.starts_with", 2)?;
+    Ok(Value::Bool(s.starts_with(&prefix)))
 }
 
 pub fn string_ends_with(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity(args, 2, "string.ends_with")?;
-    match (&args[0], &args[1]) {
-        (Value::String(id1), Value::String(id2)) => {
-            let s = pool.resolve(*id1);
-            let suffix = pool.resolve(*id2);
-            Ok(Value::Bool(s.ends_with(suffix)))
-        }
-        _ => Err(LugliError::runtime("string.ends_with expects string arguments")),
-    }
+    let s = expect_string(&args[0], pool, "string.ends_with", 1)?;
+    let suffix = expect_string(&args[1], pool, "string.ends_with", 2)?;
+    Ok(Value::Bool(s.ends_with(&suffix)))
 }
 
 pub fn string_contains(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity(args, 2, "string.contains")?;
-    match (&args[0], &args[1]) {
-        (Value::String(id1), Value::String(id2)) => {
-            let s = pool.resolve(*id1);
-            let substring = pool.resolve(*id2);
-            Ok(Value::Bool(s.contains(substring)))
-        }
-        _ => Err(LugliError::runtime("string.contains expects string arguments")),
-    }
+    let s = expect_string(&args[0], pool, "string.contains", 1)?;
+    let substring = expect_string(&args[1], pool, "string.contains", 2)?;
+    Ok(Value::Bool(s.contains(&substring)))
 }
 
 pub fn string_replace(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity(args, 3, "string.replace")?;
-    match (&args[0], &args[1], &args[2]) {
-        (Value::String(id1), Value::String(id2), Value::String(id3)) => {
-            let s = pool.resolve(*id1);
-            let from = pool.resolve(*id2);
-            let to = pool.resolve(*id3);
-            let replaced = s.replace(from, to);
-            Ok(Value::String(pool.intern(&replaced)))
-        }
-        _ => Err(LugliError::runtime("string.replace expects string arguments")),
-    }
+    let s = expect_string(&args[0], pool, "string.replace", 1)?;
+    let from = expect_string(&args[1], pool, "string.replace", 2)?;
+    let to = expect_string(&args[2], pool, "string.replace", 3)?;
+    let replaced = s.replace(&from, &to);
+    Ok(Value::String(pool.intern(&replaced)))
 }
