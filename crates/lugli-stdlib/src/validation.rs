@@ -30,7 +30,7 @@ pub fn check_arity_range(args: &[Value], min: usize, max: usize, fn_name: &str) 
 pub fn expect_string<'a>(value: &'a Value, pool: &'a StringPool, fn_name: &str, arg_pos: usize) -> Result<String, LugliError> {
     match value {
         Value::String(id) => Ok(pool.resolve(*id).to_string()),
-        _ => Err(LugliError::runtime(format!("{} argument {} must be string, got {}", fn_name, arg_pos, value.type_name()))),
+        _ => Err(LugliError::type_error("string", value.type_name())),
     }
 }
 
@@ -38,7 +38,7 @@ pub fn expect_string<'a>(value: &'a Value, pool: &'a StringPool, fn_name: &str, 
 pub fn expect_number(value: &Value, fn_name: &str, arg_pos: usize) -> Result<f64, LugliError> {
     match value {
         Value::Number(n) => Ok(*n),
-        _ => Err(LugliError::runtime(format!("{} argument {} must be number, got {}", fn_name, arg_pos, value.type_name()))),
+        _ => Err(LugliError::type_error("number", value.type_name())),
     }
 }
 
@@ -46,7 +46,7 @@ pub fn expect_number(value: &Value, fn_name: &str, arg_pos: usize) -> Result<f64
 pub fn expect_bool(value: &Value, fn_name: &str, arg_pos: usize) -> Result<bool, LugliError> {
     match value {
         Value::Bool(b) => Ok(*b),
-        _ => Err(LugliError::runtime(format!("{} argument {} must be boolean, got {}", fn_name, arg_pos, value.type_name()))),
+        _ => Err(LugliError::type_error("boolean", value.type_name())),
     }
 }
 
@@ -54,7 +54,7 @@ pub fn expect_bool(value: &Value, fn_name: &str, arg_pos: usize) -> Result<bool,
 pub fn expect_list<'a>(value: &'a Value, fn_name: &str, arg_pos: usize) -> Result<&'a Rc<RefCell<Vec<Value>>>, LugliError> {
     match value {
         Value::List(l) => Ok(l),
-        _ => Err(LugliError::runtime(format!("{} argument {} must be list, got {}", fn_name, arg_pos, value.type_name()))),
+        _ => Err(LugliError::type_error("list", value.type_name())),
     }
 }
 
@@ -62,7 +62,7 @@ pub fn expect_list<'a>(value: &'a Value, fn_name: &str, arg_pos: usize) -> Resul
 pub fn expect_dict<'a>(value: &'a Value, fn_name: &str, arg_pos: usize) -> Result<&'a Rc<RefCell<HashMap<StringId, Value>>>, LugliError> {
     match value {
         Value::Dict(d) => Ok(d),
-        _ => Err(LugliError::runtime(format!("{} argument {} must be dict, got {}", fn_name, arg_pos, value.type_name()))),
+        _ => Err(LugliError::type_error("dict", value.type_name())),
     }
 }
 
