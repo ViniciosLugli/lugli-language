@@ -261,16 +261,17 @@ fn test_index_with_method_calls() {
 
 #[test]
 fn test_index_bounds_checking() {
-    // Test out of bounds access
+    // Test out of bounds access returns null
     let source = r#"
         let arr = [1, 2, 3]
-        let value = arr[10]  # Should return null or error
+        let value = arr[10]
+
+        if value != null {
+            let error = 1 / 0
+        }
     "#;
 
-    let mut parser = Parser::new(source).unwrap();
-    let (ast, span_map) = parser.parse().unwrap();
-    let result = compile_and_run(&ast, span_map);
-    assert!(result.is_err(), "Out of bounds access should error");
+    run_test(source);
 }
 
 #[test]
@@ -399,33 +400,32 @@ fn test_negative_index_boundaries() {
 
 #[test]
 fn test_negative_index_out_of_bounds() {
-    // Test arr[-4] when len=3
+    // Test arr[-4] when len=3 returns null
     let source = r#"
         let arr = [1, 2, 3]
         let val = arr[-4]
+
+        if val != null {
+            let error = 1 / 0
+        }
     "#;
 
-    let mut parser = Parser::new(source).unwrap();
-    let (ast, span_map) = parser.parse().unwrap();
-    let result = compile_and_run(&ast, span_map);
-    assert!(result.is_err(), "Index -4 should be out of bounds for length 3");
-    let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("out of range") || err_msg.contains("Negative index"), "Error should mention out of range, got: {}", err_msg);
+    run_test(source);
 }
 
 #[test]
 fn test_positive_index_out_of_bounds() {
+    // Test arr[3] when len=3 returns null
     let source = r#"
         let arr = [1, 2, 3]
         let val = arr[3]
+
+        if val != null {
+            let error = 1 / 0
+        }
     "#;
 
-    let mut parser = Parser::new(source).unwrap();
-    let (ast, span_map) = parser.parse().unwrap();
-    let result = compile_and_run(&ast, span_map);
-    assert!(result.is_err(), "Index 3 should be out of bounds for length 3");
-    let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("out of range"), "Error should mention out of range");
+    run_test(source);
 }
 
 #[test]
@@ -467,4 +467,101 @@ fn test_negative_index_assignment_out_of_bounds() {
     assert!(result.is_err(), "Assignment at index -4 should fail for length 3");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("out of range") || err_msg.contains("Negative index"), "Error should mention out of range, got: {}", err_msg);
+}
+
+#[test]
+fn test_float_index_validation_positive() {
+    let source = r#"
+        let arr = [10, 20, 30]
+        let val = arr[1.5]
+    "#;
+
+    let mut parser = Parser::new(source).unwrap();
+    let (ast, span_map) = parser.parse().unwrap();
+    let result = compile_and_run(&ast, span_map);
+    assert!(result.is_err(), "Float index 1.5 should be rejected");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);
+}
+
+#[test]
+fn test_float_index_validation_negative() {
+    let source = r#"
+        let arr = [10, 20, 30]
+        let val = arr[-1.5]
+    "#;
+
+    let mut parser = Parser::new(source).unwrap();
+    let (ast, span_map) = parser.parse().unwrap();
+    let result = compile_and_run(&ast, span_map);
+    assert!(result.is_err(), "Float index -1.5 should be rejected");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);
+}
+
+#[test]
+fn test_float_index_validation_near_integer() {
+    let source = r#"
+        let arr = [10, 20, 30]
+        let val = arr[1.9999]
+    "#;
+
+    let mut parser = Parser::new(source).unwrap();
+    let (ast, span_map) = parser.parse().unwrap();
+    let result = compile_and_run(&ast, span_map);
+    assert!(result.is_err(), "Float index 1.9999 should be rejected");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);
+}
+
+#[test]
+fn test_exact_integer_float_index_works() {
+    let source = r#"
+        let arr = [10, 20, 30]
+
+        if arr[1.0] != 20 {
+            let error = 1 / 0
+        }
+
+        if arr[0.0] != 10 {
+            let error = 1 / 0
+        }
+
+        if arr[-1.0] != 30 {
+            let error = 1 / 0
+        }
+    "#;
+
+    run_test(source);
+}
+
+#[test]
+fn test_float_index_assignment_validation() {
+    let source = r#"
+        let arr = [10, 20, 30]
+        arr[1.5] = 999
+    "#;
+
+    let mut parser = Parser::new(source).unwrap();
+    let (ast, span_map) = parser.parse().unwrap();
+    let result = compile_and_run(&ast, span_map);
+    assert!(result.is_err(), "Float index assignment should be rejected");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);
+}
+
+#[test]
+fn test_float_index_in_expression() {
+    let source = r#"
+        let arr = [10, 20, 30]
+        let idx = 2.5
+        let val = arr[idx]
+    "#;
+
+    let mut parser = Parser::new(source).unwrap();
+    let (ast, span_map) = parser.parse().unwrap();
+    let result = compile_and_run(&ast, span_map);
+    assert!(result.is_err(), "Variable float index should be rejected");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);
 }

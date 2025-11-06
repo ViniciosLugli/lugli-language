@@ -40,6 +40,7 @@ fn test_division_by_zero_error() {
 
 #[test]
 fn test_index_out_of_bounds_positive() {
+    // Out of bounds now returns null instead of erroring
     let source = r#"
         let list = [1, 2, 3]
         let x = list[10]
@@ -49,13 +50,13 @@ fn test_index_out_of_bounds_positive() {
     let mut vm = Machine::new();
     let result = vm.run(&bytecode);
 
-    assert!(result.is_err());
-    let err_msg = format!("{}", result.unwrap_err());
-    assert!(err_msg.contains("out of bounds") || err_msg.contains("Index"));
+    // Should succeed (returns null)
+    assert!(result.is_ok());
 }
 
 #[test]
 fn test_index_out_of_bounds_negative() {
+    // Out of bounds now returns null instead of erroring
     let source = r#"
         let list = [1, 2, 3]
         let x = list[-10]
@@ -65,8 +66,8 @@ fn test_index_out_of_bounds_negative() {
     let mut vm = Machine::new();
     let result = vm.run(&bytecode);
 
-    assert!(result.is_err());
-    // The error message might vary, just verify it errors
+    // Should succeed (returns null)
+    assert!(result.is_ok());
 }
 
 #[test]

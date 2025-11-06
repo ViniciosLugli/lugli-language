@@ -1,4 +1,4 @@
-use crate::{Parser, error::ParseError};
+use crate::{Parser, error::ParseError, literals::unescape_string};
 use lugli_ast::{FStringPart, Pattern, TypeHint};
 use lugli_common::Span;
 use lugli_lexer::{Token, TokenKind};
@@ -258,7 +258,7 @@ impl<'a> Parser<'a> {
                 } else {
                     // Start of interpolation
                     if !current_text.is_empty() {
-                        parts.push(FStringPart::Text(current_text.clone()));
+                        parts.push(FStringPart::Text(unescape_string(&current_text)?));
                         current_text.clear();
                     }
 
@@ -309,7 +309,7 @@ impl<'a> Parser<'a> {
         }
 
         if !current_text.is_empty() {
-            parts.push(FStringPart::Text(current_text));
+            parts.push(FStringPart::Text(unescape_string(&current_text)?));
         }
 
         // Handle empty f-string

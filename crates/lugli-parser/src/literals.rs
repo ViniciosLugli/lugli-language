@@ -14,6 +14,33 @@ fn is_pascal_case(s: &str) -> bool {
     true
 }
 
+pub(crate) fn unescape_string(s: &str) -> Result<String, ParseError> {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.next() {
+                Some('n') => result.push('\n'),
+                Some('t') => result.push('\t'),
+                Some('r') => result.push('\r'),
+                Some('\\') => result.push('\\'),
+                Some('"') => result.push('"'),
+                Some('\'') => result.push('\''),
+                Some(c) => {
+                    result.push('\\');
+                    result.push(c);
+                }
+                None => result.push('\\'),
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+
+    Ok(result)
+}
+
 impl<'a> Parser<'a> {
     pub(crate) fn block_expression(&mut self) -> Result<Expr, ParseError> {
         let start_span = self.current_span();
@@ -47,7 +74,7 @@ impl<'a> Parser<'a> {
         match self.peek_kind() {
             Some(TokenKind::String(id)) => {
                 let s = self.scanner.pool().resolve(*id);
-                let key = s[1..s.len() - 1].to_string();
+                let key = unescape_string(&s[1..s.len() - 1])?;
                 let span = self.current_span();
                 self.advance();
 
@@ -107,7 +134,7 @@ impl<'a> Parser<'a> {
 
         if let Some(TokenKind::String(id)) = self.peek_kind() {
             let s = self.scanner.pool().resolve(*id);
-            let unquoted_value = s[1..s.len() - 1].to_string();
+            let unquoted_value = unescape_string(&s[1..s.len() - 1])?;
             let span = self.current_span();
             self.advance();
 
@@ -461,7 +488,7 @@ impl<'a> Parser<'a> {
                 Pattern::Literal(LiteralValue::Number(num))
             } else if let Some(TokenKind::String(id)) = self.peek_kind() {
                 let s = self.scanner.pool().resolve(*id);
-                let str_val = s[1..s.len() - 1].to_string();
+                let str_val = unescape_string(&s[1..s.len() - 1])?;
                 self.advance();
                 Pattern::Literal(LiteralValue::String(str_val))
             } else if self.match_any(&[TokenKind::True]) {

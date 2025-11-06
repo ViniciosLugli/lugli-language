@@ -134,12 +134,24 @@ pub fn list_get(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliEr
                 return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
             }
             let idx_i64 = *idx as i64;
-            if idx_i64 < 0 {
-                return Err(LugliError::runtime(format!("Negative index {} not allowed in list.get", idx)));
-            }
-            let index = idx_i64 as usize;
             let list = l.borrow();
-            if index < list.len() { Ok(list[index].clone()) } else { Ok(Value::Null) }
+            let len = list.len() as i64;
+
+            // Handle negative indices (consistent with bracket notation)
+            let actual_idx = if idx_i64 < 0 {
+                let positive_offset = len + idx_i64;
+                if positive_offset < 0 {
+                    return Ok(Value::Null); // Out of bounds
+                }
+                positive_offset as usize
+            } else {
+                if idx_i64 >= len {
+                    return Ok(Value::Null); // Out of bounds
+                }
+                idx_i64 as usize
+            };
+
+            Ok(list[actual_idx].clone())
         }
         (Value::List(_), _) => Err(LugliError::type_error("number", args[1].type_name())),
         _ => Err(LugliError::type_error("list", args[0].type_name())),
@@ -159,17 +171,28 @@ pub fn list_set(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliEr
                 return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
             }
             let idx_i64 = *idx as i64;
-            if idx_i64 < 0 {
-                return Err(LugliError::runtime(format!("Negative index {} not allowed in list.set", idx)));
-            }
-            let index = idx_i64 as usize;
             let mut list = l.borrow_mut();
-            if index < list.len() {
-                list[index] = args[2].clone();
-                Ok(Value::Null)
+            let len = list.len() as i64;
+
+            // Handle negative indices (consistent with bracket notation)
+            let actual_idx = if idx_i64 < 0 {
+                let positive_offset = len + idx_i64;
+                if positive_offset < 0 {
+                    return Err(LugliError::runtime(format!(
+                        "Negative index {} out of range for list assignment (length {}, minimum is -{})",
+                        idx_i64, len, len
+                    )));
+                }
+                positive_offset as usize
             } else {
-                Err(LugliError::runtime(format!("Index {} out of bounds (list length {})", index, list.len())))
-            }
+                if idx_i64 >= len {
+                    return Err(LugliError::runtime(format!("Index {} out of range for list assignment (length {})", idx_i64, len)));
+                }
+                idx_i64 as usize
+            };
+
+            list[actual_idx] = args[2].clone();
+            Ok(Value::Null)
         }
         (Value::List(_), _) => Err(LugliError::type_error("number", args[1].type_name())),
         _ => Err(LugliError::type_error("list", args[0].type_name())),
