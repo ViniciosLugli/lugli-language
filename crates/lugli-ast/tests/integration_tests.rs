@@ -3,7 +3,7 @@
 #![allow(clippy::collapsible_match)]
 #![allow(clippy::needless_return)]
 
-use lugli_ast::{AstNode, CallData, Expr, IfData, LiteralValue, NodeId, Program, Stmt, Visitor, VisitorMut};
+use lugli_ast::{AstNode, CallData, Expr, IfData, LiteralValue, NodeId, Pattern, Program, Stmt, Visitor, VisitorMut};
 use lugli_common::Span;
 use lugli_lexer::TokenKind;
 
@@ -112,7 +112,7 @@ mod ast_construction_tests {
                 // let result = fibonacci(10)
                 Stmt::VarDecl {
                     id: next_id(),
-                    name: "result".to_string(),
+                    pattern: Pattern::Identifier("result".to_string()),
                     type_hint: None,
                     initializer: Some(Expr::Call {
                         id: next_id(),
@@ -154,12 +154,12 @@ mod ast_construction_tests {
 
         // Verify variable declaration
         if let Stmt::VarDecl {
-            name,
+            pattern,
             initializer,
             ..
         } = &program.statements[1]
         {
-            assert_eq!(name, "result");
+            assert_eq!(pattern, &Pattern::Identifier("result".to_string()));
             assert!(initializer.is_some());
         } else {
             panic!("Expected variable declaration");
@@ -293,7 +293,7 @@ mod ast_construction_tests {
         // Create complex control flow: for loop with nested if-elif-else
         let for_loop = Stmt::For {
             id: next_id(),
-            variable: "item".to_string(),
+            pattern: Pattern::Identifier("item".to_string()),
             iterable: Expr::Identifier {
                 id: next_id(),
                 name: "collection".to_string(),
@@ -381,12 +381,12 @@ mod ast_construction_tests {
 
         // Verify structure - For nodes don't have span() after NodeId migration
         if let Stmt::For {
-            variable,
+            pattern,
             body,
             ..
         } = for_loop
         {
-            assert_eq!(variable, "item");
+            assert_eq!(pattern, Pattern::Identifier("item".to_string()));
             assert_eq!(body.len(), 1);
 
             // Check nested if statement
@@ -457,7 +457,7 @@ mod visitor_pattern_tests {
         let program = Program::new(
             vec![Stmt::VarDecl {
                 id: next_id(),
-                name: "result".to_string(),
+                pattern: Pattern::Identifier("result".to_string()),
                 type_hint: None,
                 initializer: Some(Expr::Binary {
                     id: next_id(),
@@ -816,7 +816,7 @@ mod ast_node_interface_tests {
         let program = Program::new(
             vec![Stmt::VarDecl {
                 id: next_id(),
-                name: "test".to_string(),
+                pattern: Pattern::Identifier("test".to_string()),
                 type_hint: None,
                 initializer: None,
                 is_const: false,

@@ -1,4 +1,4 @@
-use lugli_ast::Stmt;
+use lugli_ast::{Pattern, Stmt};
 use lugli_parser::Parser;
 
 #[test]
@@ -166,9 +166,9 @@ fn test_export_variable() {
             item, ..
         } => match &**item {
             Stmt::VarDecl {
-                name, ..
+                pattern, ..
             } => {
-                assert_eq!(name, "x");
+                assert_eq!(pattern, &Pattern::Identifier("x".to_string()));
             }
             _ => panic!("Expected VarDecl inside Export"),
         },
