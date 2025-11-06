@@ -6,6 +6,8 @@ pub struct StringId(u32);
 
 impl StringId {
     pub fn as_u32(self) -> u32 { self.0 }
+
+    pub fn from_u32(id: u32) -> Self { StringId(id) }
 }
 
 #[derive(Debug, Clone)]
