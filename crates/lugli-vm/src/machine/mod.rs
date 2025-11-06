@@ -7,6 +7,10 @@ use lugli_common::{LugliError, StringId, StringPool, Value};
 use lugli_stdlib::get_global_functions;
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
 
+// Instruction handler modules
+mod stack_ops;
+mod arithmetic_ops;
+
 const MAX_STACK_SIZE: usize = 10_000;
 const MAX_CALL_DEPTH: usize = 1000;
 
@@ -705,116 +709,39 @@ impl Machine {
         let inst_start = if self.debug.trace_execution { Some(Instant::now()) } else { None };
 
         match instruction {
-            Instruction::Constant(index) => {
-                let value = self.get_constant(bytecode, *index)?.clone_for_stack();
-                self.stack.push(value);
-            }
-            Instruction::LoadSmallInt(n) => {
-                self.stack.push(Value::Number(*n as f64));
-            }
-            Instruction::LoadInt(n) => {
-                self.stack.push(Value::Number(*n as f64));
-            }
-            Instruction::LoadTrue => {
-                self.stack.push(Value::Bool(true));
-            }
-            Instruction::LoadFalse => {
-                self.stack.push(Value::Bool(false));
-            }
-            Instruction::LoadNull => {
-                self.stack.push(Value::Null);
-            }
-            Instruction::ReserveLocals(count) => {
-                // Push Null for each local variable to reserve stack space
-                for _ in 0..*count {
-                    self.stack.push(Value::Null);
-                }
-            }
-            Instruction::Pop => {
-                self.pop()?;
-            }
-            Instruction::Dup => {
-                let val = self.peek()?.clone_for_stack();
-                self.stack.push(val);
-            }
-            Instruction::Add => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                let result = match (&a, &b) {
-                    (Value::String(_), Value::String(_)) => {
-                        let mut pool = bytecode.string_pool.borrow_mut();
-                        a.add_with_pool(&b, &mut pool)?
-                    }
-                    _ => a.add(&b)?,
-                };
-                self.stack.push(result);
-            }
-            Instruction::Subtract => self.execute_binary_op(Value::subtract)?,
-            Instruction::Multiply => self.execute_binary_op(Value::multiply)?,
-            Instruction::Divide => self.execute_binary_op(Value::divide)?,
-            Instruction::IntegerDivide => self.execute_binary_op(Value::integer_divide)?,
-            Instruction::Modulo => self.execute_binary_op(Value::modulo)?,
-            Instruction::Power => self.execute_binary_op(Value::power)?,
-            Instruction::AddInt(n) => {
-                let left = self.pop()?;
-                if let Value::Number(a) = left {
-                    self.stack.push(Value::Number(a + (*n as f64)));
-                } else {
-                    return Err(LugliError::type_error("number", left.type_name()));
-                }
-            }
-            Instruction::SubInt(n) => {
-                let left = self.pop()?;
-                if let Value::Number(a) = left {
-                    self.stack.push(Value::Number(a - (*n as f64)));
-                } else {
-                    return Err(LugliError::type_error("number", left.type_name()));
-                }
-            }
-            Instruction::MulInt(n) => {
-                let left = self.pop()?;
-                if let Value::Number(a) = left {
-                    self.stack.push(Value::Number(a * (*n as f64)));
-                } else {
-                    return Err(LugliError::type_error("number", left.type_name()));
-                }
-            }
-            Instruction::Negate => {
-                let val = self.pop()?;
-                self.stack.push(val.negate()?);
-            }
-            Instruction::Not => {
-                let val = self.pop()?;
-                self.stack.push(Value::Bool(!val.is_truthy()));
-            }
-            Instruction::And => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(Value::Bool(a.is_truthy() && b.is_truthy()));
-            }
-            Instruction::Or => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(Value::Bool(a.is_truthy() || b.is_truthy()));
-            }
-            Instruction::Print => {
-                let val = self.pop()?;
-                println!("{}", val);
-            }
-            Instruction::Equal => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(Value::Bool(a.equals(&b)));
-            }
-            Instruction::NotEqual => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(Value::Bool(!a.equals(&b)));
-            }
-            Instruction::Greater => self.execute_binary_op(Value::greater)?,
-            Instruction::GreaterEqual => self.execute_binary_op(Value::greater_equal)?,
-            Instruction::Less => self.execute_binary_op(Value::less)?,
-            Instruction::LessEqual => self.execute_binary_op(Value::less_equal)?,
+            // Stack operations
+            Instruction::Constant(index) => self.exec_constant(bytecode, *index)?,
+            Instruction::LoadSmallInt(n) => self.exec_load_small_int(*n)?,
+            Instruction::LoadInt(n) => self.exec_load_int(*n)?,
+            Instruction::LoadTrue => self.exec_load_true()?,
+            Instruction::LoadFalse => self.exec_load_false()?,
+            Instruction::LoadNull => self.exec_load_null()?,
+            Instruction::ReserveLocals(count) => self.exec_reserve_locals(*count)?,
+            Instruction::Pop => self.exec_pop()?,
+            Instruction::Dup => self.exec_dup()?,
+            Instruction::Print => self.exec_print()?,
+
+            // Arithmetic and logical operations
+            Instruction::Add => self.exec_add(bytecode)?,
+            Instruction::Subtract => self.exec_subtract()?,
+            Instruction::Multiply => self.exec_multiply()?,
+            Instruction::Divide => self.exec_divide()?,
+            Instruction::IntegerDivide => self.exec_integer_divide()?,
+            Instruction::Modulo => self.exec_modulo()?,
+            Instruction::Power => self.exec_power()?,
+            Instruction::AddInt(n) => self.exec_add_int(*n)?,
+            Instruction::SubInt(n) => self.exec_sub_int(*n)?,
+            Instruction::MulInt(n) => self.exec_mul_int(*n)?,
+            Instruction::Negate => self.exec_negate()?,
+            Instruction::Not => self.exec_not()?,
+            Instruction::And => self.exec_and()?,
+            Instruction::Or => self.exec_or()?,
+            Instruction::Equal => self.exec_equal()?,
+            Instruction::NotEqual => self.exec_not_equal()?,
+            Instruction::Greater => self.exec_greater()?,
+            Instruction::GreaterEqual => self.exec_greater_equal()?,
+            Instruction::Less => self.exec_less()?,
+            Instruction::LessEqual => self.exec_less_equal()?,
             Instruction::Jump(addr) => {
                 self.ip = *addr;
                 return Ok(true);
