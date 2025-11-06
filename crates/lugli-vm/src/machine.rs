@@ -12,16 +12,16 @@ const MAX_CALL_DEPTH: usize = 1000;
 
 #[derive(Debug, Clone)]
 struct CallFrame {
-    function_name: String,
+    function_name: Rc<str>,
     return_ip: usize,
     stack_base: usize,
-    closure_upvalues: Option<Vec<Rc<RefCell<Value>>>>, // If this is a closure call, store its upvalues
+    closure_upvalues: Option<Vec<Rc<RefCell<Value>>>>,
 }
 
 impl CallFrame {
-    fn new(function_name: String, return_ip: usize, stack_base: usize, upvalues: Option<Vec<Rc<RefCell<Value>>>>) -> Self {
+    fn new(function_name: impl Into<Rc<str>>, return_ip: usize, stack_base: usize, upvalues: Option<Vec<Rc<RefCell<Value>>>>) -> Self {
         Self {
-            function_name,
+            function_name: function_name.into(),
             return_ip,
             stack_base,
             closure_upvalues: upvalues,
@@ -73,6 +73,13 @@ pub struct Machine {
 }
 
 impl Machine {
+    fn execute_binary_op(&mut self, op: fn(&Value, &Value) -> Result<Value, LugliError>) -> Result<(), LugliError> {
+        let b = self.pop()?;
+        let a = self.pop()?;
+        self.stack.push(op(&a, &b)?);
+        Ok(())
+    }
+
     pub fn new() -> Self {
         let global_functions = get_global_functions();
         let mut globals = HashMap::with_capacity(global_functions.len());
@@ -697,36 +704,12 @@ impl Machine {
                 };
                 self.stack.push(result);
             }
-            Instruction::Subtract => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.subtract(&b)?);
-            }
-            Instruction::Multiply => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.multiply(&b)?);
-            }
-            Instruction::Divide => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.divide(&b)?);
-            }
-            Instruction::IntegerDivide => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.integer_divide(&b)?);
-            }
-            Instruction::Modulo => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.modulo(&b)?);
-            }
-            Instruction::Power => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.power(&b)?);
-            }
+            Instruction::Subtract => self.execute_binary_op(Value::subtract)?,
+            Instruction::Multiply => self.execute_binary_op(Value::multiply)?,
+            Instruction::Divide => self.execute_binary_op(Value::divide)?,
+            Instruction::IntegerDivide => self.execute_binary_op(Value::integer_divide)?,
+            Instruction::Modulo => self.execute_binary_op(Value::modulo)?,
+            Instruction::Power => self.execute_binary_op(Value::power)?,
             Instruction::AddInt(n) => {
                 let left = self.pop()?;
                 if let Value::Number(a) = left {
@@ -783,26 +766,10 @@ impl Machine {
                 let a = self.pop()?;
                 self.stack.push(Value::Bool(!a.equals(&b)));
             }
-            Instruction::Greater => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.greater(&b)?);
-            }
-            Instruction::GreaterEqual => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.greater_equal(&b)?);
-            }
-            Instruction::Less => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.less(&b)?);
-            }
-            Instruction::LessEqual => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.less_equal(&b)?);
-            }
+            Instruction::Greater => self.execute_binary_op(Value::greater)?,
+            Instruction::GreaterEqual => self.execute_binary_op(Value::greater_equal)?,
+            Instruction::Less => self.execute_binary_op(Value::less)?,
+            Instruction::LessEqual => self.execute_binary_op(Value::less_equal)?,
             Instruction::Jump(addr) => {
                 self.ip = *addr;
                 return Ok(true);
