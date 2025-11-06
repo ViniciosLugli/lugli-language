@@ -12,6 +12,7 @@ mod stack_ops;
 mod arithmetic_ops;
 mod variable_ops;
 mod object_ops;
+mod control_flow;
 
 const MAX_STACK_SIZE: usize = 10_000;
 const MAX_CALL_DEPTH: usize = 1000;
@@ -744,21 +745,14 @@ impl Machine {
             Instruction::GreaterEqual => self.exec_greater_equal()?,
             Instruction::Less => self.exec_less()?,
             Instruction::LessEqual => self.exec_less_equal()?,
-            Instruction::Jump(addr) => {
-                self.ip = *addr;
-                return Ok(true);
-            }
+            // Control flow operations
+            Instruction::Jump(addr) => return self.exec_jump(*addr),
             Instruction::JumpIfFalse(addr) => {
-                let condition = self.pop()?;
-                if !condition.is_truthy() {
-                    self.ip = *addr;
+                if self.exec_jump_if_false(*addr)? {
                     return Ok(true);
                 }
             }
-            Instruction::Loop(start) => {
-                self.ip = *start;
-                return Ok(true);
-            }
+            Instruction::Loop(start) => return self.exec_loop(*start),
             Instruction::Call(arg_count) => {
                 let arg_count = *arg_count as usize;
                 let callee = self.peek_n(0)?.clone_for_stack(); // Callee is at the top
@@ -913,25 +907,7 @@ impl Machine {
                     }
                 }
             }
-            Instruction::Return => {
-                let frame = self.call_stack.pop().ok_or_else(|| LugliError::runtime("Call stack underflow"))?;
-                let return_value = self.pop().unwrap_or(Value::Null);
-
-                // Close upvalues for this frame before returning
-                let frame_base = frame.stack_base;
-                let frame_end = self.stack.len();
-                self.open_upvalues.retain(|&index, _| index < frame_base || index >= frame_end);
-
-                if self.call_stack.is_empty() {
-                    self.stack.push(return_value);
-                    return Ok(false);
-                }
-
-                self.ip = frame.return_ip;
-                self.stack.truncate(frame.stack_base);
-                self.stack.push(return_value);
-                return Ok(true);
-            }
+            Instruction::Return => return self.exec_return(),
             // Variable operations
             Instruction::Load(index) => self.exec_load(*index)?,
             Instruction::Store(index) => self.exec_store(*index)?,
