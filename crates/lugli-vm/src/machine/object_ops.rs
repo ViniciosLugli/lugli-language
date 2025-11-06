@@ -186,4 +186,161 @@ impl Machine {
             Err(LugliError::runtime("MakeClosure requires a Function value"))
         }
     }
+
+    pub(super) fn exec_get_index(&mut self, bytecode: &Bytecode) -> Result<(), LugliError> {
+        let index = self.pop()?;
+        let object = self.pop()?;
+
+        match (&object, &index) {
+            (Value::List(list), Value::Number(idx)) => {
+                // Validate index
+                if !idx.is_finite() {
+                    return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+                }
+                if idx.fract() != 0.0 {
+                    return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
+                }
+                if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
+                    return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
+                }
+
+                let list_ref = list.borrow();
+                let len = list_ref.len() as i64;
+                let idx_i64 = *idx as i64;
+
+                // Handle negative indices
+                let actual_idx_opt = if idx_i64 < 0 {
+                    let positive_offset = len + idx_i64;
+                    if positive_offset < 0 { None } else { Some(positive_offset as usize) }
+                } else {
+                    if idx_i64 >= len { None } else { Some(idx_i64 as usize) }
+                };
+
+                if let Some(actual_idx) = actual_idx_opt {
+                    self.stack.push(list_ref[actual_idx].clone());
+                } else {
+                    self.stack.push(Value::Null);
+                }
+            }
+            (Value::Dict(dict), Value::String(key)) => {
+                let dict_ref = dict.borrow();
+                let value = dict_ref.get(key).cloned().unwrap_or(Value::Null);
+                self.stack.push(value);
+            }
+            (Value::Dict(dict), Value::Number(num)) => {
+                let key_str = if num.fract() == 0.0 && num.abs() < 1e15 {
+                    format!("{:.0}", num)
+                } else {
+                    num.to_string()
+                };
+                let key_id = bytecode.string_pool.borrow_mut().intern(&key_str);
+                let dict_ref = dict.borrow();
+                let value = dict_ref.get(&key_id).cloned().unwrap_or(Value::Null);
+                self.stack.push(value);
+            }
+            (Value::String(s), Value::Number(idx)) => {
+                if !idx.is_finite() {
+                    return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+                }
+                if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
+                    return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
+                }
+
+                let string = bytecode.string_pool.borrow().resolve(*s).to_string();
+                let chars: Vec<char> = string.chars().collect();
+                let len = chars.len() as i64;
+                let idx_i64 = *idx as i64;
+
+                let actual_idx = if idx_i64 < 0 {
+                    let positive_offset = len + idx_i64;
+                    if positive_offset < 0 {
+                        return Err(LugliError::runtime(format!(
+                            "Negative index {} out of range for string of length {} (minimum is -{})",
+                            idx_i64, len, len
+                        )));
+                    }
+                    positive_offset as usize
+                } else {
+                    if idx_i64 >= len {
+                        return Err(LugliError::runtime(format!("Index {} out of range for string of length {}", idx_i64, len)));
+                    }
+                    idx_i64 as usize
+                };
+
+                let char_str = chars[actual_idx].to_string();
+                let char_id = bytecode.string_pool.borrow_mut().intern(&char_str);
+                self.stack.push(Value::String(char_id));
+            }
+            _ => {
+                return Err(LugliError::runtime(format!("Cannot index {} with {}", object.type_name(), index.type_name())));
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn exec_set_index(&mut self, bytecode: &Bytecode) -> Result<(), LugliError> {
+        let value = self.pop()?;
+        let index = self.pop()?;
+        let object = self.pop()?;
+
+        match (&object, &index) {
+            (Value::List(list), Value::Number(idx)) => {
+                if !idx.is_finite() {
+                    return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+                }
+                if idx.fract() != 0.0 {
+                    return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
+                }
+                if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
+                    return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
+                }
+
+                let mut list_ref = list.try_borrow_mut()
+                    .map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?;
+                let len = list_ref.len() as i64;
+                let idx_i64 = *idx as i64;
+
+                let actual_idx = if idx_i64 < 0 {
+                    let positive_offset = len + idx_i64;
+                    if positive_offset < 0 {
+                        return Err(LugliError::runtime(format!(
+                            "Negative index {} out of range for list assignment (length {}, minimum is -{})",
+                            idx_i64, len, len
+                        )));
+                    }
+                    positive_offset as usize
+                } else {
+                    if idx_i64 >= len {
+                        return Err(LugliError::runtime(format!("Index {} out of range for list assignment (length {})", idx_i64, len)));
+                    }
+                    idx_i64 as usize
+                };
+
+                list_ref[actual_idx] = value.clone();
+                self.stack.push(value);
+            }
+            (Value::Dict(dict), Value::String(key)) => {
+                dict.try_borrow_mut()
+                    .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
+                    .insert(*key, value.clone());
+                self.stack.push(value);
+            }
+            (Value::Dict(dict), Value::Number(num)) => {
+                let key_str = if num.fract() == 0.0 && num.abs() < 1e15 {
+                    format!("{:.0}", num)
+                } else {
+                    num.to_string()
+                };
+                let key_id = bytecode.string_pool.borrow_mut().intern(&key_str);
+                dict.try_borrow_mut()
+                    .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
+                    .insert(key_id, value.clone());
+                self.stack.push(value);
+            }
+            _ => {
+                return Err(LugliError::runtime(format!("Cannot set index on {} with {}", object.type_name(), index.type_name())));
+            }
+        }
+        Ok(())
+    }
 }
