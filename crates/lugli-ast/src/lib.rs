@@ -244,7 +244,7 @@ mod tests {
 
         let var_decl = Stmt::VarDecl {
             id: make_id(1),
-            name: "x".to_string(),
+            pattern: Pattern::Identifier("x".to_string()),
             type_hint: None,
             initializer,
             is_const: false,
@@ -252,12 +252,12 @@ mod tests {
 
         assert_eq!(var_decl.id(), make_id(1));
         if let Stmt::VarDecl {
-            name,
+            pattern,
             is_const,
             ..
         } = var_decl
         {
-            assert_eq!(name, "x");
+            assert_eq!(pattern, Pattern::Identifier("x".to_string()));
             assert!(!is_const);
         } else {
             panic!("Expected VarDecl statement");
@@ -370,7 +370,7 @@ mod tests {
             vec![
                 Stmt::VarDecl {
                     id: make_id(0),
-                    name: "x".to_string(),
+                    pattern: Pattern::Identifier("x".to_string()),
                     type_hint: None,
                     initializer: Some(Expr::Literal {
                         id: make_id(1),

@@ -1,6 +1,6 @@
 use super::Compiler;
 use crate::Instruction;
-use lugli_ast::Stmt;
+use lugli_ast::{Pattern, Stmt};
 use lugli_common::{LugliError, Value};
 
 impl Compiler {
@@ -14,17 +14,10 @@ impl Compiler {
                 Ok(true) // Handled
             }
             Stmt::VarDecl {
-                name,
+                pattern,
                 initializer,
                 ..
             } => {
-                // Declare local first if in local scope (to get correct index)
-                let storage_info = if self.scope_depth == 0 {
-                    None // Global scope
-                } else {
-                    Some(self.declare_local(name.clone())) // Local scope
-                };
-
                 // Compile initializer value
                 if let Some(init) = initializer {
                     self.compile_expr(init)?;
@@ -33,16 +26,21 @@ impl Compiler {
                     self.emit_unknown(Instruction::Constant(null_index));
                 }
 
-                // Emit appropriate store instruction
-                if let Some(local_index) = storage_info {
-                    // Local scope - store as local variable
-                    self.emit_unknown(Instruction::Store(local_index));
-                } else {
-                    // Global scope - store as global variable
-                    let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
-                    let name_index = self.add_constant(Value::String(name_id));
-                    self.emit_unknown(Instruction::StoreGlobal(name_index));
-                }
+                // Compile pattern binding
+                self.compile_pattern_binding(pattern)?;
+
+                Ok(true) // Handled
+            }
+            Stmt::DestructuringAssignment {
+                pattern,
+                value,
+                ..
+            } => {
+                // Compile the value expression
+                self.compile_expr(value)?;
+
+                // Compile pattern assignment (assigns to existing variables)
+                self.compile_pattern_assignment(pattern)?;
 
                 Ok(true) // Handled
             }
@@ -158,8 +156,6 @@ impl Compiler {
             } => {
                 let jump_over_body = self.emit_jump(Instruction::Jump(0));
 
-                let body_start = self.current_instruction();
-
                 // Save compiler state
                 let saved_locals = self.locals.clone();
                 let saved_local_count = self.local_count;
@@ -190,6 +186,14 @@ impl Compiler {
                 for param_name in &param_names {
                     self.declare_local(param_name.clone());
                 }
+
+                // Emit placeholder to reserve space for locals (will patch later)
+                let param_count = param_names.len();
+                let reserve_locals_ip = self.current_instruction();
+                self.emit_unknown(Instruction::ReserveLocals(0)); // Placeholder
+
+                // body_start must be set AFTER ReserveLocals so the VM executes it
+                let body_start = reserve_locals_ip;
 
                 // Compile function body
                 for (i, stmt) in body.iter().enumerate() {
@@ -225,6 +229,15 @@ impl Compiler {
                         self.emit_unknown(Instruction::Return);
                     }
                 }
+
+                // Patch ReserveLocals with actual local count
+                let total_local_count = self.local_count;
+                let locals_to_reserve = if total_local_count > param_count {
+                    total_local_count - param_count
+                } else {
+                    0
+                };
+                self.bytecode.instructions[reserve_locals_ip] = Instruction::ReserveLocals(locals_to_reserve);
 
                 self.patch_jump(jump_over_body)?;
 
@@ -314,5 +327,150 @@ impl Compiler {
             }
             _ => Ok(false), // Not handled - control flow statements go to control_flow.rs
         }
+    }
+
+    pub(super) fn compile_pattern_binding(&mut self, pattern: &Pattern) -> Result<(), LugliError> {
+        match pattern {
+            Pattern::Identifier(name) => {
+                // Original single-variable logic
+                if self.scope_depth == 0 {
+                    // Global scope
+                    let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                    let name_index = self.add_constant(Value::String(name_id));
+                    self.emit_unknown(Instruction::StoreGlobal(name_index));
+                    // StoreGlobal uses peek() and leaves value on stack, need to pop it
+                    self.emit_unknown(Instruction::Pop);
+                } else {
+                    // Local scope
+                    let local_index = self.declare_local(name.clone());
+                    self.emit_unknown(Instruction::Store(local_index));
+                    // Store uses pop() and consumes the value, no extra pop needed
+                }
+            }
+
+            Pattern::List(patterns) => {
+                // Value is on stack - need to unpack it
+                for (i, sub_pattern) in patterns.iter().enumerate() {
+                    // Duplicate list on stack
+                    self.emit_unknown(Instruction::Dup);
+
+                    // Push index
+                    let i_index = self.add_constant(Value::Number(i as f64));
+                    self.emit_unknown(Instruction::Constant(i_index));
+
+                    // Get element at index
+                    self.emit_unknown(Instruction::GetIndex);
+
+                    // Recursively bind sub-pattern
+                    self.compile_pattern_binding(sub_pattern)?;
+                }
+
+                // Pop original list
+                self.emit_unknown(Instruction::Pop);
+            }
+
+            Pattern::Dict(fields) => {
+                // Value is on stack - need to unpack it
+                for (key, sub_pattern) in fields {
+                    // Duplicate dict on stack
+                    self.emit_unknown(Instruction::Dup);
+
+                    // Get property using key name
+                    let key_id = self.bytecode.string_pool.borrow_mut().intern(key);
+                    let key_index = self.add_constant(Value::String(key_id));
+                    self.emit_unknown(Instruction::GetProperty(key_index));
+
+                    // Recursively bind sub-pattern
+                    self.compile_pattern_binding(sub_pattern)?;
+                }
+
+                // Pop original dict
+                self.emit_unknown(Instruction::Pop);
+            }
+
+            Pattern::Wildcard => {
+                // Discard value
+                self.emit_unknown(Instruction::Pop);
+            }
+
+            Pattern::Literal(_) => {
+                // Literals in patterns are only used for match arms, not variable declarations
+                // For destructuring, we just pop the value
+                self.emit_unknown(Instruction::Pop);
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn compile_pattern_assignment(&mut self, pattern: &Pattern) -> Result<(), LugliError> {
+        match pattern {
+            Pattern::Identifier(name) => {
+                // Assign to existing variable
+                if let Some(&local_index) = self.locals.get(name) {
+                    // Local variable
+                    self.emit_unknown(Instruction::Store(local_index));
+                } else if let Some(&upvalue_index) = self.upvalues.get(name) {
+                    // Upvalue (captured variable)
+                    self.emit_unknown(Instruction::StoreUpvalue(upvalue_index));
+                } else {
+                    // Global variable
+                    let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                    let name_index = self.add_constant(Value::String(name_id));
+                    self.emit_unknown(Instruction::StoreGlobal(name_index));
+                    self.emit_unknown(Instruction::Pop);
+                }
+            }
+
+            Pattern::List(patterns) => {
+                // Value is on stack - need to unpack it
+                for (i, sub_pattern) in patterns.iter().enumerate() {
+                    // Duplicate list on stack
+                    self.emit_unknown(Instruction::Dup);
+
+                    // Push index
+                    let i_index = self.add_constant(Value::Number(i as f64));
+                    self.emit_unknown(Instruction::Constant(i_index));
+
+                    // Get element at index
+                    self.emit_unknown(Instruction::GetIndex);
+
+                    // Recursively assign sub-pattern
+                    self.compile_pattern_assignment(sub_pattern)?;
+                }
+
+                // Pop original list
+                self.emit_unknown(Instruction::Pop);
+            }
+
+            Pattern::Dict(fields) => {
+                // Value is on stack - need to unpack it
+                for (key, sub_pattern) in fields {
+                    // Duplicate dict on stack
+                    self.emit_unknown(Instruction::Dup);
+
+                    // Get property using key name
+                    let key_id = self.bytecode.string_pool.borrow_mut().intern(key);
+                    let key_index = self.add_constant(Value::String(key_id));
+                    self.emit_unknown(Instruction::GetProperty(key_index));
+
+                    // Recursively assign sub-pattern
+                    self.compile_pattern_assignment(sub_pattern)?;
+                }
+
+                // Pop original dict
+                self.emit_unknown(Instruction::Pop);
+            }
+
+            Pattern::Wildcard => {
+                // Discard value
+                self.emit_unknown(Instruction::Pop);
+            }
+
+            Pattern::Literal(_) => {
+                // Literals not valid in assignment patterns
+                self.emit_unknown(Instruction::Pop);
+            }
+        }
+        Ok(())
     }
 }

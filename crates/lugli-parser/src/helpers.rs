@@ -1,5 +1,5 @@
 use crate::{Parser, error::ParseError};
-use lugli_ast::{FStringPart, TypeHint};
+use lugli_ast::{FStringPart, Pattern, TypeHint};
 use lugli_common::Span;
 use lugli_lexer::{Token, TokenKind};
 use std::sync::OnceLock;
@@ -387,6 +387,63 @@ impl<'a> Parser<'a> {
         Ok(items)
     }
 
+    pub(crate) fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
+        if self.check(&TokenKind::LeftBracket) {
+            self.parse_list_pattern()
+        } else if self.check(&TokenKind::LeftBrace) {
+            self.parse_dict_pattern()
+        } else {
+            let name = self.consume_identifier("Expected identifier in pattern")?;
+            if name == "_" {
+                Ok(Pattern::Wildcard)
+            } else {
+                Ok(Pattern::Identifier(name))
+            }
+        }
+    }
+
+    fn parse_list_pattern(&mut self) -> Result<Pattern, ParseError> {
+        self.consume(&TokenKind::LeftBracket, "Expected '['")?;
+        let patterns = self.parse_delimited(
+            &TokenKind::RightBracket,
+            &TokenKind::Comma,
+            |parser| parser.parse_pattern()
+        )?;
+        self.consume(&TokenKind::RightBracket, "Expected ']' after list pattern")?;
+        Ok(Pattern::List(patterns))
+    }
+
+    fn parse_dict_pattern(&mut self) -> Result<Pattern, ParseError> {
+        self.consume(&TokenKind::LeftBrace, "Expected '{'")?;
+        let mut fields = Vec::new();
+
+        if !self.check(&TokenKind::RightBrace) {
+            loop {
+                let key = self.consume_identifier("Expected field name in dict pattern")?;
+
+                let pattern = if self.match_any(&[TokenKind::Colon]) {
+                    self.parse_pattern()?
+                } else {
+                    Pattern::Identifier(key.clone())
+                };
+
+                fields.push((key, pattern));
+
+                if !self.match_any(&[TokenKind::Comma]) {
+                    break;
+                }
+
+                self.skip_newlines();
+                if self.check(&TokenKind::RightBrace) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(&TokenKind::RightBrace, "Expected '}' after dict pattern")?;
+        Ok(Pattern::Dict(fields))
+    }
+
     pub(crate) fn parse_type_hint(&mut self) -> Result<TypeHint, ParseError> {
         let base_name = self.consume_identifier("Expected type name")?;
 
@@ -439,6 +496,53 @@ impl<'a> Parser<'a> {
         }
 
         Ok(args)
+    }
+
+    /// Convert an expression (List or Dict) to a pattern for destructuring assignment
+    pub(crate) fn expr_to_pattern(&self, expr: &lugli_ast::Expr) -> Result<Pattern, ParseError> {
+        match expr {
+            lugli_ast::Expr::List { elements, .. } => {
+                let mut patterns = Vec::new();
+                for elem in elements {
+                    patterns.push(self.expr_to_pattern(elem)?);
+                }
+                Ok(Pattern::List(patterns))
+            }
+            lugli_ast::Expr::Dict { pairs, .. } => {
+                let mut fields = Vec::new();
+                for (key_expr, value_expr) in pairs {
+                    // Key must be a string literal or identifier
+                    let key = match key_expr {
+                        lugli_ast::Expr::Literal { value: lugli_ast::LiteralValue::String(s), .. } => s.clone(),
+                        lugli_ast::Expr::Identifier { name, .. } => name.clone(),
+                        _ => {
+                            let span = self.get_expr_span(key_expr.id());
+                            return Err(ParseError::Custom {
+                                message: "Dict pattern keys must be identifiers or string literals".to_string(),
+                                span,
+                            });
+                        }
+                    };
+                    let pattern = self.expr_to_pattern(value_expr)?;
+                    fields.push((key, pattern));
+                }
+                Ok(Pattern::Dict(fields))
+            }
+            lugli_ast::Expr::Identifier { name, .. } => {
+                if name == "_" {
+                    Ok(Pattern::Wildcard)
+                } else {
+                    Ok(Pattern::Identifier(name.clone()))
+                }
+            }
+            _ => {
+                let span = self.get_expr_span(expr.id());
+                Err(ParseError::Custom {
+                    message: "Invalid pattern in destructuring assignment".to_string(),
+                    span,
+                })
+            }
+        }
     }
 }
 

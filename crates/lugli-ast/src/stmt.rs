@@ -1,4 +1,4 @@
-use crate::{AstNode, Expr, NodeId, TypeHint};
+use crate::{AstNode, Expr, NodeId, Pattern, TypeHint};
 use lugli_common::Span;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,7 +27,9 @@ pub struct IfData {
 pub enum Stmt {
     Expression { id: NodeId, expr: Expr },
 
-    VarDecl { id: NodeId, name: String, type_hint: Option<TypeHint>, initializer: Option<Expr>, is_const: bool },
+    VarDecl { id: NodeId, pattern: Pattern, type_hint: Option<TypeHint>, initializer: Option<Expr>, is_const: bool },
+
+    DestructuringAssignment { id: NodeId, pattern: Pattern, value: Expr },
 
     FnDecl { id: NodeId, name: String, params: Vec<(String, Option<TypeHint>)>, return_type: Option<TypeHint>, body: Vec<Stmt> },
 
@@ -37,7 +39,7 @@ pub enum Stmt {
 
     While { id: NodeId, condition: Expr, body: Vec<Stmt> },
 
-    For { id: NodeId, variable: String, iterable: Expr, body: Vec<Stmt> },
+    For { id: NodeId, pattern: Pattern, iterable: Expr, body: Vec<Stmt> },
 
     Loop { id: NodeId, body: Vec<Stmt> },
 
@@ -61,6 +63,9 @@ impl Stmt {
                 id, ..
             } => *id,
             Stmt::VarDecl {
+                id, ..
+            } => *id,
+            Stmt::DestructuringAssignment {
                 id, ..
             } => *id,
             Stmt::FnDecl {
