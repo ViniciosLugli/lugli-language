@@ -15,20 +15,9 @@ pub fn dict_keys(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliE
 
 pub fn dict_contains(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity(args, 2, "dict.contains")?;
-    match &args[0] {
-        Value::Dict(d) => {
-            // Convert key to string if needed
-            let key_id = match &args[1] {
-                Value::String(id) => *id,
-                Value::Number(n) => pool.intern(&n.to_string()),
-                Value::Bool(b) => pool.intern(if *b { "true" } else { "false" }),
-                Value::Null => pool.intern("null"),
-                other => return Err(LugliError::runtime(format!("Cannot use {} as dictionary key", other.type_name()))),
-            };
-            Ok(Value::Bool(d.borrow().contains_key(&key_id)))
-        }
-        _ => Err(LugliError::type_error("dict", args[0].type_name())),
-    }
+    let dict = expect_dict(&args[0], "dict.contains", 1)?;
+    let key_id = value_to_dict_key(&args[1], pool)?;
+    Ok(Value::Bool(dict.borrow().contains_key(&key_id)))
 }
 
 pub fn dict_values(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
@@ -44,28 +33,15 @@ pub fn dict_values(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugl
 
 pub fn dict_get(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity_range(args, 2, 3, "dict.get")?;
-    match &args[0] {
-        Value::Dict(d) => {
-            // Convert key to string if needed
-            let key_id = match &args[1] {
-                Value::String(id) => *id,
-                Value::Number(n) => pool.intern(&n.to_string()),
-                Value::Bool(b) => pool.intern(if *b { "true" } else { "false" }),
-                Value::Null => pool.intern("null"),
-                other => return Err(LugliError::runtime(format!("Cannot use {} as dictionary key", other.type_name()))),
-            };
+    let dict = expect_dict(&args[0], "dict.get", 1)?;
+    let key_id = value_to_dict_key(&args[1], pool)?;
 
-            if let Some(value) = d.borrow().get(&key_id) {
-                Ok(value.clone())
-            } else if args.len() == 3 {
-                // Return default value
-                Ok(args[2].clone())
-            } else {
-                // Return null when key not found (consistent with bracket notation)
-                Ok(Value::Null)
-            }
-        }
-        _ => Err(LugliError::type_error("dict", args[0].type_name())),
+    if let Some(value) = dict.borrow().get(&key_id) {
+        Ok(value.clone())
+    } else if args.len() == 3 {
+        Ok(args[2].clone())
+    } else {
+        Ok(Value::Null)
     }
 }
 

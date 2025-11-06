@@ -128,7 +128,7 @@ impl Bytecode {
             constants: Vec::new(),
             source_map: Vec::new(),
             source_code: None,
-            string_pool: Rc::new(RefCell::new(StringPool::new())),
+            string_pool: Rc::new(RefCell::new(StringPool::with_common_strings())),
         }
     }
 
@@ -138,7 +138,7 @@ impl Bytecode {
             constants: Vec::new(),
             source_map: Vec::new(),
             source_code: Some(source_code),
-            string_pool: Rc::new(RefCell::new(StringPool::new())),
+            string_pool: Rc::new(RefCell::new(StringPool::with_common_strings())),
         }
     }
 

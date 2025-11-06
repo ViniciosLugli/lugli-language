@@ -12,16 +12,16 @@ const MAX_CALL_DEPTH: usize = 1000;
 
 #[derive(Debug, Clone)]
 struct CallFrame {
-    function_name: String,
+    function_name: Rc<str>,
     return_ip: usize,
     stack_base: usize,
-    closure_upvalues: Option<Vec<Rc<RefCell<Value>>>>, // If this is a closure call, store its upvalues
+    closure_upvalues: Option<Vec<Rc<RefCell<Value>>>>,
 }
 
 impl CallFrame {
-    fn new(function_name: String, return_ip: usize, stack_base: usize, upvalues: Option<Vec<Rc<RefCell<Value>>>>) -> Self {
+    fn new(function_name: impl Into<Rc<str>>, return_ip: usize, stack_base: usize, upvalues: Option<Vec<Rc<RefCell<Value>>>>) -> Self {
         Self {
-            function_name,
+            function_name: function_name.into(),
             return_ip,
             stack_base,
             closure_upvalues: upvalues,
@@ -73,9 +73,17 @@ pub struct Machine {
 }
 
 impl Machine {
+    fn execute_binary_op(&mut self, op: fn(&Value, &Value) -> Result<Value, LugliError>) -> Result<(), LugliError> {
+        let b = self.pop()?;
+        let a = self.pop()?;
+        self.stack.push(op(&a, &b)?);
+        Ok(())
+    }
+
     pub fn new() -> Self {
-        let mut globals = HashMap::new();
-        for (name, func) in get_global_functions() {
+        let global_functions = get_global_functions();
+        let mut globals = HashMap::with_capacity(global_functions.len());
+        for (name, func) in global_functions {
             globals.insert(
                 name.to_string(),
                 Value::NativeFunction {
@@ -91,21 +99,24 @@ impl Machine {
             debug.start_time = Some(Instant::now());
         }
 
+        let mut call_stack = Vec::with_capacity(64);
+        call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
+
         Self {
             stack: Vec::with_capacity(256),
             globals,
             ip: 0,
-            call_stack: vec![CallFrame::new("<script>".to_string(), 0, 0, None)],
+            call_stack,
             debug,
             module_cache: ModuleCache::new(),
             module_resolver: ModuleResolver::new(),
             current_file: None,
-            bytecode_registry: HashMap::new(),
-            module_globals: HashMap::new(),
+            bytecode_registry: HashMap::with_capacity(16),
+            module_globals: HashMap::with_capacity(16),
             next_bytecode_id: 1,
-            open_upvalues: HashMap::new(),
+            open_upvalues: HashMap::with_capacity(32),
             method_registry: lugli_stdlib::MethodRegistry::new(),
-            method_cache: HashMap::new(),
+            method_cache: HashMap::with_capacity(256),
             gc: lugli_common::GarbageCollector::new(),
         }
     }
@@ -488,7 +499,7 @@ impl Machine {
         let shared_pool = if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
             std::rc::Rc::clone(&main_bytecode.string_pool)
         } else {
-            std::rc::Rc::new(std::cell::RefCell::new(lugli_common::StringPool::new()))
+            std::rc::Rc::new(std::cell::RefCell::new(lugli_common::StringPool::with_common_strings()))
         };
 
         let mut compiler = crate::Compiler::with_shared_pool(shared_pool);
@@ -630,13 +641,17 @@ impl Machine {
             eprintln!("[TRACE] IP:{:04} | {:?}", self.ip, instruction);
         }
 
-        // Periodic garbage collection every 10,000 instructions
-        if self.debug.instruction_count % 10_000 == 0 {
-            let mut roots = Vec::with_capacity(self.globals.len() + self.stack.len());
-            roots.extend(self.globals.values().cloned());
-            roots.extend(self.stack.iter().cloned());
-            self.gc.collect(&roots);
-        }
+        // TODO: GC is currently disabled because:
+        // 1. It clones entire VM state (expensive)
+        // 2. sweep() is a no-op - doesn't actually free memory
+        // 3. Rust's Rc<RefCell<>> handles reference counting automatically
+        // Need to implement proper tri-color marking GC or remove GC tracking entirely
+        // if self.debug.instruction_count % 10_000 == 0 {
+        //     let mut roots = Vec::with_capacity(self.globals.len() + self.stack.len());
+        //     roots.extend(self.globals.values().cloned());
+        //     roots.extend(self.stack.iter().cloned());
+        //     self.gc.collect(&roots);
+        // }
 
         if self.debug.trace_stack && !self.stack.is_empty() {
             eprintln!("[STACK] depth:{} top:{:?}", self.stack.len(), self.stack.last());
@@ -689,36 +704,12 @@ impl Machine {
                 };
                 self.stack.push(result);
             }
-            Instruction::Subtract => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.subtract(&b)?);
-            }
-            Instruction::Multiply => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.multiply(&b)?);
-            }
-            Instruction::Divide => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.divide(&b)?);
-            }
-            Instruction::IntegerDivide => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.integer_divide(&b)?);
-            }
-            Instruction::Modulo => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.modulo(&b)?);
-            }
-            Instruction::Power => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.power(&b)?);
-            }
+            Instruction::Subtract => self.execute_binary_op(Value::subtract)?,
+            Instruction::Multiply => self.execute_binary_op(Value::multiply)?,
+            Instruction::Divide => self.execute_binary_op(Value::divide)?,
+            Instruction::IntegerDivide => self.execute_binary_op(Value::integer_divide)?,
+            Instruction::Modulo => self.execute_binary_op(Value::modulo)?,
+            Instruction::Power => self.execute_binary_op(Value::power)?,
             Instruction::AddInt(n) => {
                 let left = self.pop()?;
                 if let Value::Number(a) = left {
@@ -775,26 +766,10 @@ impl Machine {
                 let a = self.pop()?;
                 self.stack.push(Value::Bool(!a.equals(&b)));
             }
-            Instruction::Greater => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.greater(&b)?);
-            }
-            Instruction::GreaterEqual => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.greater_equal(&b)?);
-            }
-            Instruction::Less => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.less(&b)?);
-            }
-            Instruction::LessEqual => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(a.less_equal(&b)?);
-            }
+            Instruction::Greater => self.execute_binary_op(Value::greater)?,
+            Instruction::GreaterEqual => self.execute_binary_op(Value::greater_equal)?,
+            Instruction::Less => self.execute_binary_op(Value::less)?,
+            Instruction::LessEqual => self.execute_binary_op(Value::less_equal)?,
             Instruction::Jump(addr) => {
                 self.ip = *addr;
                 return Ok(true);
