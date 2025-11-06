@@ -499,7 +499,7 @@ impl Machine {
         let shared_pool = if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
             std::rc::Rc::clone(&main_bytecode.string_pool)
         } else {
-            std::rc::Rc::new(std::cell::RefCell::new(lugli_common::StringPool::new()))
+            std::rc::Rc::new(std::cell::RefCell::new(lugli_common::StringPool::with_common_strings()))
         };
 
         let mut compiler = crate::Compiler::with_shared_pool(shared_pool);
