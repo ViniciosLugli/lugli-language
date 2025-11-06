@@ -287,6 +287,7 @@ impl PeepholeOptimizer {
             Instruction::Store(_)
                 | Instruction::StoreGlobal(_)
                 | Instruction::StoreUpvalue(_)
+                | Instruction::ReserveLocals(_)
                 | Instruction::DefineFunction(_)
                 | Instruction::MakeClosure { .. }
                 | Instruction::SetProperty(_)
