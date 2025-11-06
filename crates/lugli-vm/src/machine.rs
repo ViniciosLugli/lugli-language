@@ -1243,20 +1243,12 @@ impl Machine {
                 }
             }
             Instruction::CallMethod(method_name_index, arg_count) => {
-                if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                    eprintln!("[DEBUG] CallMethod START: ip={}, method_name_index={}, arg_count={}", self.ip, method_name_index, arg_count);
-                }
-
                 let arg_count = *arg_count as usize;
                 let method_name_id = match self.get_constant(bytecode, *method_name_index)? {
                     Value::String(name_id) => *name_id,
                     _ => return Err(LugliError::runtime("Method name must be a string")),
                 };
                 let method_name = bytecode.string_pool.borrow().resolve(method_name_id).to_string();
-
-                if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                    eprintln!("[DEBUG] CallMethod: method_name='{}', arg_count={}", method_name, arg_count);
-                }
 
                 // Get the object (it's below the arguments on the stack)
                 let object_index = self.stack.len() - arg_count - 1;
@@ -1350,26 +1342,11 @@ impl Machine {
                         // This is a struct instance - look up the method as StructType_methodName
                         let struct_method_name = format!("{}_{}", struct_type, method_name);
 
-                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                            eprintln!("[DEBUG] Looking for struct method: {}", struct_method_name);
-                            eprintln!("[DEBUG] In globals: {}", self.globals.contains_key(&struct_method_name));
-                            eprintln!("[DEBUG] Available in module cache:");
-                            if let Some(val) = self.module_cache.find_in_exports(&struct_method_name) {
-                                eprintln!("[DEBUG]   Found: {:?}", val);
-                            } else {
-                                eprintln!("[DEBUG]   Not found");
-                            }
-                        }
-
                         // Look up the method in globals first, then check all loaded modules
                         let func = self.globals.get(&struct_method_name).cloned()
                             .or_else(|| self.module_cache.find_in_exports(&struct_method_name));
 
                         if let Some(func) = func {
-                            if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                                eprintln!("[DEBUG] Found struct method, executing...");
-                            }
-
                             match func {
                                 Value::Function {
                                     name,
@@ -1384,10 +1361,6 @@ impl Machine {
                                     bytecode_id,
                                     ..
                                 } => {
-                                    if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                                        eprintln!("[DEBUG] Function/Closure match, bytecode_id={}", bytecode_id);
-                                    }
-
                                     // Check arity - should be args + 1 for self parameter
                                     let arity = params.len();
                                     if arg_count + 1 != arity {
@@ -1400,9 +1373,6 @@ impl Machine {
 
                                     // Check if this is a cross-bytecode call (module method)
                                     if bytecode_id != 0 {
-                                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                                            eprintln!("[DEBUG] Cross-bytecode call detected");
-                                        }
                                         // Cross-bytecode call - need to execute in method's bytecode
                                         let method_bytecode = self
                                             .bytecode_registry
@@ -1426,18 +1396,9 @@ impl Machine {
 
                                         let exec_result = self.execute_function_until_return(&method_bytecode, saved_call_stack_len);
 
-                                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                                            eprintln!("[DEBUG] Method execute_function_until_return completed, IP now: {}", self.ip);
-                                        }
-
                                         self.ip = saved_ip; // Restore IP; execute_instruction will increment it
                                         self.globals = saved_globals; // Restore original globals
                                         exec_result?;
-
-                                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                                            eprintln!("[DEBUG] Method executed successfully, restored IP to: {}", self.ip);
-                                            eprintln!("[DEBUG] Stack size: {}, object_index: {}", self.stack.len(), object_index);
-                                        }
 
                                         // Return value is now on stack, but we need to clean up
                                         // The stack has: [... object, arg1, ..., argN, return_value]
@@ -1445,10 +1406,6 @@ impl Machine {
                                         let return_value = self.pop().unwrap_or(Value::Null);
                                         self.stack.truncate(object_index);
                                         self.stack.push(return_value);
-
-                                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-                                            eprintln!("[DEBUG] Stack cleaned up, advancing IP and returning");
-                                        }
 
                                         // Manually increment IP since we're returning early
                                         self.ip += 1;
@@ -1844,13 +1801,7 @@ impl Machine {
             }
         }
 
-        let old_ip = self.ip;
         self.ip += 1;
-
-        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
-            eprintln!("[DEBUG] execute_instruction END: IP {} -> {}", old_ip, self.ip);
-        }
-
         Ok(true)
     }
 }
