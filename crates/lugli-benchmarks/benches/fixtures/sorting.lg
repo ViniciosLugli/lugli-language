@@ -23,7 +23,7 @@ fn quicksort(arr) {
         return arr
     }
 
-    let pivot = arr[arr.len() / 2]
+    let pivot = arr[arr.len() // 2]
     let less = [x for x in arr if x < pivot]
     let equal = [x for x in arr if x == pivot]
     let greater = [x for x in arr if x > pivot]

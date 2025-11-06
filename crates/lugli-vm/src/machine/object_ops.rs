@@ -1,5 +1,5 @@
 use crate::Bytecode;
-use lugli_common::{LugliError, Value, StringId};
+use lugli_common::{LugliError, Value};
 use hashbrown::HashMap;
 use std::{cell::RefCell, rc::Rc};
 use super::Machine;
