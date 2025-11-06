@@ -1,3 +1,4 @@
+use crate::validation::check_arity;
 use crate::NativeFunction;
 use chrono::Utc;
 use lugli_common::{LugliError, StringPool, Value};
@@ -12,9 +13,7 @@ fn time_now(_args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError
 }
 
 fn time_sleep(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("sleep expects 1 argument"));
-    }
+    check_arity(args, 1, "sleep")?;
     match &args[0] {
         Value::Number(ms) => {
             std::thread::sleep(std::time::Duration::from_millis(*ms as u64));

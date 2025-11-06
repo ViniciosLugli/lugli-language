@@ -77,6 +77,81 @@ pub fn value_to_dict_key(value: &Value, pool: &mut StringPool) -> Result<StringI
     }
 }
 
+/// Validates and normalizes a list index, handling negative indices
+/// Returns Ok(Some(idx)) for valid index, Ok(None) for out-of-bounds (get operations)
+pub fn validate_list_index_for_get(index: &Value, list_len: usize) -> Result<Option<usize>, LugliError> {
+    match index {
+        Value::Number(idx) => {
+            if !idx.is_finite() {
+                return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+            }
+            if idx.fract() != 0.0 {
+                return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
+            }
+
+            let idx_i64 = *idx as i64;
+            let len = list_len as i64;
+
+            // Handle negative indices
+            let actual_idx = if idx_i64 < 0 {
+                let positive_offset = len + idx_i64;
+                if positive_offset < 0 {
+                    return Ok(None); // Out of bounds
+                }
+                positive_offset as usize
+            } else {
+                if idx_i64 >= len {
+                    return Ok(None); // Out of bounds
+                }
+                idx_i64 as usize
+            };
+
+            Ok(Some(actual_idx))
+        }
+        _ => Err(LugliError::type_error("number", index.type_name())),
+    }
+}
+
+/// Validates and normalizes a list index for set operations (errors on out-of-bounds)
+pub fn validate_list_index_for_set(index: &Value, list_len: usize) -> Result<usize, LugliError> {
+    match index {
+        Value::Number(idx) => {
+            if !idx.is_finite() {
+                return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+            }
+            if idx.fract() != 0.0 {
+                return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
+            }
+
+            let idx_i64 = *idx as i64;
+            let len = list_len as i64;
+
+            // Handle negative indices
+            let actual_idx = if idx_i64 < 0 {
+                let positive_offset = len + idx_i64;
+                if positive_offset < 0 {
+                    return Err(LugliError::runtime(format!(
+                        "Negative index {} out of range for list assignment (length {}, minimum is -{})",
+                        idx_i64, len, len
+                    )));
+                }
+                positive_offset as usize
+            } else {
+                if idx_i64 >= len {
+                    return Err(LugliError::runtime(format!(
+                        "Index {} out of range for list assignment (length {})",
+                        idx_i64, len
+                    )));
+                }
+                idx_i64 as usize
+            };
+
+            Ok(actual_idx)
+        }
+        _ => Err(LugliError::type_error("number", index.type_name())),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
