@@ -12,6 +12,7 @@ pub struct Module {
     pub path: PathBuf,
     pub bytecode: Bytecode,
     pub exports: HashMap<String, Value>,
+    pub globals: HashMap<String, Value>,
 }
 
 impl Module {
@@ -20,6 +21,17 @@ impl Module {
             path,
             bytecode,
             exports: HashMap::new(),
+            globals: HashMap::new(),
+        }
+    }
+
+    pub fn with_globals(path: PathBuf, bytecode: Bytecode, globals: HashMap<String, Value>) -> Self {
+        let exports = globals.clone();
+        Self {
+            path,
+            bytecode,
+            exports,
+            globals,
         }
     }
 
