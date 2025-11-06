@@ -21,10 +21,6 @@ let score: f64 = 95.5
 mut username: str = "user123"
 let is_active: bool = true
 
-# Multiple assignment (Python-style)
-let x, y = 10, 20
-mut a, b, c = 1, 2, 3
-
 # String interpolation (Python f-string style)
 let greeting = f"Hello, {name}! You are {age} years old."
 let status = f"Score: {score}/100"
@@ -37,9 +33,15 @@ let person = {
     "active": is_active
 }
 
-# Destructuring assignment
-let {name: user_name, age: user_age} = person
-let [first, second, ...rest] = numbers
+# Assignment operators
+mut x = 10
+x += 5
+x -= 3
+x *= 2
+x /= 4
+x %= 3
 
-print(f"User: {user_name}, Age: {user_age}")
-print(f"First: {first}, Rest: {rest}")
+print(greeting)
+print(status)
+print(f"Final x value: {x}")
+print(f"Person: {person}")
