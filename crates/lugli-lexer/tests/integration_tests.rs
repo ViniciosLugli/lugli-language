@@ -334,4 +334,37 @@ mod public_api_tests {
         // Should either be empty or contain only whitespace tokens
         assert!(whitespace_tokens.is_empty() || whitespace_tokens.iter().all(|t| matches!(t.kind, TokenKind::Newline)));
     }
+
+    #[test]
+    fn test_single_quote_strings() {
+        let source = r#"let msg = 'hello world'"#;
+        let (tokens, pool) = tokenize_with_pool(source).unwrap();
+
+        let has_string = tokens.iter().any(|t| matches!(&t.kind, TokenKind::String(id) if pool.resolve(*id) == "'hello world'"));
+        assert!(has_string, "Should tokenize single-quote string");
+    }
+
+    #[test]
+    fn test_single_quote_fstrings() {
+        let source = r#"let msg = f'hello {name}'"#;
+        let (tokens, pool) = tokenize_with_pool(source).unwrap();
+
+        let has_fstring = tokens.iter().any(|t| matches!(&t.kind, TokenKind::FString(id) if pool.resolve(*id) == "f'hello {name}'"));
+        assert!(has_fstring, "Should tokenize single-quote f-string");
+    }
+
+    #[test]
+    fn test_mixed_quote_styles() {
+        let source = r#"let a = "double"
+let b = 'single'
+let c = f"double {x}"
+let d = f'single {y}'"#;
+        let (tokens, _pool) = tokenize_with_pool(source).unwrap();
+
+        let string_count = tokens.iter().filter(|t| matches!(t.kind, TokenKind::String(_))).count();
+        let fstring_count = tokens.iter().filter(|t| matches!(t.kind, TokenKind::FString(_))).count();
+
+        assert_eq!(string_count, 2, "Should have 2 regular strings");
+        assert_eq!(fstring_count, 2, "Should have 2 f-strings");
+    }
 }

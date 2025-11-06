@@ -1,0 +1,12 @@
+struct Person {
+    name
+    age
+
+    fn greet(self) {
+        return f"Hi, I'm {self.name}, age {self.age}"
+    }
+}
+
+fn create_person(name, age) {
+    return Person { name: name, age: age }
+}

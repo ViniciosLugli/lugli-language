@@ -64,6 +64,7 @@ pub struct Machine {
     module_resolver: ModuleResolver,
     current_file: Option<PathBuf>,
     bytecode_registry: HashMap<usize, Rc<Bytecode>>,
+    module_globals: HashMap<usize, HashMap<String, Value>>,
     next_bytecode_id: usize,
     open_upvalues: HashMap<usize, Rc<RefCell<Value>>>,
     method_registry: lugli_stdlib::MethodRegistry,
@@ -100,6 +101,7 @@ impl Machine {
             module_resolver: ModuleResolver::new(),
             current_file: None,
             bytecode_registry: HashMap::new(),
+            module_globals: HashMap::new(),
             next_bytecode_id: 1,
             open_upvalues: HashMap::new(),
             method_registry: lugli_stdlib::MethodRegistry::new(),
@@ -391,14 +393,23 @@ impl Machine {
                 let frame = CallFrame::new(name.clone(), usize::MAX, stack_base, None);
                 self.call_stack.push(frame);
 
+                // Save and restore module globals for cross-bytecode execution
+                let saved_globals = self.globals.clone();
+                if bytecode_id != &0 {
+                    if let Some(module_globals) = self.module_globals.get(bytecode_id) {
+                        self.globals = module_globals.clone();
+                    }
+                }
+
                 // Jump to function body
                 self.ip = *body_start;
 
                 // Execute function body and handle result/errors - use the correct bytecode!
                 let execution_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
 
-                // Always restore IP, even on error
+                // Always restore IP and globals, even on error
                 self.ip = saved_ip;
+                self.globals = saved_globals;
 
                 // Handle execution result
                 match execution_result {
@@ -474,46 +485,20 @@ impl Machine {
         let (ast, span_map) =
             parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
 
-        let mut compiler = crate::Compiler::new();
+        let shared_pool = if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
+            std::rc::Rc::clone(&main_bytecode.string_pool)
+        } else {
+            std::rc::Rc::new(std::cell::RefCell::new(lugli_common::StringPool::new()))
+        };
+
+        let mut compiler = crate::Compiler::with_shared_pool(shared_pool);
         let module_bytecode = compiler
             .compile(&ast, span_map)
             .map_err(|e| LugliError::runtime(format!("Compile error in module '{}': {}", resolved_path.display(), e)))?;
 
-        // TODO: Module import system requires architectural changes
-        // Current issue: Each bytecode has its own RefCell<StringPool>, but modules need to share
-        // the same pool to avoid string ID mismatches. This requires changing Bytecode to use
-        // Rc<RefCell<StringPool>> instead of RefCell<StringPool>, which is a significant refactoring.
-        //
-        // For now, basic module loading works but may have string pool synchronization issues
-        // when modules create new strings during execution (e.g., f-string evaluation).
-
-        // Attempt to merge module's string pool (partial solution)
-        let string_id_mapping = {
-            if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
-                let mut main_pool = main_bytecode.string_pool.borrow_mut();
-                let module_pool = module_bytecode.string_pool.borrow();
-                main_pool.merge(&module_pool)
-            } else {
-                HashMap::new()
-            }
-        };
-
-        // Remap bytecode constants
-        let mut remapped_bytecode = module_bytecode.clone();
-        for constant in remapped_bytecode.constants.iter_mut() {
-            constant.remap_string_ids(&string_id_mapping);
-        }
-
-        // Replace the module's string pool with the main program's string pool
-        // This ensures all string operations in the module use the main pool
-        if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
-            *remapped_bytecode.string_pool.borrow_mut() = main_bytecode.string_pool.borrow().clone();
-        }
-
-        // NOW assign and register the remapped bytecode ID for this module
         let module_bytecode_id = self.next_bytecode_id;
         self.next_bytecode_id += 1;
-        self.bytecode_registry.insert(module_bytecode_id, Rc::new(remapped_bytecode.clone()));
+        self.bytecode_registry.insert(module_bytecode_id, Rc::new(module_bytecode.clone()));
 
         let saved_globals = self.globals.clone();
         let saved_file = self.current_file.clone();
@@ -534,12 +519,11 @@ impl Machine {
         }
         self.current_file = Some(resolved_path.clone());
 
-        // Execute module bytecode directly (now with remapped string pool)
         self.ip = 0;
         let mut result = Ok(());
-        while self.ip < remapped_bytecode.instructions.len() {
-            let instruction = &remapped_bytecode.instructions[self.ip];
-            match self.execute_instruction(instruction, &remapped_bytecode) {
+        while self.ip < module_bytecode.instructions.len() {
+            let instruction = &module_bytecode.instructions[self.ip];
+            match self.execute_instruction(instruction, &module_bytecode) {
                 Ok(should_continue) => {
                     if !should_continue {
                         break;
@@ -555,11 +539,6 @@ impl Machine {
         result?;
 
         let mut module_exports = self.globals.clone();
-
-        // Remap all StringIds in module exports to use the main pool's IDs (safety measure)
-        for (_, value) in module_exports.iter_mut() {
-            value.remap_string_ids(&string_id_mapping);
-        }
 
         // Update all functions in exports to have correct bytecode_id
         for (_, value) in module_exports.iter_mut() {
@@ -578,6 +557,9 @@ impl Machine {
             }
         }
 
+        // Store module globals for cross-bytecode function calls
+        self.module_globals.insert(module_bytecode_id, module_exports.clone());
+
         self.globals = saved_globals;
         self.current_file = saved_file;
         self.stack.truncate(saved_stack_len);
@@ -586,11 +568,11 @@ impl Machine {
 
         self.module_cache.unmark_loading(&resolved_path);
 
-        let module = crate::module::Module {
-            path: resolved_path.clone(),
-            bytecode: remapped_bytecode,
-            exports: module_exports.clone(),
-        };
+        let module = crate::module::Module::with_globals(
+            resolved_path.clone(),
+            module_bytecode,
+            module_exports.clone(),
+        );
 
         self.module_cache.insert(resolved_path, module);
 
@@ -903,11 +885,18 @@ impl Machine {
                             let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
                             self.call_stack.push(frame);
 
+                            // Save and restore module globals for cross-bytecode execution
+                            let saved_globals = self.globals.clone();
+                            if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
+                                self.globals = module_globals.clone();
+                            }
+
                             let saved_ip = self.ip;
                             self.ip = body_start;
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
-                            self.ip = saved_ip + 1; // Move past Call instruction
+                            self.ip = saved_ip; // Restore IP; execute_instruction will increment it
+                            self.globals = saved_globals; // Restore original globals
                             exec_result?;
 
                             // Return value is now on stack
@@ -946,11 +935,18 @@ impl Machine {
                             let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, Some(upvalues.clone()));
                             self.call_stack.push(frame);
 
+                            // Save and restore module globals for cross-bytecode execution
+                            let saved_globals = self.globals.clone();
+                            if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
+                                self.globals = module_globals.clone();
+                            }
+
                             let saved_ip = self.ip;
                             self.ip = body_start;
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
-                            self.ip = saved_ip + 1; // Move past Call instruction
+                            self.ip = saved_ip; // Restore IP; execute_instruction will increment it
+                            self.globals = saved_globals; // Restore original globals
                             exec_result?;
 
                             // Return value is now on stack
@@ -1255,11 +1251,18 @@ impl Machine {
                 let method_name = bytecode.string_pool.borrow().resolve(method_name_id).to_string();
 
                 // Get the object (it's below the arguments on the stack)
+                // Validate stack has enough elements (object + args)
+                if self.stack.len() < arg_count + 1 {
+                    return Err(LugliError::runtime(format!(
+                        "Stack underflow in CallMethod: need {} elements (1 object + {} args), have {}",
+                        arg_count + 1, arg_count, self.stack.len()
+                    )));
+                }
                 let object_index = self.stack.len() - arg_count - 1;
-                let object = &self.stack[object_index];
+                let object = self.stack[object_index].clone(); // Clone to avoid long borrow
 
                 // Check for struct method calls first
-                if let Value::Dict(d) = object {
+                if let Value::Dict(ref d) = object {
                     let dict_ref = d.borrow();
                     let struct_type_key = bytecode.string_pool.borrow_mut().intern("__struct_type__");
                     if let Some(Value::String(struct_type_id)) = dict_ref.get(&struct_type_key) {
@@ -1346,19 +1349,23 @@ impl Machine {
                         // This is a struct instance - look up the method as StructType_methodName
                         let struct_method_name = format!("{}_{}", struct_type, method_name);
 
-                        // Look up the global function
-                        if let Some(func) = self.globals.get(&struct_method_name) {
+                        // Look up the method in globals first, then check all loaded modules
+                        let func = self.globals.get(&struct_method_name).cloned()
+                            .or_else(|| self.module_cache.find_in_exports(&struct_method_name));
+
+                        if let Some(func) = func {
                             match func {
                                 Value::Function {
                                     name,
                                     params,
                                     body_start,
-                                    ..
+                                    bytecode_id,
                                 }
                                 | Value::Closure {
                                     name,
                                     params,
                                     body_start,
+                                    bytecode_id,
                                     ..
                                 } => {
                                     // Check arity - should be args + 1 for self parameter
@@ -1371,12 +1378,53 @@ impl Machine {
                                         )));
                                     }
 
-                                    // Set up call frame and invoke function
-                                    let stack_base = self.stack.len() - arg_count - 1; // Include the object
-                                    let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
-                                    self.call_stack.push(frame);
-                                    self.ip = *body_start;
-                                    return Ok(true); // Function call will handle stack management
+                                    // Check if this is a cross-bytecode call (module method)
+                                    if bytecode_id != 0 {
+                                        // Cross-bytecode call - need to execute in method's bytecode
+                                        let method_bytecode = self
+                                            .bytecode_registry
+                                            .get(&bytecode_id)
+                                            .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
+                                            .clone();
+
+                                        let saved_call_stack_len = self.call_stack.len();
+                                        let stack_base = self.stack.len() - arg_count - 1; // Include the object
+                                        let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
+                                        self.call_stack.push(frame);
+
+                                        // Save and restore module globals for cross-bytecode execution
+                                        let saved_globals = self.globals.clone();
+                                        if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
+                                            self.globals = module_globals.clone();
+                                        }
+
+                                        let saved_ip = self.ip;
+                                        self.ip = body_start;
+
+                                        let exec_result = self.execute_function_until_return(&method_bytecode, saved_call_stack_len);
+
+                                        self.ip = saved_ip; // Restore IP; execute_instruction will increment it
+                                        self.globals = saved_globals; // Restore original globals
+                                        exec_result?;
+
+                                        // Return value is now on stack, but we need to clean up
+                                        // The stack has: [... object, arg1, ..., argN, return_value]
+                                        // We need to remove object and args, keep only return_value
+                                        let return_value = self.pop().unwrap_or(Value::Null);
+                                        self.stack.truncate(object_index);
+                                        self.stack.push(return_value);
+
+                                        // Manually increment IP since we're returning early
+                                        self.ip += 1;
+                                        return Ok(true); // Cross-bytecode method call complete
+                                    } else {
+                                        // Same-bytecode call - normal path
+                                        let stack_base = self.stack.len() - arg_count - 1; // Include the object
+                                        let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
+                                        self.call_stack.push(frame);
+                                        self.ip = body_start;
+                                        return Ok(true); // Function call will handle stack management
+                                    }
                                 }
                                 Value::NativeFunction {
                                     callback, ..
@@ -1391,6 +1439,8 @@ impl Machine {
                                     // Pop arguments and object, push result
                                     self.stack.truncate(object_index);
                                     self.stack.push(result);
+                                    // Manually increment IP since we're returning early
+                                    self.ip += 1;
                                     return Ok(true);
                                 }
                                 _ => {
@@ -1404,7 +1454,7 @@ impl Machine {
                 }
 
                 // Special handling for higher-order list methods that need bytecode access
-                if let Value::List(l) = object
+                if let Value::List(ref l) = object
                     && (method_name == "filter" || method_name == "map" || method_name == "map!")
                     && arg_count == 1
                 {

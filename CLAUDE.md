@@ -764,9 +764,11 @@ cargo flamegraph --bin lugli -- run large_program.lg
 -   Control flow: `if/elif/else`, `while`, `for`, `loop`, `break`, `continue`
 -   Pattern matching with guards and wildcards
 -   List comprehensions with filters
--   F-string interpolation
+-   F-string interpolation with nested f-strings and string context tracking
+-   Single-quote and double-quote strings (both regular and f-strings)
 -   Closures with upvalue capture
 -   Collections: lists and dictionaries
+-   Module system with `import` and `from...import` (with shared string pool architecture)
 
 **Standard Library:**
 -   String methods: `upper()`, `lower()`, `len()`, `contains()`, `split()`, etc.
@@ -778,21 +780,21 @@ cargo flamegraph --bin lugli -- run large_program.lg
 **Infrastructure:**
 -   8-crate workspace with clean architecture
 -   VM-based bytecode execution (>1M instructions/second)
+-   Shared string pool architecture for module imports (Rc<RefCell<StringPool>>)
 -   Enhanced REPL with history and multiline support
 -   Comprehensive benchmark suite
--   890 passing tests with full coverage (Nov 2025: +240 from audit)
+-   918 passing tests with full coverage (Nov 2025: +240 audit, +28 module/fstring enhancements)
 
 ### Not Implemented (Do Not Use)
 
 **Language Features:**
--   ❌ Module system / file-based imports
 -   ❌ Type inference
 -   ❌ Multiple assignment / destructuring
 -   ❌ Spread operators
 -   ❌ Generic types
 -   ❌ Inheritance
 -   ❌ Result/Option types
--   ❌ Nested f-strings
+-   ⚠️ Triple-nested f-strings and block expressions in f-strings (known limitations)
 
 **Tooling:**
 -   ❌ LSP server
@@ -811,12 +813,15 @@ cargo flamegraph --bin lugli -- run large_program.lg
 -   Import code → Use Python-style imports (`import module`, `from module import item`)
 
 **Test expectations:**
--   All 890 tests must pass after changes (as of Nov 2025)
+-   All 918 tests must pass after changes (as of Nov 2025)
 -   Run `cargo test --workspace` to verify
 -   Run `cargo bench --workspace` to check performance regressions
 -   Every new feature needs comprehensive tests
 
-**Recent Improvements (Nov 2025 Audit):**
+**Recent Improvements (Nov 2025):**
+-   ✅ **Module Import System** - Shared string pool architecture with Rc<RefCell<>> for proper module imports
+-   ✅ **F-String Enhancements** - String context tracking, nested f-strings, string literals in expressions
+-   ✅ **Single-Quote Strings** - Both `'text'` and `f'text {var}'` now supported
 -   ✅ Fixed float index truncation bug (arr[1.5] now errors correctly)
 -   ✅ Implemented escape sequence processing (\n, \t, \r, \\, \", \')
 -   ✅ Standardized out-of-bounds to return null (no more inconsistencies)
