@@ -10,6 +10,8 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
 // Instruction handler modules
 mod stack_ops;
 mod arithmetic_ops;
+mod variable_ops;
+mod object_ops;
 
 const MAX_STACK_SIZE: usize = 10_000;
 const MAX_CALL_DEPTH: usize = 1000;
@@ -930,266 +932,23 @@ impl Machine {
                 self.stack.push(return_value);
                 return Ok(true);
             }
-            Instruction::Load(index) => {
-                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
-                let target_index = frame.stack_base + index;
-                let value = self
-                    .stack
-                    .get(target_index)
-                    .ok_or_else(|| {
-                        LugliError::runtime(format!(
-                            "Stack underflow: attempted to load local {} at index {} (stack size: {})",
-                            index,
-                            target_index,
-                            self.stack.len()
-                        ))
-                    })?
-                    .clone();
-                self.stack.push(value);
-            }
-            Instruction::Store(index) => {
-                let value = self.pop()?;
-                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
-                let target_index = frame.stack_base + index;
-
-                // Grow stack if necessary
-                while self.stack.len() <= target_index {
-                    self.stack.push(Value::Null);
-                }
-
-                self.stack[target_index] = value;
-            }
-            Instruction::LoadUpvalue(index) => {
-                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
-
-                if let Some(upvalues) = &frame.closure_upvalues {
-                    let upvalue_ref = upvalues
-                        .get(*index)
-                        .ok_or_else(|| LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len())))?;
-
-                    let value = upvalue_ref.try_borrow().map_err(|_| LugliError::runtime("Cannot access upvalue while it's being modified"))?.clone();
-
-                    self.stack.push(value);
-                } else {
-                    return Err(LugliError::runtime("LoadUpvalue used in non-closure context"));
-                }
-            }
-            Instruction::StoreUpvalue(index) => {
-                let value = self.pop()?;
-                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
-
-                if let Some(upvalues) = &frame.closure_upvalues {
-                    let upvalue_ref = upvalues
-                        .get(*index)
-                        .ok_or_else(|| LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len())))?;
-
-                    *upvalue_ref.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify upvalue while it's being used"))? = value;
-                } else {
-                    return Err(LugliError::runtime("StoreUpvalue used in non-closure context"));
-                }
-            }
-            Instruction::LoadGlobal(name_index) => {
-                let var_name = self.get_constant(bytecode, *name_index)?;
-                if let Value::String(name_id) = var_name {
-                    let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                    if let Some(value) = self.globals.get(&name) {
-                        self.stack.push(value.clone());
-                    } else {
-                        // Generate helpful error with suggestions
-                        if let Some(context) = self.get_source_context(bytecode) {
-                            let available_names: Vec<&str> = self.globals.keys().map(|s| s.as_str()).collect();
-                            let suggestion = crate::error_formatter::suggest_similar_name(&name, &available_names);
-                            return Err(LugliError::undefined_variable_with_context(name, context, suggestion));
-                        } else {
-                            return Err(LugliError::undefined_variable(name));
-                        }
-                    }
-                } else {
-                    return Err(LugliError::runtime("Variable name must be a string"));
-                }
-            }
-            Instruction::StoreGlobal(name_index) => {
-                let value = self.peek()?.clone_for_stack(); // Don't pop - leave value on stack like Store does
-                let var_name = self.get_constant(bytecode, *name_index)?;
-                if let Value::String(name_id) = var_name {
-                    let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                    self.globals.insert(name, value);
-                } else {
-                    return Err(LugliError::runtime("Variable name must be a string"));
-                }
-            }
-            Instruction::GetProperty(name_index) => {
-                let object = self.pop()?;
-                let prop_name = self.get_constant(bytecode, *name_index)?;
-                if let Value::String(name_id) = prop_name {
-                    match object {
-                        Value::Dict(dict_ref) => {
-                            let dict = dict_ref.borrow();
-                            if let Some(value) = dict.get(name_id) {
-                                self.stack.push(value.clone());
-                            } else {
-                                self.stack.push(Value::Null);
-                            }
-                        }
-                        Value::Module {
-                            exports, ..
-                        } => {
-                            let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                            if let Some(value) = exports.get(&name) {
-                                self.stack.push(value.clone());
-                            } else {
-                                return Err(LugliError::runtime(format!("Module has no export '{}'", name)));
-                            }
-                        }
-                        _ => {
-                            let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                            return Err(LugliError::runtime(format!("Cannot access property '{}' on a value of type {}", name, object.type_name())));
-                        }
-                    }
-                } else {
-                    return Err(LugliError::runtime("Property name must be a string"));
-                }
-            }
-            Instruction::SetProperty(name_index) => {
-                let value = self.pop()?;
-                let object = self.pop()?;
-                let prop_name = self.get_constant(bytecode, *name_index)?;
-
-                if let Value::String(name_id) = prop_name {
-                    if let Value::Dict(dict_ref) = &object {
-                        // Detect potential circular reference (self-assignment)
-                        if let Value::Dict(value_dict_ref) = &value
-                            && Rc::ptr_eq(dict_ref, value_dict_ref)
-                        {
-                            eprintln!("⚠️  WARNING: Assigning dictionary to itself creates a circular reference");
-                            eprintln!("   This will cause a memory leak as Rc reference count never reaches 0");
-                            eprintln!("   Consider using weak references or avoid circular structures");
-                        }
-
-                        dict_ref
-                            .try_borrow_mut()
-                            .map_err(|_| LugliError::runtime("Cannot modify struct while it's being used"))?
-                            .insert(*name_id, value.clone());
-                        // Push the value back as the expression result
-                        self.stack.push(value);
-                    } else {
-                        let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                        return Err(LugliError::runtime(format!("Cannot set property '{}' on a value of type {}", name, object.type_name())));
-                    }
-                } else {
-                    return Err(LugliError::runtime("Property name must be a string"));
-                }
-            }
-            Instruction::MakeList(count) => {
-                let mut list = Vec::with_capacity(*count);
-                for _ in 0..*count {
-                    list.push(self.pop()?);
-                }
-                list.reverse();
-                self.stack.push(Value::List(Rc::new(RefCell::new(list))));
-            }
-            Instruction::MakeDict(count) => {
-                let mut dict = HashMap::new();
-                for _ in 0..*count {
-                    let value = self.pop()?;
-                    let key = self.pop()?;
-                    if let Value::String(key_str) = key {
-                        dict.insert(key_str, value);
-                    } else {
-                        return Err(LugliError::runtime("Dictionary keys must be strings"));
-                    }
-                }
-
-                // Check if this is a struct instantiation (has __struct_type__ field)
-                let struct_type_key = bytecode.string_pool.borrow_mut().intern("__struct_type__");
-                if let Some(Value::String(struct_type_id)) = dict.get(&struct_type_key) {
-                    let struct_type = self.resolve_string_id(*struct_type_id)
-                        .ok_or_else(|| LugliError::runtime(format!("Invalid struct type id: {}", struct_type_id.as_u32())))?;
-                    // Look up struct metadata from globals
-                    if let Some(Value::Dict(meta)) = self.globals.get(&struct_type) {
-                        let meta_ref = meta.borrow();
-
-                        // Get default values from struct metadata
-                        let defaults_key = bytecode.string_pool.borrow_mut().intern("__defaults__");
-                        if let Some(Value::Dict(defaults)) = meta_ref.get(&defaults_key) {
-                            let defaults_ref = defaults.borrow();
-
-                            // Apply defaults for missing fields
-                            for (field_name, default_value) in defaults_ref.iter() {
-                                if !dict.contains_key(field_name) {
-                                    dict.insert(*field_name, default_value.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-
-                self.stack.push(Value::Dict(Rc::new(RefCell::new(dict))));
-            }
-            Instruction::DefineFunction(function_index) => {
-                let function_value = self.get_constant(bytecode, *function_index)?.clone();
-                self.stack.push(function_value);
-            }
+            // Variable operations
+            Instruction::Load(index) => self.exec_load(*index)?,
+            Instruction::Store(index) => self.exec_store(*index)?,
+            Instruction::LoadUpvalue(index) => self.exec_load_upvalue(*index)?,
+            Instruction::StoreUpvalue(index) => self.exec_store_upvalue(*index)?,
+            Instruction::LoadGlobal(name_index) => self.exec_load_global(bytecode, *name_index)?,
+            Instruction::StoreGlobal(name_index) => self.exec_store_global(bytecode, *name_index)?,
+            // Object and collection operations
+            Instruction::GetProperty(name_index) => self.exec_get_property(bytecode, *name_index)?,
+            Instruction::SetProperty(name_index) => self.exec_set_property(bytecode, *name_index)?,
+            Instruction::MakeList(count) => self.exec_make_list(*count)?,
+            Instruction::MakeDict(count) => self.exec_make_dict(bytecode, *count)?,
+            Instruction::DefineFunction(function_index) => self.exec_define_function(bytecode, *function_index)?,
             Instruction::MakeClosure {
                 function_index,
                 capture_indices,
-            } => {
-                // Get the base function template
-                let function_value = self.get_constant(bytecode, *function_index)?;
-
-                if let Value::Function {
-                    name,
-                    params,
-                    body_start,
-                    bytecode_id,
-                } = function_value
-                {
-                    // Get current stack frame to calculate absolute positions
-                    let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty during closure creation"))?;
-
-                    // Capture values from the stack using open upvalues pattern
-                    // Convert local indices to absolute stack positions
-                    let mut upvalues: Vec<Rc<RefCell<Value>>> = Vec::new();
-
-                    for &local_index in capture_indices {
-                        let absolute_index = frame.stack_base + local_index;
-
-                        // Check if this stack slot already has a shared reference
-                        let upvalue = if let Some(existing) = self.open_upvalues.get(&absolute_index) {
-                            // Reuse existing shared reference
-                            Rc::clone(existing)
-                        } else {
-                            // Create new shared reference
-                            let value = self.stack.get(absolute_index).cloned().ok_or_else(|| {
-                                LugliError::runtime(format!(
-                                    "Invalid upvalue capture: local {} (absolute {}) out of bounds (stack size: {})",
-                                    local_index,
-                                    absolute_index,
-                                    self.stack.len()
-                                ))
-                            })?;
-                            let shared = Rc::new(RefCell::new(value));
-                            self.open_upvalues.insert(absolute_index, Rc::clone(&shared));
-                            shared
-                        };
-
-                        upvalues.push(upvalue);
-                    }
-
-                    // Create closure with captured upvalues
-                    let closure = Value::Closure {
-                        name: name.clone(),
-                        params: params.clone(),
-                        body_start: *body_start,
-                        bytecode_id: *bytecode_id,
-                        upvalues,
-                    };
-
-                    self.stack.push(closure);
-                } else {
-                    return Err(LugliError::runtime("MakeClosure requires a Function value"));
-                }
-            }
+            } => self.exec_make_closure(bytecode, *function_index, capture_indices)?,
             Instruction::CallMethod(method_name_index, arg_count) => {
                 let arg_count = *arg_count as usize;
                 let method_name_id = match self.get_constant(bytecode, *method_name_index)? {
