@@ -153,17 +153,21 @@ impl Machine {
     }
 
     /// Get current GC statistics
-    pub fn gc_stats(&self) -> lugli_common::GCStats {
-        self.gc.stats()
-    }
+    pub fn gc_stats(&self) -> lugli_common::GCStats { self.gc.stats() }
 
     /// Recursively mark bytecode IDs referenced by a value
     fn mark_bytecode_ids(&self, value: &Value, live_set: &mut std::collections::HashSet<usize>) {
         match value {
-            Value::Function { bytecode_id, .. } => {
+            Value::Function {
+                bytecode_id, ..
+            } => {
                 live_set.insert(*bytecode_id);
             }
-            Value::Closure { bytecode_id, upvalues, .. } => {
+            Value::Closure {
+                bytecode_id,
+                upvalues,
+                ..
+            } => {
                 live_set.insert(*bytecode_id);
                 for upvalue in upvalues {
                     self.mark_bytecode_ids(&upvalue.borrow(), live_set);
@@ -179,12 +183,16 @@ impl Machine {
                     self.mark_bytecode_ids(val, live_set);
                 }
             }
-            Value::StructInstance { fields, .. } => {
+            Value::StructInstance {
+                fields, ..
+            } => {
                 for val in fields.values() {
                     self.mark_bytecode_ids(val, live_set);
                 }
             }
-            Value::Module { exports, .. } => {
+            Value::Module {
+                exports, ..
+            } => {
                 for val in exports.values() {
                     self.mark_bytecode_ids(val, live_set);
                 }

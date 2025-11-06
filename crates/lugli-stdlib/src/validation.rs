@@ -3,12 +3,7 @@ use lugli_common::{LugliError, StringPool, Value};
 /// Validates that args has exactly `expected` number of arguments
 pub fn check_arity(args: &[Value], expected: usize, fn_name: &str) -> Result<(), LugliError> {
     if args.len() != expected {
-        return Err(LugliError::runtime(format!(
-            "{} expects {} argument(s), got {}",
-            fn_name,
-            expected,
-            args.len()
-        )));
+        return Err(LugliError::runtime(format!("{} expects {} argument(s), got {}", fn_name, expected, args.len())));
     }
     Ok(())
 }
@@ -16,84 +11,40 @@ pub fn check_arity(args: &[Value], expected: usize, fn_name: &str) -> Result<(),
 /// Validates that args has at least `min` number of arguments
 pub fn check_min_arity(args: &[Value], min: usize, fn_name: &str) -> Result<(), LugliError> {
     if args.len() < min {
-        return Err(LugliError::runtime(format!(
-            "{} expects at least {} argument(s), got {}",
-            fn_name,
-            min,
-            args.len()
-        )));
+        return Err(LugliError::runtime(format!("{} expects at least {} argument(s), got {}", fn_name, min, args.len())));
     }
     Ok(())
 }
 
 /// Validates that args has between `min` and `max` number of arguments
-pub fn check_arity_range(
-    args: &[Value],
-    min: usize,
-    max: usize,
-    fn_name: &str,
-) -> Result<(), LugliError> {
+pub fn check_arity_range(args: &[Value], min: usize, max: usize, fn_name: &str) -> Result<(), LugliError> {
     if args.len() < min || args.len() > max {
-        return Err(LugliError::runtime(format!(
-            "{} expects {} to {} argument(s), got {}",
-            fn_name,
-            min,
-            max,
-            args.len()
-        )));
+        return Err(LugliError::runtime(format!("{} expects {} to {} argument(s), got {}", fn_name, min, max, args.len())));
     }
     Ok(())
 }
 
 /// Extracts a string from a Value, returning error if not a string
-pub fn expect_string<'a>(
-    value: &'a Value,
-    pool: &'a StringPool,
-    fn_name: &str,
-    arg_pos: usize,
-) -> Result<String, LugliError> {
+pub fn expect_string<'a>(value: &'a Value, pool: &'a StringPool, fn_name: &str, arg_pos: usize) -> Result<String, LugliError> {
     match value {
         Value::String(id) => Ok(pool.resolve(*id).to_string()),
-        _ => Err(LugliError::runtime(format!(
-            "{} argument {} must be string, got {}",
-            fn_name,
-            arg_pos,
-            value.type_name()
-        ))),
+        _ => Err(LugliError::runtime(format!("{} argument {} must be string, got {}", fn_name, arg_pos, value.type_name()))),
     }
 }
 
 /// Extracts a number from a Value, returning error if not a number
-pub fn expect_number(
-    value: &Value,
-    fn_name: &str,
-    arg_pos: usize,
-) -> Result<f64, LugliError> {
+pub fn expect_number(value: &Value, fn_name: &str, arg_pos: usize) -> Result<f64, LugliError> {
     match value {
         Value::Number(n) => Ok(*n),
-        _ => Err(LugliError::runtime(format!(
-            "{} argument {} must be number, got {}",
-            fn_name,
-            arg_pos,
-            value.type_name()
-        ))),
+        _ => Err(LugliError::runtime(format!("{} argument {} must be number, got {}", fn_name, arg_pos, value.type_name()))),
     }
 }
 
 /// Extracts a boolean from a Value, returning error if not a boolean
-pub fn expect_bool(
-    value: &Value,
-    fn_name: &str,
-    arg_pos: usize,
-) -> Result<bool, LugliError> {
+pub fn expect_bool(value: &Value, fn_name: &str, arg_pos: usize) -> Result<bool, LugliError> {
     match value {
         Value::Bool(b) => Ok(*b),
-        _ => Err(LugliError::runtime(format!(
-            "{} argument {} must be boolean, got {}",
-            fn_name,
-            arg_pos,
-            value.type_name()
-        ))),
+        _ => Err(LugliError::runtime(format!("{} argument {} must be boolean, got {}", fn_name, arg_pos, value.type_name()))),
     }
 }
 
