@@ -262,30 +262,8 @@ impl<'a> Parser<'a> {
                         current_text.clear();
                     }
 
-                    // Extract expression until }
-                    let mut expr_str = String::new();
-                    let mut brace_depth = 1;
-                    for ch in chars.by_ref() {
-                        if ch == '{' {
-                            brace_depth += 1;
-                            expr_str.push(ch);
-                        } else if ch == '}' {
-                            brace_depth -= 1;
-                            if brace_depth == 0 {
-                                break;
-                            }
-                            expr_str.push(ch);
-                        } else {
-                            expr_str.push(ch);
-                        }
-                    }
-
-                    if brace_depth != 0 {
-                        return Err(ParseError::Custom {
-                            message: "Unterminated expression in f-string".to_string(),
-                            span: self.current_span(),
-                        });
-                    }
+                    // Extract expression with string context tracking
+                    let expr_str = self.extract_interpolation_expression(&mut chars)?;
 
                     // Parse the expression by creating a sub-parser
                     let mut expr_parser = Parser::new(&expr_str)?;
@@ -318,6 +296,126 @@ impl<'a> Parser<'a> {
         }
 
         Ok(parts)
+    }
+
+    fn extract_interpolation_expression(&self, chars: &mut std::iter::Peekable<std::str::Chars>) -> Result<String, ParseError> {
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        enum StringType {
+            Regular,
+            FString,
+        }
+
+        let mut expr_str = String::new();
+        let mut brace_depth = 1;
+        let mut delimiter_stack: Vec<(char, StringType)> = Vec::new();
+        let mut escape_next = false;
+
+        while let Some(ch) = chars.next() {
+            // Handle escape sequences
+            if escape_next {
+                expr_str.push(ch);
+                escape_next = false;
+                continue;
+            }
+
+            // Check for backslash (escape character) when inside a string
+            if !delimiter_stack.is_empty() && ch == '\\' {
+                expr_str.push(ch);
+                escape_next = true;
+                continue;
+            }
+
+            // Check for f-string prefix (f" or f') when NOT inside a string
+            if delimiter_stack.is_empty() && ch == 'f' {
+                if let Some(&quote) = chars.peek() {
+                    if quote == '"' || quote == '\'' {
+                        expr_str.push(ch); // push 'f'
+                        expr_str.push(chars.next().unwrap()); // push quote
+                        delimiter_stack.push((quote, StringType::FString));
+                        continue;
+                    }
+                }
+            }
+
+            // Handle quote characters
+            if ch == '"' || ch == '\'' {
+                expr_str.push(ch);
+
+                if let Some(&(delimiter, _string_type)) = delimiter_stack.last() {
+                    // Inside a string - check if this closes it
+                    if ch == delimiter {
+                        // This quote matches the opening delimiter
+                        delimiter_stack.pop();
+
+                        // For f-strings, we need to check if there are interpolations
+                        // The braces inside f-strings should be counted
+                    } else {
+                        // Different quote inside string - start a nested string
+                        delimiter_stack.push((ch, StringType::Regular));
+                    }
+                } else {
+                    // Not in a string - this opens a regular string
+                    delimiter_stack.push((ch, StringType::Regular));
+                }
+                continue;
+            }
+
+            // Handle braces - the key logic for interpolation extraction
+            if ch == '{' {
+                // Count braces ONLY if:
+                // 1. We're not inside any string, OR
+                // 2. We're inside an f-string (but not inside a nested regular string)
+                let should_count = if delimiter_stack.is_empty() {
+                    true // Not in any string
+                } else {
+                    // Check if we're directly in an f-string (not nested in regular string inside it)
+                    delimiter_stack.last() == Some(&('"', StringType::FString))
+                        || delimiter_stack.last() == Some(&('\'', StringType::FString))
+                };
+
+                if should_count {
+                    brace_depth += 1;
+                }
+                expr_str.push(ch);
+            } else if ch == '}' {
+                // Mirror logic for closing braces
+                let should_count = if delimiter_stack.is_empty() {
+                    true
+                } else {
+                    delimiter_stack.last() == Some(&('"', StringType::FString))
+                        || delimiter_stack.last() == Some(&('\'', StringType::FString))
+                };
+
+                if should_count {
+                    brace_depth -= 1;
+                    if brace_depth == 0 {
+                        // Found the matching closing brace for our interpolation
+                        break;
+                    }
+                }
+                expr_str.push(ch);
+            } else {
+                // Regular character
+                expr_str.push(ch);
+            }
+        }
+
+        // Validation: ensure all braces and strings are properly closed
+        if brace_depth != 0 {
+            return Err(ParseError::Custom {
+                message: "Unterminated expression in f-string".to_string(),
+                span: self.current_span(),
+            });
+        }
+
+        if !delimiter_stack.is_empty() {
+            return Err(ParseError::Custom {
+                message: "Unterminated string in f-string expression".to_string(),
+                span: self.current_span(),
+            });
+        }
+
+        Ok(expr_str)
     }
 
     pub(crate) fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {
