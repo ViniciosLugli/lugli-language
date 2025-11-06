@@ -1251,6 +1251,13 @@ impl Machine {
                 let method_name = bytecode.string_pool.borrow().resolve(method_name_id).to_string();
 
                 // Get the object (it's below the arguments on the stack)
+                // Validate stack has enough elements (object + args)
+                if self.stack.len() < arg_count + 1 {
+                    return Err(LugliError::runtime(format!(
+                        "Stack underflow in CallMethod: need {} elements (1 object + {} args), have {}",
+                        arg_count + 1, arg_count, self.stack.len()
+                    )));
+                }
                 let object_index = self.stack.len() - arg_count - 1;
                 let object = self.stack[object_index].clone(); // Clone to avoid long borrow
 
