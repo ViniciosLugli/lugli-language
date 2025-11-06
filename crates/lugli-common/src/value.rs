@@ -565,4 +565,65 @@ impl Value {
             _ => Err(LugliError::runtime(format!("Unsupported operand types for <=: {} and {}", self.type_name(), other.type_name()))),
         }
     }
+
+    /// Remap all StringId references in this value using the provided mapping.
+    /// This is used when merging module string pools into the main VM's string pool.
+    pub fn remap_string_ids(&mut self, mapping: &HashMap<StringId, StringId>) {
+        match self {
+            Value::String(id) => {
+                if let Some(&new_id) = mapping.get(id) {
+                    *id = new_id;
+                }
+            }
+            Value::List(list) => {
+                if let Ok(mut list_ref) = list.try_borrow_mut() {
+                    for item in list_ref.iter_mut() {
+                        item.remap_string_ids(mapping);
+                    }
+                }
+            }
+            Value::Dict(dict) => {
+                if let Ok(mut dict_ref) = dict.try_borrow_mut() {
+                    // Need to rebuild the HashMap with remapped keys
+                    let old_dict = dict_ref.clone();
+                    dict_ref.clear();
+                    for (old_key, mut value) in old_dict {
+                        let new_key = mapping.get(&old_key).copied().unwrap_or(old_key);
+                        value.remap_string_ids(mapping);
+                        dict_ref.insert(new_key, value);
+                    }
+                }
+            }
+            Value::StructInstance {
+                fields, ..
+            } => {
+                // Need to rebuild the HashMap with remapped keys
+                let old_fields = fields.clone();
+                fields.clear();
+                for (old_key, mut value) in old_fields {
+                    let new_key = mapping.get(&old_key).copied().unwrap_or(old_key);
+                    value.remap_string_ids(mapping);
+                    fields.insert(new_key, value);
+                }
+            }
+            Value::Closure {
+                upvalues, ..
+            } => {
+                for upvalue in upvalues {
+                    if let Ok(mut val) = upvalue.try_borrow_mut() {
+                        val.remap_string_ids(mapping);
+                    }
+                }
+            }
+            Value::Module {
+                exports, ..
+            } => {
+                for (_, value) in exports.iter_mut() {
+                    value.remap_string_ids(mapping);
+                }
+            }
+            // Other types don't contain StringIds
+            _ => {}
+        }
+    }
 }

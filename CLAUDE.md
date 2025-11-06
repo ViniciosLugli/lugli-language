@@ -780,7 +780,7 @@ cargo flamegraph --bin lugli -- run large_program.lg
 -   VM-based bytecode execution (>1M instructions/second)
 -   Enhanced REPL with history and multiline support
 -   Comprehensive benchmark suite
--   651 passing tests with full coverage
+-   890 passing tests with full coverage (Nov 2025: +240 from audit)
 
 ### Not Implemented (Do Not Use)
 
@@ -811,10 +811,18 @@ cargo flamegraph --bin lugli -- run large_program.lg
 -   Import code → Use Python-style imports (`import module`, `from module import item`)
 
 **Test expectations:**
--   All 674 tests must pass after changes
+-   All 890 tests must pass after changes (as of Nov 2025)
 -   Run `cargo test --workspace` to verify
 -   Run `cargo bench --workspace` to check performance regressions
 -   Every new feature needs comprehensive tests
+
+**Recent Improvements (Nov 2025 Audit):**
+-   ✅ Fixed float index truncation bug (arr[1.5] now errors correctly)
+-   ✅ Implemented escape sequence processing (\n, \t, \r, \\, \", \')
+-   ✅ Standardized out-of-bounds to return null (no more inconsistencies)
+-   ✅ Added negative index support to list.get() and list.set()
+-   ✅ Added 240+ comprehensive edge case tests
+-   ✅ All stdlib methods now thoroughly tested
 
 **Performance expectations:**
 -   VM execution: >1M instructions/second
