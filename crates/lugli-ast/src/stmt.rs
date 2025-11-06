@@ -29,6 +29,8 @@ pub enum Stmt {
 
     VarDecl { id: NodeId, pattern: Pattern, type_hint: Option<TypeHint>, initializer: Option<Expr>, is_const: bool },
 
+    DestructuringAssignment { id: NodeId, pattern: Pattern, value: Expr },
+
     FnDecl { id: NodeId, name: String, params: Vec<(String, Option<TypeHint>)>, return_type: Option<TypeHint>, body: Vec<Stmt> },
 
     StructDecl { id: NodeId, data: Box<StructDeclData> },
@@ -61,6 +63,9 @@ impl Stmt {
                 id, ..
             } => *id,
             Stmt::VarDecl {
+                id, ..
+            } => *id,
+            Stmt::DestructuringAssignment {
                 id, ..
             } => *id,
             Stmt::FnDecl {

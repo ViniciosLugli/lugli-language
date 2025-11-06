@@ -29,6 +29,11 @@ where T: Default {
                     self.visit_expr(init);
                 }
             }
+            Stmt::DestructuringAssignment {
+                value, ..
+            } => {
+                self.visit_expr(value);
+            }
             Stmt::FnDecl {
                 body, ..
             } => {
@@ -275,6 +280,11 @@ where T: Default {
                 if let Some(init) = initializer {
                     self.visit_expr_mut(init);
                 }
+            }
+            Stmt::DestructuringAssignment {
+                value, ..
+            } => {
+                self.visit_expr_mut(value);
             }
             Stmt::FnDecl {
                 body, ..

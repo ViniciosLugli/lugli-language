@@ -497,6 +497,53 @@ impl<'a> Parser<'a> {
 
         Ok(args)
     }
+
+    /// Convert an expression (List or Dict) to a pattern for destructuring assignment
+    pub(crate) fn expr_to_pattern(&self, expr: &lugli_ast::Expr) -> Result<Pattern, ParseError> {
+        match expr {
+            lugli_ast::Expr::List { elements, .. } => {
+                let mut patterns = Vec::new();
+                for elem in elements {
+                    patterns.push(self.expr_to_pattern(elem)?);
+                }
+                Ok(Pattern::List(patterns))
+            }
+            lugli_ast::Expr::Dict { pairs, .. } => {
+                let mut fields = Vec::new();
+                for (key_expr, value_expr) in pairs {
+                    // Key must be a string literal or identifier
+                    let key = match key_expr {
+                        lugli_ast::Expr::Literal { value: lugli_ast::LiteralValue::String(s), .. } => s.clone(),
+                        lugli_ast::Expr::Identifier { name, .. } => name.clone(),
+                        _ => {
+                            let span = self.get_expr_span(key_expr.id());
+                            return Err(ParseError::Custom {
+                                message: "Dict pattern keys must be identifiers or string literals".to_string(),
+                                span,
+                            });
+                        }
+                    };
+                    let pattern = self.expr_to_pattern(value_expr)?;
+                    fields.push((key, pattern));
+                }
+                Ok(Pattern::Dict(fields))
+            }
+            lugli_ast::Expr::Identifier { name, .. } => {
+                if name == "_" {
+                    Ok(Pattern::Wildcard)
+                } else {
+                    Ok(Pattern::Identifier(name.clone()))
+                }
+            }
+            _ => {
+                let span = self.get_expr_span(expr.id());
+                Err(ParseError::Custom {
+                    message: "Invalid pattern in destructuring assignment".to_string(),
+                    span,
+                })
+            }
+        }
+    }
 }
 
 #[cfg(test)]

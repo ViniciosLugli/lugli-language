@@ -31,6 +31,19 @@ impl Compiler {
 
                 Ok(true) // Handled
             }
+            Stmt::DestructuringAssignment {
+                pattern,
+                value,
+                ..
+            } => {
+                // Compile the value expression
+                self.compile_expr(value)?;
+
+                // Compile pattern assignment (assigns to existing variables)
+                self.compile_pattern_assignment(pattern)?;
+
+                Ok(true) // Handled
+            }
             Stmt::Return {
                 value, ..
             } => {
@@ -383,6 +396,78 @@ impl Compiler {
             Pattern::Literal(_) => {
                 // Literals in patterns are only used for match arms, not variable declarations
                 // For destructuring, we just pop the value
+                self.emit_unknown(Instruction::Pop);
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn compile_pattern_assignment(&mut self, pattern: &Pattern) -> Result<(), LugliError> {
+        match pattern {
+            Pattern::Identifier(name) => {
+                // Assign to existing variable
+                if let Some(&local_index) = self.locals.get(name) {
+                    // Local variable
+                    self.emit_unknown(Instruction::Store(local_index));
+                } else if let Some(&upvalue_index) = self.upvalues.get(name) {
+                    // Upvalue (captured variable)
+                    self.emit_unknown(Instruction::StoreUpvalue(upvalue_index));
+                } else {
+                    // Global variable
+                    let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                    let name_index = self.add_constant(Value::String(name_id));
+                    self.emit_unknown(Instruction::StoreGlobal(name_index));
+                    self.emit_unknown(Instruction::Pop);
+                }
+            }
+
+            Pattern::List(patterns) => {
+                // Value is on stack - need to unpack it
+                for (i, sub_pattern) in patterns.iter().enumerate() {
+                    // Duplicate list on stack
+                    self.emit_unknown(Instruction::Dup);
+
+                    // Push index
+                    let i_index = self.add_constant(Value::Number(i as f64));
+                    self.emit_unknown(Instruction::Constant(i_index));
+
+                    // Get element at index
+                    self.emit_unknown(Instruction::GetIndex);
+
+                    // Recursively assign sub-pattern
+                    self.compile_pattern_assignment(sub_pattern)?;
+                }
+
+                // Pop original list
+                self.emit_unknown(Instruction::Pop);
+            }
+
+            Pattern::Dict(fields) => {
+                // Value is on stack - need to unpack it
+                for (key, sub_pattern) in fields {
+                    // Duplicate dict on stack
+                    self.emit_unknown(Instruction::Dup);
+
+                    // Get property using key name
+                    let key_id = self.bytecode.string_pool.borrow_mut().intern(key);
+                    let key_index = self.add_constant(Value::String(key_id));
+                    self.emit_unknown(Instruction::GetProperty(key_index));
+
+                    // Recursively assign sub-pattern
+                    self.compile_pattern_assignment(sub_pattern)?;
+                }
+
+                // Pop original dict
+                self.emit_unknown(Instruction::Pop);
+            }
+
+            Pattern::Wildcard => {
+                // Discard value
+                self.emit_unknown(Instruction::Pop);
+            }
+
+            Pattern::Literal(_) => {
+                // Literals not valid in assignment patterns
                 self.emit_unknown(Instruction::Pop);
             }
         }

@@ -449,6 +449,23 @@ impl<'a> Parser<'a> {
 
             let final_value_span = self.get_expr_span(final_value.id());
 
+            // Check if left side is a list or dict (destructuring assignment)
+            if matches!(expr, Expr::List { .. } | Expr::Dict { .. }) {
+                // Convert the expr to a pattern
+                let pattern = self.expr_to_pattern(&expr)?;
+
+                let assignment_span = self.get_expr_span(expr.id());
+                let span = self.merge_spans(assignment_span, final_value_span);
+                let stmt_id = self.span_map.alloc_id();
+                self.span_map.insert(stmt_id, span);
+
+                return Ok(Stmt::DestructuringAssignment {
+                    id: stmt_id,
+                    pattern,
+                    value: final_value,
+                });
+            }
+
             let assignment_expr = match expr.clone() {
                 Expr::Identifier {
                     name,

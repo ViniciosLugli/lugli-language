@@ -626,11 +626,20 @@ impl Compiler {
                             self.emit_unknown(Instruction::Equal);
                         }
                         Pattern::Identifier(name) => {
-                            // Bind match value to local variable
-                            let var_local = self.declare_local(name.clone());
-                            arm_locals.push(name.clone());
+                            // Bind match value to variable (local or global depending on scope)
                             self.emit_unknown(Instruction::Dup);
-                            self.emit_unknown(Instruction::Store(var_local)); // Store pops the dup
+                            if self.scope_depth == 0 {
+                                // Global scope
+                                let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                                let name_index = self.add_constant(Value::String(name_id));
+                                self.emit_unknown(Instruction::StoreGlobal(name_index));
+                                // Note: StoreGlobal uses peek, doesn't pop, so we're left with the value on stack
+                            } else {
+                                // Local scope
+                                let var_local = self.declare_local(name.clone());
+                                arm_locals.push(name.clone());
+                                self.emit_unknown(Instruction::Store(var_local)); // Store pops the dup
+                            }
                             let true_const = self.add_constant(Value::Bool(true));
                             self.emit_unknown(Instruction::Constant(true_const));
                         }
