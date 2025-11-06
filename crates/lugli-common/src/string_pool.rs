@@ -1,4 +1,5 @@
-use std::{collections::HashMap, sync::Arc};
+use hashbrown::HashMap;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StringId(u32);
@@ -40,6 +41,18 @@ impl StringPool {
     pub fn len(&self) -> usize { self.strings.len() }
 
     pub fn is_empty(&self) -> bool { self.strings.is_empty() }
+
+    /// Merge another string pool into this one and return a mapping from old IDs to new IDs.
+    /// This is used when loading modules to ensure string IDs are consistent.
+    pub fn merge(&mut self, other: &StringPool) -> HashMap<StringId, StringId> {
+        let mut mapping = HashMap::new();
+        for (idx, arc_str) in other.strings.iter().enumerate() {
+            let old_id = StringId(idx as u32);
+            let new_id = self.intern(arc_str);
+            mapping.insert(old_id, new_id);
+        }
+        mapping
+    }
 }
 
 impl Default for StringPool {
