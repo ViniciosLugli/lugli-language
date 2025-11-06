@@ -113,9 +113,7 @@ pub fn string_ends_with(args: &[Value], pool: &mut StringPool) -> Result<Value, 
 }
 
 pub fn string_contains(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("string.contains expects 2 arguments"));
-    }
+    check_arity(args, 2, "string.contains")?;
     match (&args[0], &args[1]) {
         (Value::String(id1), Value::String(id2)) => {
             let s = pool.resolve(*id1);

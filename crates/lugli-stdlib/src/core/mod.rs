@@ -239,9 +239,7 @@ fn zip_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
 }
 
 fn all_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("all expects 1 argument"));
-    }
+    check_arity(args, 1, "all")?;
 
     match &args[0] {
         Value::List(list) => {
@@ -297,9 +295,7 @@ fn minmax_fn(args: &[Value], pool: &mut StringPool, op: Comparison) -> Result<Va
         Comparison::Max => "max",
     };
 
-    if args.len() != 1 {
-        return Err(LugliError::runtime(format!("{} expects 1 argument", fn_name)));
-    }
+    check_arity(args, 1, fn_name)?;
 
     match &args[0] {
         Value::List(list) => {
@@ -376,9 +372,7 @@ fn round_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError>
 }
 
 fn pow_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("pow expects 2 arguments"));
-    }
+    check_arity(args, 2, "pow")?;
 
     let base = match &args[0] {
         Value::Number(n) => *n,

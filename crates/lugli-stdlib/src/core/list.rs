@@ -85,9 +85,7 @@ pub fn list_clear(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugli
 }
 
 pub fn list_reverse(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("list.reverse expects 1 argument"));
-    }
+    check_arity(args, 1, "list.reverse")?;
     match &args[0] {
         Value::List(l) => {
             l.borrow_mut().reverse();
@@ -98,9 +96,7 @@ pub fn list_reverse(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lug
 }
 
 pub fn list_append(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("list.append expects 2 arguments"));
-    }
+    check_arity(args, 2, "list.append")?;
     match (&args[0], &args[1]) {
         (Value::List(l1), Value::List(l2)) => {
             if Rc::ptr_eq(l1, l2) {
@@ -116,79 +112,28 @@ pub fn list_append(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugl
 }
 
 pub fn list_get(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("list.get expects 2 arguments (list, index)"));
-    }
-    match (&args[0], &args[1]) {
-        (Value::List(l), Value::Number(idx)) => {
-            if !idx.is_finite() {
-                return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
-            }
-            if idx.fract() != 0.0 {
-                return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
-            }
-            let idx_i64 = *idx as i64;
+    check_arity(args, 2, "list.get")?;
+    match &args[0] {
+        Value::List(l) => {
             let list = l.borrow();
-            let len = list.len() as i64;
-
-            // Handle negative indices (consistent with bracket notation)
-            let actual_idx = if idx_i64 < 0 {
-                let positive_offset = len + idx_i64;
-                if positive_offset < 0 {
-                    return Ok(Value::Null); // Out of bounds
-                }
-                positive_offset as usize
-            } else {
-                if idx_i64 >= len {
-                    return Ok(Value::Null); // Out of bounds
-                }
-                idx_i64 as usize
-            };
-
-            Ok(list[actual_idx].clone())
+            match validate_list_index_for_get(&args[1], list.len())? {
+                Some(idx) => Ok(list[idx].clone()),
+                None => Ok(Value::Null),
+            }
         }
-        (Value::List(_), _) => Err(LugliError::type_error("number", args[1].type_name())),
         _ => Err(LugliError::type_error("list", args[0].type_name())),
     }
 }
 
 pub fn list_set(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 3 {
-        return Err(LugliError::runtime("list.set expects 3 arguments (list, index, value)"));
-    }
-    match (&args[0], &args[1]) {
-        (Value::List(l), Value::Number(idx)) => {
-            if !idx.is_finite() {
-                return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
-            }
-            if idx.fract() != 0.0 {
-                return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
-            }
-            let idx_i64 = *idx as i64;
+    check_arity(args, 3, "list.set")?;
+    match &args[0] {
+        Value::List(l) => {
             let mut list = l.borrow_mut();
-            let len = list.len() as i64;
-
-            // Handle negative indices (consistent with bracket notation)
-            let actual_idx = if idx_i64 < 0 {
-                let positive_offset = len + idx_i64;
-                if positive_offset < 0 {
-                    return Err(LugliError::runtime(format!(
-                        "Negative index {} out of range for list assignment (length {}, minimum is -{})",
-                        idx_i64, len, len
-                    )));
-                }
-                positive_offset as usize
-            } else {
-                if idx_i64 >= len {
-                    return Err(LugliError::runtime(format!("Index {} out of range for list assignment (length {})", idx_i64, len)));
-                }
-                idx_i64 as usize
-            };
-
-            list[actual_idx] = args[2].clone();
+            let idx = validate_list_index_for_set(&args[1], list.len())?;
+            list[idx] = args[2].clone();
             Ok(Value::Null)
         }
-        (Value::List(_), _) => Err(LugliError::type_error("number", args[1].type_name())),
         _ => Err(LugliError::type_error("list", args[0].type_name())),
     }
 }
@@ -255,9 +200,7 @@ pub fn list_sorted(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugl
 }
 
 pub fn list_reversed(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("reversed expects 1 argument"));
-    }
+    check_arity(args, 1, "reversed")?;
 
     match &args[0] {
         Value::List(list) => {
