@@ -1465,23 +1465,27 @@ impl Machine {
                         let len = list_ref.len() as i64;
                         let idx_i64 = *idx as i64;
 
-                        let actual_idx = if idx_i64 < 0 {
+                        // Check bounds and return null if out of range
+                        let actual_idx_opt = if idx_i64 < 0 {
                             let positive_offset = len + idx_i64;
                             if positive_offset < 0 {
-                                return Err(LugliError::runtime(format!(
-                                    "Negative index {} out of range for list of length {} (minimum is -{})",
-                                    idx_i64, len, len
-                                )));
+                                None
+                            } else {
+                                Some(positive_offset as usize)
                             }
-                            positive_offset as usize
                         } else {
                             if idx_i64 >= len {
-                                return Err(LugliError::runtime(format!("Index {} out of range for list of length {}", idx_i64, len)));
+                                None
+                            } else {
+                                Some(idx_i64 as usize)
                             }
-                            idx_i64 as usize
                         };
 
-                        self.stack.push(list_ref[actual_idx].clone());
+                        if let Some(actual_idx) = actual_idx_opt {
+                            self.stack.push(list_ref[actual_idx].clone());
+                        } else {
+                            self.stack.push(Value::Null);
+                        }
                     }
                     (Value::Dict(dict), Value::String(key)) => {
                         let dict_ref = dict.borrow();
