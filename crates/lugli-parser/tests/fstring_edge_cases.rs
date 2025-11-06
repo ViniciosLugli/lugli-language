@@ -60,20 +60,40 @@ fn test_fstring_empty_expression() {
 
 #[test]
 fn test_fstring_nested_single_level() {
-    // Known limitation in v0.3.0: nested f-strings not supported
-    let source = r#"f"outer {f"inner {x}"}""#;
+    let source = r#"f"outer {f'inner {x}'}""#;
     let mut parser = Parser::new(source).unwrap();
     let result = parser.parse();
-    // Currently fails - nested f-strings are a v0.4.0 feature
-    assert!(result.is_err(), "Nested f-strings not yet supported (v0.4.0 planned)");
+    assert!(result.is_ok(), "Nested f-strings with mixed quotes should parse (v0.4.0+)");
 }
 
-// Note: Deep nesting test commented out as it may cause stack overflow
-// This is a known limitation documented in v0.3.0
-// #[test]
-// fn test_fstring_deep_nesting() {
-//     let nested = "f\"".to_string() + &"f\"".repeat(15) + "x" + &"}\"".repeat(15);
-//     let mut parser = Parser::new(&nested).unwrap();
-//     let result = parser.parse();
-//     // Should ideally error with depth limit, but currently may succeed or overflow
-// }
+#[test]
+fn test_fstring_with_string_literal_single_quotes() {
+    let source = r#"f"Value: {'hello'}""#;
+    let mut parser = Parser::new(source).unwrap();
+    let result = parser.parse();
+    assert!(result.is_ok(), "F-string with string literal should parse");
+}
+
+#[test]
+fn test_fstring_with_dict_access_string_key() {
+    let source = r#"f"Name: {data['name']}""#;
+    let mut parser = Parser::new(source).unwrap();
+    let result = parser.parse();
+    assert!(result.is_ok(), "F-string with dict string key access should parse");
+}
+
+#[test]
+fn test_fstring_single_quote_style() {
+    let source = r#"f'Hello {name}!'"#;
+    let mut parser = Parser::new(source).unwrap();
+    let result = parser.parse();
+    assert!(result.is_ok(), "Single-quote f-string should parse");
+}
+
+#[test]
+fn test_fstring_mixed_quotes_in_expression() {
+    let source = r#"f'Value: {d["key"]}'"#;
+    let mut parser = Parser::new(source).unwrap();
+    let result = parser.parse();
+    assert!(result.is_ok(), "F-string with mixed quotes should parse");
+}

@@ -474,46 +474,20 @@ impl Machine {
         let (ast, span_map) =
             parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
 
-        let mut compiler = crate::Compiler::new();
+        let shared_pool = if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
+            std::rc::Rc::clone(&main_bytecode.string_pool)
+        } else {
+            std::rc::Rc::new(std::cell::RefCell::new(lugli_common::StringPool::new()))
+        };
+
+        let mut compiler = crate::Compiler::with_shared_pool(shared_pool);
         let module_bytecode = compiler
             .compile(&ast, span_map)
             .map_err(|e| LugliError::runtime(format!("Compile error in module '{}': {}", resolved_path.display(), e)))?;
 
-        // TODO: Module import system requires architectural changes
-        // Current issue: Each bytecode has its own RefCell<StringPool>, but modules need to share
-        // the same pool to avoid string ID mismatches. This requires changing Bytecode to use
-        // Rc<RefCell<StringPool>> instead of RefCell<StringPool>, which is a significant refactoring.
-        //
-        // For now, basic module loading works but may have string pool synchronization issues
-        // when modules create new strings during execution (e.g., f-string evaluation).
-
-        // Attempt to merge module's string pool (partial solution)
-        let string_id_mapping = {
-            if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
-                let mut main_pool = main_bytecode.string_pool.borrow_mut();
-                let module_pool = module_bytecode.string_pool.borrow();
-                main_pool.merge(&module_pool)
-            } else {
-                HashMap::new()
-            }
-        };
-
-        // Remap bytecode constants
-        let mut remapped_bytecode = module_bytecode.clone();
-        for constant in remapped_bytecode.constants.iter_mut() {
-            constant.remap_string_ids(&string_id_mapping);
-        }
-
-        // Replace the module's string pool with the main program's string pool
-        // This ensures all string operations in the module use the main pool
-        if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
-            *remapped_bytecode.string_pool.borrow_mut() = main_bytecode.string_pool.borrow().clone();
-        }
-
-        // NOW assign and register the remapped bytecode ID for this module
         let module_bytecode_id = self.next_bytecode_id;
         self.next_bytecode_id += 1;
-        self.bytecode_registry.insert(module_bytecode_id, Rc::new(remapped_bytecode.clone()));
+        self.bytecode_registry.insert(module_bytecode_id, Rc::new(module_bytecode.clone()));
 
         let saved_globals = self.globals.clone();
         let saved_file = self.current_file.clone();
@@ -534,12 +508,11 @@ impl Machine {
         }
         self.current_file = Some(resolved_path.clone());
 
-        // Execute module bytecode directly (now with remapped string pool)
         self.ip = 0;
         let mut result = Ok(());
-        while self.ip < remapped_bytecode.instructions.len() {
-            let instruction = &remapped_bytecode.instructions[self.ip];
-            match self.execute_instruction(instruction, &remapped_bytecode) {
+        while self.ip < module_bytecode.instructions.len() {
+            let instruction = &module_bytecode.instructions[self.ip];
+            match self.execute_instruction(instruction, &module_bytecode) {
                 Ok(should_continue) => {
                     if !should_continue {
                         break;
@@ -555,11 +528,6 @@ impl Machine {
         result?;
 
         let mut module_exports = self.globals.clone();
-
-        // Remap all StringIds in module exports to use the main pool's IDs (safety measure)
-        for (_, value) in module_exports.iter_mut() {
-            value.remap_string_ids(&string_id_mapping);
-        }
 
         // Update all functions in exports to have correct bytecode_id
         for (_, value) in module_exports.iter_mut() {
@@ -588,7 +556,7 @@ impl Machine {
 
         let module = crate::module::Module {
             path: resolved_path.clone(),
-            bytecode: remapped_bytecode,
+            bytecode: module_bytecode,
             exports: module_exports.clone(),
         };
 

@@ -38,9 +38,11 @@ pub enum TokenKind {
     Number(f64),
 
     #[regex(r#""([^"\\]|\\.)*""#, |_| PLACEHOLDER_STRING_ID)]
+    #[regex(r#"'([^'\\]|\\.)*'"#, |_| PLACEHOLDER_STRING_ID)]
     String(StringId),
 
     #[regex(r#"f"([^"\\]|\\.)*""#, |_| PLACEHOLDER_STRING_ID)]
+    #[regex(r#"f'([^'\\]|\\.)*'"#, |_| PLACEHOLDER_STRING_ID)]
     FString(StringId),
 
     #[token("true")]

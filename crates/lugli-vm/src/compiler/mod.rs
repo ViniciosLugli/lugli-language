@@ -1,7 +1,9 @@
 use crate::{Bytecode, Instruction};
 use hashbrown::HashMap;
 use lugli_ast::{SpanMap, Stmt};
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringPool, Value};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 mod control_flow;
 mod expressions;
@@ -68,6 +70,23 @@ impl Compiler {
         compiler.bytecode = Bytecode::with_source(source_code);
         compiler.span_map = SpanMap::new();
         compiler
+    }
+
+    pub fn with_shared_pool(pool: Rc<RefCell<StringPool>>) -> Self {
+        Self {
+            bytecode: Bytecode::with_shared_pool(pool),
+            locals: HashMap::new(),
+            local_count: 0,
+            debug: CompilerDebug::default(),
+            loop_stack: Vec::new(),
+            loop_depth: 0,
+            scope_depth: 0,
+            upvalues: HashMap::new(),
+            upvalue_count: 0,
+            file_path: "<unknown>".to_string(),
+            source_code: None,
+            span_map: SpanMap::new(),
+        }
     }
 
     pub fn compile(&mut self, program: &lugli_ast::Program, span_map: SpanMap) -> Result<Bytecode, LugliError> {
