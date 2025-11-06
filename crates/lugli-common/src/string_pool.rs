@@ -22,6 +22,30 @@ impl StringPool {
         }
     }
 
+    pub fn with_common_strings() -> Self {
+        let mut pool = Self {
+            strings: Vec::with_capacity(64),
+            lookup: HashMap::with_capacity(64),
+        };
+
+        // Pre-intern most common identifiers and keywords
+        let common = [
+            "self", "true", "false", "null", "len", "push", "pop", "get", "set",
+            "name", "value", "result", "data", "error", "message", "type", "item",
+            "index", "key", "size", "count", "list", "dict", "string", "number",
+            "add", "remove", "contains", "clear", "empty", "start", "end", "text",
+            "i", "j", "k", "x", "y", "z", "a", "b", "c", "n", "m", "tmp", "temp",
+            "main", "fn", "struct", "if", "else", "for", "while", "return", "match",
+            "print", "input", "str", "int", "float", "bool", "upper", "lower", "split",
+        ];
+
+        for s in &common {
+            pool.intern(s);
+        }
+
+        pool
+    }
+
     pub fn intern(&mut self, s: &str) -> StringId {
         if let Some(&id) = self.lookup.get(s) {
             return id;
