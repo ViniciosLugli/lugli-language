@@ -875,7 +875,7 @@ impl Machine {
                             self.ip = body_start;
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
-                            self.ip = saved_ip + 1; // Move past Call instruction
+                            self.ip = saved_ip; // Restore IP; execute_instruction will increment it
                             exec_result?;
 
                             // Return value is now on stack
@@ -918,7 +918,7 @@ impl Machine {
                             self.ip = body_start;
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
-                            self.ip = saved_ip + 1; // Move past Call instruction
+                            self.ip = saved_ip; // Restore IP; execute_instruction will increment it
                             exec_result?;
 
                             // Return value is now on stack
@@ -1215,6 +1215,10 @@ impl Machine {
                 }
             }
             Instruction::CallMethod(method_name_index, arg_count) => {
+                if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+                    eprintln!("[DEBUG] CallMethod START: ip={}, method_name_index={}, arg_count={}", self.ip, method_name_index, arg_count);
+                }
+
                 let arg_count = *arg_count as usize;
                 let method_name_id = match self.get_constant(bytecode, *method_name_index)? {
                     Value::String(name_id) => *name_id,
@@ -1222,12 +1226,16 @@ impl Machine {
                 };
                 let method_name = bytecode.string_pool.borrow().resolve(method_name_id).to_string();
 
+                if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+                    eprintln!("[DEBUG] CallMethod: method_name='{}', arg_count={}", method_name, arg_count);
+                }
+
                 // Get the object (it's below the arguments on the stack)
                 let object_index = self.stack.len() - arg_count - 1;
-                let object = &self.stack[object_index];
+                let object = self.stack[object_index].clone(); // Clone to avoid long borrow
 
                 // Check for struct method calls first
-                if let Value::Dict(d) = object {
+                if let Value::Dict(ref d) = object {
                     let dict_ref = d.borrow();
                     let struct_type_key = bytecode.string_pool.borrow_mut().intern("__struct_type__");
                     if let Some(Value::String(struct_type_id)) = dict_ref.get(&struct_type_key) {
@@ -1314,21 +1322,44 @@ impl Machine {
                         // This is a struct instance - look up the method as StructType_methodName
                         let struct_method_name = format!("{}_{}", struct_type, method_name);
 
-                        // Look up the global function
-                        if let Some(func) = self.globals.get(&struct_method_name) {
+                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+                            eprintln!("[DEBUG] Looking for struct method: {}", struct_method_name);
+                            eprintln!("[DEBUG] In globals: {}", self.globals.contains_key(&struct_method_name));
+                            eprintln!("[DEBUG] Available in module cache:");
+                            if let Some(val) = self.module_cache.find_in_exports(&struct_method_name) {
+                                eprintln!("[DEBUG]   Found: {:?}", val);
+                            } else {
+                                eprintln!("[DEBUG]   Not found");
+                            }
+                        }
+
+                        // Look up the method in globals first, then check all loaded modules
+                        let func = self.globals.get(&struct_method_name).cloned()
+                            .or_else(|| self.module_cache.find_in_exports(&struct_method_name));
+
+                        if let Some(func) = func {
+                            if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+                                eprintln!("[DEBUG] Found struct method, executing...");
+                            }
+
                             match func {
                                 Value::Function {
                                     name,
                                     params,
                                     body_start,
-                                    ..
+                                    bytecode_id,
                                 }
                                 | Value::Closure {
                                     name,
                                     params,
                                     body_start,
+                                    bytecode_id,
                                     ..
                                 } => {
+                                    if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+                                        eprintln!("[DEBUG] Function/Closure match, bytecode_id={}", bytecode_id);
+                                    }
+
                                     // Check arity - should be args + 1 for self parameter
                                     let arity = params.len();
                                     if arg_count + 1 != arity {
@@ -1339,12 +1370,55 @@ impl Machine {
                                         )));
                                     }
 
-                                    // Set up call frame and invoke function
-                                    let stack_base = self.stack.len() - arg_count - 1; // Include the object
-                                    let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
-                                    self.call_stack.push(frame);
-                                    self.ip = *body_start;
-                                    return Ok(true); // Function call will handle stack management
+                                    // Check if this is a cross-bytecode call (module method)
+                                    if bytecode_id != 0 {
+                                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+                                            eprintln!("[DEBUG] Cross-bytecode call detected");
+                                        }
+                                        // Cross-bytecode call - need to execute in method's bytecode
+                                        let method_bytecode = self
+                                            .bytecode_registry
+                                            .get(&bytecode_id)
+                                            .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
+                                            .clone();
+
+                                        let saved_call_stack_len = self.call_stack.len();
+                                        let stack_base = self.stack.len() - arg_count - 1; // Include the object
+                                        let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
+                                        self.call_stack.push(frame);
+
+                                        let saved_ip = self.ip;
+                                        self.ip = body_start;
+
+                                        let exec_result = self.execute_function_until_return(&method_bytecode, saved_call_stack_len);
+                                        self.ip = saved_ip; // Restore IP; execute_instruction will increment it
+                                        exec_result?;
+
+                                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+                                            eprintln!("[DEBUG] Method executed successfully");
+                                            eprintln!("[DEBUG] Stack size: {}, object_index: {}", self.stack.len(), object_index);
+                                        }
+
+                                        // Return value is now on stack, but we need to clean up
+                                        // The stack has: [... object, arg1, ..., argN, return_value]
+                                        // We need to remove object and args, keep only return_value
+                                        let return_value = self.pop().unwrap_or(Value::Null);
+                                        self.stack.truncate(object_index);
+                                        self.stack.push(return_value);
+
+                                        if std::env::var("DEBUG_STRUCT_METHODS").is_ok() {
+                                            eprintln!("[DEBUG] Stack cleaned up, returning");
+                                        }
+
+                                        return Ok(true); // Cross-bytecode method call complete
+                                    } else {
+                                        // Same-bytecode call - normal path
+                                        let stack_base = self.stack.len() - arg_count - 1; // Include the object
+                                        let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
+                                        self.call_stack.push(frame);
+                                        self.ip = body_start;
+                                        return Ok(true); // Function call will handle stack management
+                                    }
                                 }
                                 Value::NativeFunction {
                                     callback, ..
@@ -1372,7 +1446,7 @@ impl Machine {
                 }
 
                 // Special handling for higher-order list methods that need bytecode access
-                if let Value::List(l) = object
+                if let Value::List(ref l) = object
                     && (method_name == "filter" || method_name == "map" || method_name == "map!")
                     && arg_count == 1
                 {
