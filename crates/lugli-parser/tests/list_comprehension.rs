@@ -1,4 +1,4 @@
-use lugli_ast::{Expr, LiteralValue, Stmt};
+use lugli_ast::{Expr, LiteralValue, Pattern, Stmt};
 use lugli_parser::Parser;
 
 fn parse_expr(source: &str) -> Expr {
@@ -23,7 +23,7 @@ fn test_basic_list_comprehension() {
     {
         assert!(matches!(data.element, Expr::Identifier { .. }));
         assert_eq!(data.clauses.len(), 1);
-        assert_eq!(data.clauses[0].variable, "x");
+        assert_eq!(data.clauses[0].pattern, Pattern::Identifier("x".to_string()));
         assert!(matches!(data.clauses[0].iterable, Expr::Identifier { .. }));
         assert!(data.clauses[0].condition.is_none());
     } else {
@@ -42,7 +42,7 @@ fn test_list_comprehension_with_expression() {
     {
         assert!(matches!(data.element, Expr::Binary { .. }));
         assert_eq!(data.clauses.len(), 1);
-        assert_eq!(data.clauses[0].variable, "x");
+        assert_eq!(data.clauses[0].pattern, Pattern::Identifier("x".to_string()));
         assert!(matches!(data.clauses[0].iterable, Expr::Identifier { .. }));
         assert!(data.clauses[0].condition.is_none());
     } else {
@@ -61,7 +61,7 @@ fn test_list_comprehension_with_condition() {
     {
         assert!(matches!(data.element, Expr::Identifier { .. }));
         assert_eq!(data.clauses.len(), 1);
-        assert_eq!(data.clauses[0].variable, "x");
+        assert_eq!(data.clauses[0].pattern, Pattern::Identifier("x".to_string()));
         assert!(matches!(data.clauses[0].iterable, Expr::Identifier { .. }));
         assert!(data.clauses[0].condition.is_some());
         if let Some(ref cond) = data.clauses[0].condition {
@@ -83,7 +83,7 @@ fn test_list_comprehension_complex_expression() {
     {
         assert!(matches!(data.element, Expr::Binary { .. }));
         assert_eq!(data.clauses.len(), 1);
-        assert_eq!(data.clauses[0].variable, "x");
+        assert_eq!(data.clauses[0].pattern, Pattern::Identifier("x".to_string()));
         assert!(matches!(data.clauses[0].iterable, Expr::Identifier { .. }));
         assert!(data.clauses[0].condition.is_some());
     } else {
@@ -102,7 +102,7 @@ fn test_list_comprehension_list_literal() {
     {
         assert!(matches!(data.element, Expr::Identifier { .. }));
         assert_eq!(data.clauses.len(), 1);
-        assert_eq!(data.clauses[0].variable, "x");
+        assert_eq!(data.clauses[0].pattern, Pattern::Identifier("x".to_string()));
         assert!(matches!(data.clauses[0].iterable, Expr::List { .. }));
         assert!(data.clauses[0].condition.is_none());
     } else {
@@ -121,7 +121,7 @@ fn test_list_comprehension_method_call() {
     {
         assert!(matches!(data.element, Expr::Call { .. }));
         assert_eq!(data.clauses.len(), 1);
-        assert_eq!(data.clauses[0].variable, "x");
+        assert_eq!(data.clauses[0].pattern, Pattern::Identifier("x".to_string()));
         assert!(matches!(data.clauses[0].iterable, Expr::Identifier { .. }));
         assert!(data.clauses[0].condition.is_some());
     } else {
@@ -142,12 +142,12 @@ fn test_nested_list_comprehension() {
         assert_eq!(data.clauses.len(), 2);
 
         // First clause: for x in [1,2]
-        assert_eq!(data.clauses[0].variable, "x");
+        assert_eq!(data.clauses[0].pattern, Pattern::Identifier("x".to_string()));
         assert!(matches!(data.clauses[0].iterable, Expr::List { .. }));
         assert!(data.clauses[0].condition.is_none());
 
         // Second clause: for y in [3,4]
-        assert_eq!(data.clauses[1].variable, "y");
+        assert_eq!(data.clauses[1].pattern, Pattern::Identifier("y".to_string()));
         assert!(matches!(data.clauses[1].iterable, Expr::List { .. }));
         assert!(data.clauses[1].condition.is_none());
     } else {
@@ -168,11 +168,11 @@ fn test_nested_list_comprehension_with_conditions() {
         assert_eq!(data.clauses.len(), 2);
 
         // First clause with condition
-        assert_eq!(data.clauses[0].variable, "x");
+        assert_eq!(data.clauses[0].pattern, Pattern::Identifier("x".to_string()));
         assert!(data.clauses[0].condition.is_some());
 
         // Second clause with condition
-        assert_eq!(data.clauses[1].variable, "y");
+        assert_eq!(data.clauses[1].pattern, Pattern::Identifier("y".to_string()));
         assert!(data.clauses[1].condition.is_some());
     } else {
         panic!("Expected list comprehension, got: {:?}", expr);

@@ -81,6 +81,7 @@ fn calculate_complexity_score(bytecode: &Bytecode) -> usize {
             | Instruction::LoadTrue
             | Instruction::LoadFalse
             | Instruction::LoadNull
+            | Instruction::ReserveLocals(_)
             | Instruction::Return
             | Instruction::Pop
             | Instruction::Print => 1,

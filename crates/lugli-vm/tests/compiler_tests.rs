@@ -12,7 +12,7 @@
 mod helpers;
 
 use helpers::assert_value_eq;
-use lugli_ast::{Expr, LiteralValue, NodeId, Program, SpanMap, Stmt};
+use lugli_ast::{Expr, LiteralValue, NodeId, Pattern, Program, SpanMap, Stmt};
 use lugli_common::{Span, Value};
 use lugli_lexer::TokenKind;
 use lugli_vm::compile_and_run;
@@ -100,7 +100,7 @@ fn test_compiler_variable_declaration_and_access() {
             Stmt::VarDecl {
                 type_hint: None,
                 id: make_id(0),
-                name: "x".to_string(),
+                pattern: Pattern::Identifier("x".to_string()),
                 initializer: Some(Expr::Literal {
                     id: make_id(1),
                     value: LiteralValue::Number(42.0),
@@ -225,7 +225,7 @@ fn test_compiler_property_access() {
             Stmt::VarDecl {
                 type_hint: None,
                 id: make_id(0),
-                name: "person".to_string(),
+                pattern: Pattern::Identifier("person".to_string()),
                 initializer: Some(Expr::Dict {
                     id: make_id(1),
                     pairs: vec![(
@@ -273,7 +273,7 @@ fn test_compiler_global_variable_assignment() {
             Stmt::VarDecl {
                 type_hint: None,
                 id: make_id(0),
-                name: "x".to_string(),
+                pattern: Pattern::Identifier("x".to_string()),
                 initializer: Some(Expr::Literal {
                     id: make_id(1),
                     value: LiteralValue::Number(10.0),
@@ -321,7 +321,7 @@ fn test_compiler_property_assignment() {
             Stmt::VarDecl {
                 type_hint: None,
                 id: make_id(0),
-                name: "person".to_string(),
+                pattern: Pattern::Identifier("person".to_string()),
                 initializer: Some(Expr::Dict {
                     id: make_id(1),
                     pairs: vec![(
@@ -504,7 +504,7 @@ fn test_compiler_multiple_variable_declarations() {
             Stmt::VarDecl {
                 type_hint: None,
                 id: make_id(0),
-                name: "a".to_string(),
+                pattern: Pattern::Identifier("a".to_string()),
                 initializer: Some(Expr::Literal {
                     id: make_id(1),
                     value: LiteralValue::Number(10.0),
@@ -515,7 +515,7 @@ fn test_compiler_multiple_variable_declarations() {
             Stmt::VarDecl {
                 type_hint: None,
                 id: make_id(2),
-                name: "b".to_string(),
+                pattern: Pattern::Identifier("b".to_string()),
                 initializer: Some(Expr::Literal {
                     id: make_id(3),
                     value: LiteralValue::Number(20.0),

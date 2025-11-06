@@ -107,6 +107,12 @@ pub enum LugliError {
 
     #[error("IO error: {message}")]
     Io { message: String },
+
+    #[error("Cannot unpack {actual} value(s) into {expected} variable(s)")]
+    ArityMismatch { expected: usize, actual: usize, context: Option<SourceContext> },
+
+    #[error("Cannot destructure {type_name} type")]
+    InvalidDestructureTarget { type_name: String, context: Option<SourceContext> },
 }
 
 impl LugliError {
@@ -234,6 +240,36 @@ impl LugliError {
         }
     }
 
+    pub fn arity_mismatch(expected: usize, actual: usize) -> Self {
+        Self::ArityMismatch {
+            expected,
+            actual,
+            context: None,
+        }
+    }
+
+    pub fn arity_mismatch_with_context(expected: usize, actual: usize, context: SourceContext) -> Self {
+        Self::ArityMismatch {
+            expected,
+            actual,
+            context: Some(context),
+        }
+    }
+
+    pub fn invalid_destructure_target(type_name: impl Into<String>) -> Self {
+        Self::InvalidDestructureTarget {
+            type_name: type_name.into(),
+            context: None,
+        }
+    }
+
+    pub fn invalid_destructure_target_with_context(type_name: impl Into<String>, context: SourceContext) -> Self {
+        Self::InvalidDestructureTarget {
+            type_name: type_name.into(),
+            context: Some(context),
+        }
+    }
+
     pub fn get_code(&self) -> Option<ErrorCode> {
         match self {
             LugliError::Runtime(data) => Some(data.code),
@@ -245,6 +281,12 @@ impl LugliError {
             LugliError::IndexOutOfBounds {
                 ..
             } => Some(ErrorCode::E005),
+            LugliError::ArityMismatch {
+                ..
+            } => Some(ErrorCode::E006),
+            LugliError::InvalidDestructureTarget {
+                ..
+            } => Some(ErrorCode::E007),
             _ => None,
         }
     }
@@ -258,6 +300,12 @@ impl LugliError {
                 context,
             } => context.as_ref(),
             LugliError::IndexOutOfBounds {
+                context, ..
+            } => context.as_ref(),
+            LugliError::ArityMismatch {
+                context, ..
+            } => context.as_ref(),
+            LugliError::InvalidDestructureTarget {
                 context, ..
             } => context.as_ref(),
             _ => None,

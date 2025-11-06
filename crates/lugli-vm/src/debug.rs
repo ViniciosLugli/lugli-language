@@ -29,6 +29,7 @@ fn disassemble_instruction(bytecode: &Bytecode, offset: usize) -> String {
         }
         Instruction::Load(idx) => (format!("{}", idx), 2),
         Instruction::Store(idx) => (format!("{}", idx), 2),
+        Instruction::ReserveLocals(count) => (format!("{}", count), 2),
         Instruction::LoadGlobal(idx) => {
             let const_display = bytecode.constants.get(*idx).map(|c| format!("{} ('{:?}')", idx, c)).unwrap_or_else(|| format!("{} (invalid)", idx));
             (const_display, 2)

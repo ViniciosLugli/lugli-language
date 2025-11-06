@@ -136,7 +136,7 @@ impl Compiler {
                 Ok(true) // Handled
             }
             Stmt::For {
-                variable,
+                pattern,
                 iterable,
                 body,
                 ..
@@ -157,9 +157,6 @@ impl Compiler {
                 let zero_constant = self.add_constant(lugli_common::Value::Number(0.0));
                 self.emit_unknown(Instruction::Constant(zero_constant));
                 self.emit_unknown(Instruction::Store(index_local));
-
-                // Declare the loop variable
-                let var_local = self.declare_local(variable.clone());
 
                 let loop_start = self.current_instruction();
 
@@ -182,7 +179,9 @@ impl Compiler {
                 self.emit_unknown(Instruction::Load(iterable_local));
                 self.emit_unknown(Instruction::Load(index_local));
                 self.emit_unknown(Instruction::GetIndex);
-                self.emit_unknown(Instruction::Store(var_local));
+
+                // Bind pattern with element value on stack
+                self.compile_pattern_binding(pattern)?;
 
                 // Compile body
                 for stmt in body {

@@ -364,9 +364,6 @@ impl Compiler {
                 // Jump over function body (similar to FnDecl)
                 let jump_over_body = self.emit_jump(Instruction::Jump(0));
 
-                // Record where the function body starts
-                let body_start = self.current_instruction();
-
                 // Save compiler state
                 let saved_locals = self.locals.clone();
                 let saved_local_count = self.local_count;
@@ -395,6 +392,14 @@ impl Compiler {
                     self.declare_local(param.clone());
                 }
 
+                // Emit placeholder to reserve space for locals (will patch later)
+                let param_count = params.len();
+                let reserve_locals_ip = self.current_instruction();
+                self.emit_unknown(Instruction::ReserveLocals(0)); // Placeholder
+
+                // body_start must be set AFTER ReserveLocals so the VM executes it
+                let body_start = reserve_locals_ip;
+
                 // Compile function body
                 for stmt in body {
                     self.compile_stmt(stmt)?;
@@ -420,6 +425,15 @@ impl Compiler {
                         self.emit_unknown(Instruction::Return);
                     }
                 }
+
+                // Patch ReserveLocals with actual local count
+                let total_local_count = self.local_count;
+                let locals_to_reserve = if total_local_count > param_count {
+                    total_local_count - param_count
+                } else {
+                    0
+                };
+                self.bytecode.instructions[reserve_locals_ip] = Instruction::ReserveLocals(locals_to_reserve);
 
                 // Patch the jump to skip over the function body
                 self.patch_jump(jump_over_body)?;
@@ -488,7 +502,6 @@ impl Compiler {
                     skip_jump: Option<usize>,
                 }
                 let mut loops: Vec<LoopInfo> = Vec::new();
-                let mut var_names: Vec<String> = Vec::new();
 
                 // Generate nested loops for each clause
                 for (clause_idx, clause) in clauses.iter().enumerate() {
@@ -503,10 +516,6 @@ impl Compiler {
                     self.emit_unknown(Instruction::Constant(zero_constant));
                     self.emit_unknown(Instruction::Store(index_local));
 
-                    // Declare the loop variable
-                    let var_local = self.declare_local(clause.variable.clone());
-                    var_names.push(clause.variable.clone());
-
                     // Loop start
                     let loop_start = self.current_instruction();
 
@@ -519,11 +528,13 @@ impl Compiler {
                     self.emit_unknown(Instruction::Less);
                     let exit_jump = self.emit_jump(Instruction::JumpIfFalse(0));
 
-                    // Get element at current index
+                    // Get element at current index and bind to pattern
                     self.emit_unknown(Instruction::Load(iterable_local));
                     self.emit_unknown(Instruction::Load(index_local));
                     self.emit_unknown(Instruction::GetIndex);
-                    self.emit_unknown(Instruction::Store(var_local));
+
+                    // Bind pattern with element value on stack
+                    self.compile_pattern_binding(&clause.pattern)?;
 
                     // Optional condition check for this clause
                     let skip_jump = if let Some(cond) = &clause.condition {
@@ -575,10 +586,9 @@ impl Compiler {
                 // Load result list onto stack
                 self.emit_unknown(Instruction::Load(result_local));
 
-                // Clean up locals
-                let locals_created = 1 + clauses.len() * 3; // result + (iterable, index, var) per clause
-                self.local_count -= locals_created;
-                self.locals.retain(|name, _| !name.starts_with("__comp_") && !var_names.contains(name));
+                // Clean up locals (compiler-generated temps only)
+                // Pattern variables will be cleaned up by scope management
+                self.locals.retain(|name, _| !name.starts_with("__comp_"));
 
                 Ok(())
             }
@@ -616,11 +626,26 @@ impl Compiler {
                             self.emit_unknown(Instruction::Equal);
                         }
                         Pattern::Identifier(name) => {
-                            // Bind match value to local variable
-                            let var_local = self.declare_local(name.clone());
-                            arm_locals.push(name.clone());
+                            // Bind match value to variable (local or global depending on scope)
                             self.emit_unknown(Instruction::Dup);
-                            self.emit_unknown(Instruction::Store(var_local)); // Store pops the dup
+                            if self.scope_depth == 0 {
+                                // Global scope
+                                let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                                let name_index = self.add_constant(Value::String(name_id));
+                                self.emit_unknown(Instruction::StoreGlobal(name_index));
+                                // Note: StoreGlobal uses peek, doesn't pop, so we're left with the value on stack
+                            } else {
+                                // Local scope
+                                let var_local = self.declare_local(name.clone());
+                                arm_locals.push(name.clone());
+                                self.emit_unknown(Instruction::Store(var_local)); // Store pops the dup
+                            }
+                            let true_const = self.add_constant(Value::Bool(true));
+                            self.emit_unknown(Instruction::Constant(true_const));
+                        }
+                        Pattern::List(_) | Pattern::Dict(_) => {
+                            // Complex patterns in match arms not yet supported
+                            // Treat as wildcard for now
                             let true_const = self.add_constant(Value::Bool(true));
                             self.emit_unknown(Instruction::Constant(true_const));
                         }

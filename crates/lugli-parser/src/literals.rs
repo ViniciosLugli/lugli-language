@@ -531,9 +531,9 @@ impl<'a> Parser<'a> {
             while self.check(&TokenKind::For) {
                 self.advance(); // consume 'for'
 
-                let variable = self.consume_identifier("Expected variable name after 'for'")?;
+                let pattern = self.parse_pattern()?;
 
-                self.consume(&TokenKind::In, "Expected 'in' after variable in list comprehension")?;
+                self.consume(&TokenKind::In, "Expected 'in' after pattern in list comprehension")?;
 
                 let iterable = self.expression()?;
 
@@ -545,7 +545,7 @@ impl<'a> Parser<'a> {
                 };
 
                 clauses.push(ComprehensionClause {
-                    variable,
+                    pattern,
                     iterable,
                     condition,
                 });
