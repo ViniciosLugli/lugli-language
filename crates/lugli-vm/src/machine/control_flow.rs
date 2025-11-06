@@ -1,4 +1,3 @@
-use crate::Bytecode;
 use lugli_common::{LugliError, Value};
 use super::Machine;
 
