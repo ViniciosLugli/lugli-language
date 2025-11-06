@@ -299,64 +299,118 @@ impl<'a> Parser<'a> {
     }
 
     fn extract_interpolation_expression(&self, chars: &mut std::iter::Peekable<std::str::Chars>) -> Result<String, ParseError> {
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        enum StringType {
+            Regular,
+            FString,
+        }
+
         let mut expr_str = String::new();
         let mut brace_depth = 1;
-        let mut in_string = false;
-        let mut string_delimiter = None;
+        let mut delimiter_stack: Vec<(char, StringType)> = Vec::new();
         let mut escape_next = false;
 
         while let Some(ch) = chars.next() {
+            // Handle escape sequences
             if escape_next {
                 expr_str.push(ch);
                 escape_next = false;
                 continue;
             }
 
-            if ch == '\\' && in_string {
+            // Check for backslash (escape character) when inside a string
+            if !delimiter_stack.is_empty() && ch == '\\' {
                 expr_str.push(ch);
                 escape_next = true;
                 continue;
             }
 
-            // Handle quotes - they toggle string state
-            if (ch == '"' || ch == '\'') && !in_string {
-                // Entering a string
-                in_string = true;
-                string_delimiter = Some(ch);
+            // Check for f-string prefix (f" or f') when NOT inside a string
+            if delimiter_stack.is_empty() && ch == 'f' {
+                if let Some(&quote) = chars.peek() {
+                    if quote == '"' || quote == '\'' {
+                        expr_str.push(ch); // push 'f'
+                        expr_str.push(chars.next().unwrap()); // push quote
+                        delimiter_stack.push((quote, StringType::FString));
+                        continue;
+                    }
+                }
+            }
+
+            // Handle quote characters
+            if ch == '"' || ch == '\'' {
                 expr_str.push(ch);
-                continue;
-            } else if in_string && Some(ch) == string_delimiter {
-                // Exiting a string
-                in_string = false;
-                string_delimiter = None;
-                expr_str.push(ch);
+
+                if let Some(&(delimiter, _string_type)) = delimiter_stack.last() {
+                    // Inside a string - check if this closes it
+                    if ch == delimiter {
+                        // This quote matches the opening delimiter
+                        delimiter_stack.pop();
+
+                        // For f-strings, we need to check if there are interpolations
+                        // The braces inside f-strings should be counted
+                    } else {
+                        // Different quote inside string - start a nested string
+                        delimiter_stack.push((ch, StringType::Regular));
+                    }
+                } else {
+                    // Not in a string - this opens a regular string
+                    delimiter_stack.push((ch, StringType::Regular));
+                }
                 continue;
             }
 
-            // Only count braces outside of strings
-            if !in_string {
-                if ch == '{' {
+            // Handle braces - the key logic for interpolation extraction
+            if ch == '{' {
+                // Count braces ONLY if:
+                // 1. We're not inside any string, OR
+                // 2. We're inside an f-string (but not inside a nested regular string)
+                let should_count = if delimiter_stack.is_empty() {
+                    true // Not in any string
+                } else {
+                    // Check if we're directly in an f-string (not nested in regular string inside it)
+                    delimiter_stack.last() == Some(&('"', StringType::FString))
+                        || delimiter_stack.last() == Some(&('\'', StringType::FString))
+                };
+
+                if should_count {
                     brace_depth += 1;
-                    expr_str.push(ch);
-                } else if ch == '}' {
+                }
+                expr_str.push(ch);
+            } else if ch == '}' {
+                // Mirror logic for closing braces
+                let should_count = if delimiter_stack.is_empty() {
+                    true
+                } else {
+                    delimiter_stack.last() == Some(&('"', StringType::FString))
+                        || delimiter_stack.last() == Some(&('\'', StringType::FString))
+                };
+
+                if should_count {
                     brace_depth -= 1;
                     if brace_depth == 0 {
-                        // Found matching closing brace
+                        // Found the matching closing brace for our interpolation
                         break;
                     }
-                    expr_str.push(ch);
-                } else {
-                    expr_str.push(ch);
                 }
+                expr_str.push(ch);
             } else {
-                // Inside string, just accumulate
+                // Regular character
                 expr_str.push(ch);
             }
         }
 
+        // Validation: ensure all braces and strings are properly closed
         if brace_depth != 0 {
             return Err(ParseError::Custom {
                 message: "Unterminated expression in f-string".to_string(),
+                span: self.current_span(),
+            });
+        }
+
+        if !delimiter_stack.is_empty() {
+            return Err(ParseError::Custom {
+                message: "Unterminated string in f-string expression".to_string(),
                 span: self.current_span(),
             });
         }

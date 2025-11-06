@@ -103,7 +103,6 @@ fn test_nested_fstring_with_expressions() {
 }
 
 #[test]
-#[ignore] // TODO: Triple-nested f-strings require more sophisticated parsing
 fn test_triple_nested_fstring() {
     let code = r#"
         let x = 10
@@ -169,7 +168,6 @@ fn test_fstring_with_list_access_and_strings() {
 }
 
 #[test]
-#[ignore] // TODO: Block expressions with braces inside f-strings need special handling
 fn test_fstring_with_conditional_and_strings() {
     let code = r#"
         let status = "ok"
@@ -202,7 +200,6 @@ fn test_fstring_single_quotes_only() {
 }
 
 #[test]
-#[ignore] // TODO: Triple-nested f-strings with alternating quotes need special handling
 fn test_nested_fstring_alternating_quotes() {
     let code = r#"
         let name = "Bob"

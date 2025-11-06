@@ -5,6 +5,81 @@ use std::fmt;
 // Placeholder StringId used by logos (will be replaced during lexing)
 const PLACEHOLDER_STRING_ID: StringId = unsafe { std::mem::transmute(0u32) };
 
+// Custom f-string lexer using Python-inspired state machine approach
+// Note: logos has already consumed "f\"" or "f'", so we need to determine the quote type
+fn lex_fstring(lex: &mut logos::Lexer<TokenKind>) -> Option<StringId> {
+    // Determine which quote was used by looking at the matched text
+    let slice = lex.slice();
+    let quote = slice.chars().last()?; // Get the quote character (last char of "f\"" or "f'")
+
+    let remainder = lex.remainder();
+    let mut chars = remainder.chars();
+
+    let mut brace_depth = 0;
+    let mut in_string = false;
+    let mut string_delimiter = None;
+    let mut escape_next = false;
+    let mut consumed = 0;
+
+    while let Some(ch) = chars.next() {
+        consumed += ch.len_utf8();
+
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+
+        if ch == '\\' {
+            escape_next = true;
+            continue;
+        }
+
+        // Handle quotes inside interpolations
+        if ch == '"' || ch == '\'' {
+            if in_string && Some(ch) == string_delimiter {
+                // Close the nested string
+                in_string = false;
+                string_delimiter = None;
+            } else if !in_string && brace_depth > 0 {
+                // Open a nested string inside interpolation
+                in_string = true;
+                string_delimiter = Some(ch);
+            } else if !in_string && brace_depth == 0 && ch == quote {
+                // This is the closing quote of the f-string
+                lex.bump(consumed);
+                return Some(PLACEHOLDER_STRING_ID);
+            }
+            continue;
+        }
+
+        // Track braces for interpolations (only when not in nested strings)
+        if !in_string {
+            if ch == '{' {
+                // Check for escaped brace {{ (only when not inside interpolation)
+                if brace_depth == 0 && chars.clone().next() == Some('{') {
+                    chars.next(); // consume second {
+                    consumed += 1;
+                } else {
+                    brace_depth += 1;
+                }
+            } else if ch == '}' {
+                // Check for escaped brace }} (only when not inside interpolation)
+                if brace_depth == 0 && chars.clone().next() == Some('}') {
+                    chars.next(); // consume second }
+                    consumed += 1;
+                } else if brace_depth > 0 {
+                    brace_depth -= 1;
+                }
+            }
+        }
+    }
+
+    // Unterminated f-string - consume everything to EOF and let parser handle the error
+    // This allows better error messages from the parser
+    lex.bump(consumed);
+    Some(PLACEHOLDER_STRING_ID)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
@@ -41,8 +116,8 @@ pub enum TokenKind {
     #[regex(r#"'([^'\\]|\\.)*'"#, |_| PLACEHOLDER_STRING_ID)]
     String(StringId),
 
-    #[regex(r#"f"([^"\\]|\\.)*""#, |_| PLACEHOLDER_STRING_ID)]
-    #[regex(r#"f'([^'\\]|\\.)*'"#, |_| PLACEHOLDER_STRING_ID)]
+    #[token("f\"", lex_fstring)]
+    #[token("f'", lex_fstring)]
     FString(StringId),
 
     #[token("true")]
