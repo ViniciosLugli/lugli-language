@@ -1,0 +1,8 @@
+let PI = 3.14159
+let E = 2.71828
+
+fn square(x) {
+    return x * x
+}
+
+let SQRT_2 = 1.41421

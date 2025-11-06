@@ -60,6 +60,15 @@ impl ModuleCache {
         self.modules.clear();
         self.loading.clear();
     }
+
+    pub fn find_in_exports(&self, name: &str) -> Option<Value> {
+        for module in self.modules.values() {
+            if let Some(value) = module.exports.get(name) {
+                return Some(value.clone());
+            }
+        }
+        None
+    }
 }
 
 impl Default for ModuleCache {
