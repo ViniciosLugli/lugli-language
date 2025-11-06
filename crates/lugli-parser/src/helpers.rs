@@ -318,34 +318,18 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
-            // Check for f-string prefix (f" or f')
-            if !in_string && ch == 'f' {
-                if let Some(&next_ch) = chars.peek() {
-                    if next_ch == '"' || next_ch == '\'' {
-                        // This is an f-string, mark as entering string
-                        expr_str.push(ch);
-                        expr_str.push(chars.next().unwrap()); // consume quote
-                        in_string = true;
-                        string_delimiter = Some(next_ch);
-                        continue;
-                    }
-                }
-            }
-
-            // Handle quotes
-            if ch == '"' || ch == '\'' {
+            // Handle quotes - they toggle string state
+            if (ch == '"' || ch == '\'') && !in_string {
+                // Entering a string
+                in_string = true;
+                string_delimiter = Some(ch);
                 expr_str.push(ch);
-                if in_string {
-                    // Check if this closes the string
-                    if Some(ch) == string_delimiter {
-                        in_string = false;
-                        string_delimiter = None;
-                    }
-                } else {
-                    // Opening a string
-                    in_string = true;
-                    string_delimiter = Some(ch);
-                }
+                continue;
+            } else if in_string && Some(ch) == string_delimiter {
+                // Exiting a string
+                in_string = false;
+                string_delimiter = None;
+                expr_str.push(ch);
                 continue;
             }
 
