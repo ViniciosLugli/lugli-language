@@ -55,9 +55,7 @@ pub fn list_join(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliEr
 }
 
 pub fn list_contains(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("list.contains expects 2 arguments (list, item)"));
-    }
+    check_arity(args, 2, "list.contains")?;
     match &args[0] {
         Value::List(l) => {
             let contains = l.borrow().iter().any(|v| v.equals(&args[1]));
@@ -68,9 +66,7 @@ pub fn list_contains(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lu
 }
 
 pub fn list_is_empty(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("list.is_empty expects 1 argument"));
-    }
+    check_arity(args, 1, "list.is_empty")?;
     match &args[0] {
         Value::List(l) => Ok(Value::Bool(l.borrow().is_empty())),
         _ => Err(LugliError::type_error("list", args[0].type_name())),
@@ -78,9 +74,7 @@ pub fn list_is_empty(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lu
 }
 
 pub fn list_clear(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("list.clear expects 1 argument"));
-    }
+    check_arity(args, 1, "list.clear")?;
     match &args[0] {
         Value::List(l) => {
             l.borrow_mut().clear();
