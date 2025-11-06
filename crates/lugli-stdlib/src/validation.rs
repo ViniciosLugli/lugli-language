@@ -1,4 +1,6 @@
-use lugli_common::{LugliError, StringPool, Value};
+use lugli_common::{LugliError, StringId, StringPool, Value};
+use hashbrown::HashMap;
+use std::{cell::RefCell, rc::Rc};
 
 /// Validates that args has exactly `expected` number of arguments
 pub fn check_arity(args: &[Value], expected: usize, fn_name: &str) -> Result<(), LugliError> {
@@ -45,6 +47,33 @@ pub fn expect_bool(value: &Value, fn_name: &str, arg_pos: usize) -> Result<bool,
     match value {
         Value::Bool(b) => Ok(*b),
         _ => Err(LugliError::runtime(format!("{} argument {} must be boolean, got {}", fn_name, arg_pos, value.type_name()))),
+    }
+}
+
+/// Extracts a list from a Value, returning error if not a list
+pub fn expect_list<'a>(value: &'a Value, fn_name: &str, arg_pos: usize) -> Result<&'a Rc<RefCell<Vec<Value>>>, LugliError> {
+    match value {
+        Value::List(l) => Ok(l),
+        _ => Err(LugliError::runtime(format!("{} argument {} must be list, got {}", fn_name, arg_pos, value.type_name()))),
+    }
+}
+
+/// Extracts a dict from a Value, returning error if not a dict
+pub fn expect_dict<'a>(value: &'a Value, fn_name: &str, arg_pos: usize) -> Result<&'a Rc<RefCell<HashMap<StringId, Value>>>, LugliError> {
+    match value {
+        Value::Dict(d) => Ok(d),
+        _ => Err(LugliError::runtime(format!("{} argument {} must be dict, got {}", fn_name, arg_pos, value.type_name()))),
+    }
+}
+
+/// Converts a Value to a dictionary key (StringId)
+pub fn value_to_dict_key(value: &Value, pool: &mut StringPool) -> Result<StringId, LugliError> {
+    match value {
+        Value::String(id) => Ok(*id),
+        Value::Number(n) => Ok(pool.intern(&n.to_string())),
+        Value::Bool(b) => Ok(pool.intern(if *b { "true" } else { "false" })),
+        Value::Null => Ok(pool.intern("null")),
+        other => Err(LugliError::runtime(format!("Cannot use {} as dictionary key", other.type_name()))),
     }
 }
 

@@ -74,8 +74,9 @@ pub struct Machine {
 
 impl Machine {
     pub fn new() -> Self {
-        let mut globals = HashMap::new();
-        for (name, func) in get_global_functions() {
+        let global_functions = get_global_functions();
+        let mut globals = HashMap::with_capacity(global_functions.len());
+        for (name, func) in global_functions {
             globals.insert(
                 name.to_string(),
                 Value::NativeFunction {
@@ -91,21 +92,24 @@ impl Machine {
             debug.start_time = Some(Instant::now());
         }
 
+        let mut call_stack = Vec::with_capacity(64);
+        call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
+
         Self {
             stack: Vec::with_capacity(256),
             globals,
             ip: 0,
-            call_stack: vec![CallFrame::new("<script>".to_string(), 0, 0, None)],
+            call_stack,
             debug,
             module_cache: ModuleCache::new(),
             module_resolver: ModuleResolver::new(),
             current_file: None,
-            bytecode_registry: HashMap::new(),
-            module_globals: HashMap::new(),
+            bytecode_registry: HashMap::with_capacity(16),
+            module_globals: HashMap::with_capacity(16),
             next_bytecode_id: 1,
-            open_upvalues: HashMap::new(),
+            open_upvalues: HashMap::with_capacity(32),
             method_registry: lugli_stdlib::MethodRegistry::new(),
-            method_cache: HashMap::new(),
+            method_cache: HashMap::with_capacity(256),
             gc: lugli_common::GarbageCollector::new(),
         }
     }
@@ -630,13 +634,17 @@ impl Machine {
             eprintln!("[TRACE] IP:{:04} | {:?}", self.ip, instruction);
         }
 
-        // Periodic garbage collection every 10,000 instructions
-        if self.debug.instruction_count % 10_000 == 0 {
-            let mut roots = Vec::with_capacity(self.globals.len() + self.stack.len());
-            roots.extend(self.globals.values().cloned());
-            roots.extend(self.stack.iter().cloned());
-            self.gc.collect(&roots);
-        }
+        // TODO: GC is currently disabled because:
+        // 1. It clones entire VM state (expensive)
+        // 2. sweep() is a no-op - doesn't actually free memory
+        // 3. Rust's Rc<RefCell<>> handles reference counting automatically
+        // Need to implement proper tri-color marking GC or remove GC tracking entirely
+        // if self.debug.instruction_count % 10_000 == 0 {
+        //     let mut roots = Vec::with_capacity(self.globals.len() + self.stack.len());
+        //     roots.extend(self.globals.values().cloned());
+        //     roots.extend(self.stack.iter().cloned());
+        //     self.gc.collect(&roots);
+        // }
 
         if self.debug.trace_stack && !self.stack.is_empty() {
             eprintln!("[STACK] depth:{} top:{:?}", self.stack.len(), self.stack.last());

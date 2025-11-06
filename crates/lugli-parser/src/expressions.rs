@@ -5,13 +5,17 @@ use lugli_lexer::TokenKind;
 impl<'a> Parser<'a> {
     pub(crate) fn expression(&mut self) -> Result<Expr, ParseError> { self.or() }
 
-    pub(crate) fn or(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.and()?;
+    fn parse_binary_left_associative(
+        &mut self,
+        operators: &[TokenKind],
+        next_precedence: fn(&mut Self) -> Result<Expr, ParseError>,
+    ) -> Result<Expr, ParseError> {
+        let mut expr = next_precedence(self)?;
 
-        while self.match_any(&[TokenKind::Or]) {
+        while self.match_any(operators) {
             let operator_kind = self.previous().kind.clone();
             self.skip_newlines();
-            let right = self.and()?;
+            let right = next_precedence(self)?;
 
             let left_span = self.get_expr_span(expr.id());
             let right_span = self.get_expr_span(right.id());
@@ -28,131 +32,36 @@ impl<'a> Parser<'a> {
         }
 
         Ok(expr)
+    }
+
+    pub(crate) fn or(&mut self) -> Result<Expr, ParseError> {
+        self.parse_binary_left_associative(&[TokenKind::Or], Self::and)
     }
 
     pub(crate) fn and(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.equality()?;
-
-        while self.match_any(&[TokenKind::And]) {
-            let operator_kind = self.previous().kind.clone();
-            self.skip_newlines();
-            let right = self.equality()?;
-
-            let left_span = self.get_expr_span(expr.id());
-            let right_span = self.get_expr_span(right.id());
-            let span = self.merge_spans(left_span, right_span);
-            let id = self.span_map.alloc_id();
-            self.span_map.insert(id, span);
-
-            expr = Expr::Binary {
-                id,
-                left: Box::new(expr),
-                operator: operator_kind,
-                right: Box::new(right),
-            };
-        }
-
-        Ok(expr)
+        self.parse_binary_left_associative(&[TokenKind::And], Self::equality)
     }
 
     pub(crate) fn equality(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.comparison()?;
-
-        while self.match_any(&[TokenKind::BangEqual, TokenKind::EqualEqual]) {
-            let operator_kind = self.previous().kind.clone();
-            self.skip_newlines();
-            let right = self.comparison()?;
-
-            let left_span = self.get_expr_span(expr.id());
-            let right_span = self.get_expr_span(right.id());
-            let span = self.merge_spans(left_span, right_span);
-            let id = self.span_map.alloc_id();
-            self.span_map.insert(id, span);
-
-            expr = Expr::Binary {
-                id,
-                left: Box::new(expr),
-                operator: operator_kind,
-                right: Box::new(right),
-            };
-        }
-
-        Ok(expr)
+        self.parse_binary_left_associative(&[TokenKind::BangEqual, TokenKind::EqualEqual], Self::comparison)
     }
 
     pub(crate) fn comparison(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.term()?;
-
-        while self.match_any(&[TokenKind::Greater, TokenKind::GreaterEqual, TokenKind::Less, TokenKind::LessEqual]) {
-            let operator_kind = self.previous().kind.clone();
-            self.skip_newlines();
-            let right = self.term()?;
-
-            let left_span = self.get_expr_span(expr.id());
-            let right_span = self.get_expr_span(right.id());
-            let span = self.merge_spans(left_span, right_span);
-            let id = self.span_map.alloc_id();
-            self.span_map.insert(id, span);
-
-            expr = Expr::Binary {
-                id,
-                left: Box::new(expr),
-                operator: operator_kind,
-                right: Box::new(right),
-            };
-        }
-
-        Ok(expr)
+        self.parse_binary_left_associative(
+            &[TokenKind::Greater, TokenKind::GreaterEqual, TokenKind::Less, TokenKind::LessEqual],
+            Self::term,
+        )
     }
 
     pub(crate) fn term(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.factor()?;
-
-        while self.match_any(&[TokenKind::Minus, TokenKind::Plus]) {
-            let operator_kind = self.previous().kind.clone();
-            self.skip_newlines();
-            let right = self.factor()?;
-
-            let left_span = self.get_expr_span(expr.id());
-            let right_span = self.get_expr_span(right.id());
-            let span = self.merge_spans(left_span, right_span);
-            let id = self.span_map.alloc_id();
-            self.span_map.insert(id, span);
-
-            expr = Expr::Binary {
-                id,
-                left: Box::new(expr),
-                operator: operator_kind,
-                right: Box::new(right),
-            };
-        }
-
-        Ok(expr)
+        self.parse_binary_left_associative(&[TokenKind::Minus, TokenKind::Plus], Self::factor)
     }
 
     pub(crate) fn factor(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.power()?;
-
-        while self.match_any(&[TokenKind::Slash, TokenKind::Star, TokenKind::Percent, TokenKind::IntegerDivision]) {
-            let operator_kind = self.previous().kind.clone();
-            self.skip_newlines();
-            let right = self.power()?;
-
-            let left_span = self.get_expr_span(expr.id());
-            let right_span = self.get_expr_span(right.id());
-            let span = self.merge_spans(left_span, right_span);
-            let id = self.span_map.alloc_id();
-            self.span_map.insert(id, span);
-
-            expr = Expr::Binary {
-                id,
-                left: Box::new(expr),
-                operator: operator_kind,
-                right: Box::new(right),
-            };
-        }
-
-        Ok(expr)
+        self.parse_binary_left_associative(
+            &[TokenKind::Slash, TokenKind::Star, TokenKind::Percent, TokenKind::IntegerDivision],
+            Self::power,
+        )
     }
 
     pub(crate) fn power(&mut self) -> Result<Expr, ParseError> {

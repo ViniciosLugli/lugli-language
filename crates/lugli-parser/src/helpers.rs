@@ -330,9 +330,11 @@ impl<'a> Parser<'a> {
                 if let Some(&quote) = chars.peek() {
                     if quote == '"' || quote == '\'' {
                         expr_str.push(ch); // push 'f'
-                        expr_str.push(chars.next().unwrap()); // push quote
-                        delimiter_stack.push((quote, StringType::FString));
-                        continue;
+                        if let Some(quote_ch) = chars.next() {
+                            expr_str.push(quote_ch); // push quote
+                            delimiter_stack.push((quote, StringType::FString));
+                            continue;
+                        }
                     }
                 }
             }
