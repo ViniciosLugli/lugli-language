@@ -479,10 +479,41 @@ impl Machine {
             .compile(&ast, span_map)
             .map_err(|e| LugliError::runtime(format!("Compile error in module '{}': {}", resolved_path.display(), e)))?;
 
-        // Assign and register bytecode ID for this module
+        // TODO: Module import system requires architectural changes
+        // Current issue: Each bytecode has its own RefCell<StringPool>, but modules need to share
+        // the same pool to avoid string ID mismatches. This requires changing Bytecode to use
+        // Rc<RefCell<StringPool>> instead of RefCell<StringPool>, which is a significant refactoring.
+        //
+        // For now, basic module loading works but may have string pool synchronization issues
+        // when modules create new strings during execution (e.g., f-string evaluation).
+
+        // Attempt to merge module's string pool (partial solution)
+        let string_id_mapping = {
+            if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
+                let mut main_pool = main_bytecode.string_pool.borrow_mut();
+                let module_pool = module_bytecode.string_pool.borrow();
+                main_pool.merge(&module_pool)
+            } else {
+                HashMap::new()
+            }
+        };
+
+        // Remap bytecode constants
+        let mut remapped_bytecode = module_bytecode.clone();
+        for constant in remapped_bytecode.constants.iter_mut() {
+            constant.remap_string_ids(&string_id_mapping);
+        }
+
+        // Replace the module's string pool with the main program's string pool
+        // This ensures all string operations in the module use the main pool
+        if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
+            *remapped_bytecode.string_pool.borrow_mut() = main_bytecode.string_pool.borrow().clone();
+        }
+
+        // NOW assign and register the remapped bytecode ID for this module
         let module_bytecode_id = self.next_bytecode_id;
         self.next_bytecode_id += 1;
-        self.bytecode_registry.insert(module_bytecode_id, Rc::new(module_bytecode.clone()));
+        self.bytecode_registry.insert(module_bytecode_id, Rc::new(remapped_bytecode.clone()));
 
         let saved_globals = self.globals.clone();
         let saved_file = self.current_file.clone();
@@ -503,13 +534,12 @@ impl Machine {
         }
         self.current_file = Some(resolved_path.clone());
 
-        // Execute module bytecode directly without calling run() to avoid overwriting bytecode ID
-        // 0
+        // Execute module bytecode directly (now with remapped string pool)
         self.ip = 0;
         let mut result = Ok(());
-        while self.ip < module_bytecode.instructions.len() {
-            let instruction = &module_bytecode.instructions[self.ip];
-            match self.execute_instruction(instruction, &module_bytecode) {
+        while self.ip < remapped_bytecode.instructions.len() {
+            let instruction = &remapped_bytecode.instructions[self.ip];
+            match self.execute_instruction(instruction, &remapped_bytecode) {
                 Ok(should_continue) => {
                     if !should_continue {
                         break;
@@ -525,6 +555,11 @@ impl Machine {
         result?;
 
         let mut module_exports = self.globals.clone();
+
+        // Remap all StringIds in module exports to use the main pool's IDs (safety measure)
+        for (_, value) in module_exports.iter_mut() {
+            value.remap_string_ids(&string_id_mapping);
+        }
 
         // Update all functions in exports to have correct bytecode_id
         for (_, value) in module_exports.iter_mut() {
@@ -553,7 +588,7 @@ impl Machine {
 
         let module = crate::module::Module {
             path: resolved_path.clone(),
-            bytecode: module_bytecode,
+            bytecode: remapped_bytecode,
             exports: module_exports.clone(),
         };
 
@@ -1454,6 +1489,9 @@ impl Machine {
                         if !idx.is_finite() {
                             return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
                         }
+                        if idx.fract() != 0.0 {
+                            return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
+                        }
                         if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
                             return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
                         }
@@ -1462,23 +1500,27 @@ impl Machine {
                         let len = list_ref.len() as i64;
                         let idx_i64 = *idx as i64;
 
-                        let actual_idx = if idx_i64 < 0 {
+                        // Check bounds and return null if out of range
+                        let actual_idx_opt = if idx_i64 < 0 {
                             let positive_offset = len + idx_i64;
                             if positive_offset < 0 {
-                                return Err(LugliError::runtime(format!(
-                                    "Negative index {} out of range for list of length {} (minimum is -{})",
-                                    idx_i64, len, len
-                                )));
+                                None
+                            } else {
+                                Some(positive_offset as usize)
                             }
-                            positive_offset as usize
                         } else {
                             if idx_i64 >= len {
-                                return Err(LugliError::runtime(format!("Index {} out of range for list of length {}", idx_i64, len)));
+                                None
+                            } else {
+                                Some(idx_i64 as usize)
                             }
-                            idx_i64 as usize
                         };
 
-                        self.stack.push(list_ref[actual_idx].clone());
+                        if let Some(actual_idx) = actual_idx_opt {
+                            self.stack.push(list_ref[actual_idx].clone());
+                        } else {
+                            self.stack.push(Value::Null);
+                        }
                     }
                     (Value::Dict(dict), Value::String(key)) => {
                         let dict_ref = dict.borrow();
@@ -1552,6 +1594,9 @@ impl Machine {
                         // Validate index is finite and in valid range
                         if !idx.is_finite() {
                             return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+                        }
+                        if idx.fract() != 0.0 {
+                            return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
                         }
                         if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
                             return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
