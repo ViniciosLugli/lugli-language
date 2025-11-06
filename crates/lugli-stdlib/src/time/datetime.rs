@@ -1,10 +1,9 @@
+use crate::validation::check_arity;
 use chrono::{TimeZone, Utc};
 use lugli_common::{LugliError, StringPool, Value};
 
 pub fn format_datetime(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("format_datetime expects 2 arguments"));
-    }
+    check_arity(args, 2, "format_datetime")?;
 
     let timestamp = match &args[0] {
         Value::Number(n) => *n as i64,

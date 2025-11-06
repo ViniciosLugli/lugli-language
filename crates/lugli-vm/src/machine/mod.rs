@@ -3,9 +3,17 @@ use crate::{
     module::{ModuleCache, ModuleResolver},
 };
 use hashbrown::HashMap;
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringId, StringPool, Value};
 use lugli_stdlib::get_global_functions;
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
+
+// Instruction handler modules
+mod stack_ops;
+mod arithmetic_ops;
+mod variable_ops;
+mod object_ops;
+mod control_flow;
+mod utility_ops;
 
 const MAX_STACK_SIZE: usize = 10_000;
 const MAX_CALL_DEPTH: usize = 1000;
@@ -63,8 +71,9 @@ pub struct Machine {
     module_cache: ModuleCache,
     module_resolver: ModuleResolver,
     current_file: Option<PathBuf>,
+    string_pool: Rc<RefCell<StringPool>>,
     bytecode_registry: HashMap<usize, Rc<Bytecode>>,
-    module_globals: HashMap<usize, HashMap<String, Value>>,
+    module_globals: HashMap<usize, Rc<HashMap<String, Value>>>,
     next_bytecode_id: usize,
     open_upvalues: HashMap<usize, Rc<RefCell<Value>>>,
     method_registry: lugli_stdlib::MethodRegistry,
@@ -81,6 +90,7 @@ impl Machine {
     }
 
     pub fn new() -> Self {
+        let string_pool = Rc::new(RefCell::new(StringPool::with_common_strings()));
         let global_functions = get_global_functions();
         let mut globals = HashMap::with_capacity(global_functions.len());
         for (name, func) in global_functions {
@@ -111,6 +121,7 @@ impl Machine {
             module_cache: ModuleCache::new(),
             module_resolver: ModuleResolver::new(),
             current_file: None,
+            string_pool,
             bytecode_registry: HashMap::with_capacity(16),
             module_globals: HashMap::with_capacity(16),
             next_bytecode_id: 1,
@@ -214,19 +225,47 @@ impl Machine {
         }
     }
 
+    /// Resolve a StringId using hybrid approach: try shared pool first, then bytecode pools
+    fn resolve_string_id(&self, id: StringId) -> Option<String> {
+        // Try shared pool first (fast path)
+        {
+            let pool = self.string_pool.borrow();
+            if let Some(s) = pool.try_resolve(id) {
+                return Some(s.to_string());
+            }
+        }
+
+        // Fallback: search bytecode pools
+        for bytecode in self.bytecode_registry.values() {
+            let pool = bytecode.string_pool.borrow();
+            if let Some(s) = pool.try_resolve(id) {
+                return Some(s.to_string());
+            }
+        }
+
+        None
+    }
+
     pub fn format_value(&self, value: &Value) -> String {
         use lugli_common::Value;
 
         match value {
             Value::String(id) => {
-                // Try to resolve string from any registered bytecode
+                // Try shared string pool first (fast path for modules)
+                let pool = self.string_pool.borrow();
+                if let Some(s) = pool.try_resolve(*id) {
+                    return format!("\"{}\"", s);
+                }
+                drop(pool);
+
+                // Fallback: search registered bytecode pools (for REPL/standalone bytecode)
                 for bytecode in self.bytecode_registry.values() {
                     let pool = bytecode.string_pool.borrow();
                     if let Some(s) = pool.try_resolve(*id) {
                         return format!("\"{}\"", s);
                     }
                 }
-                // Fallback if not found
+
                 format!("<string#{}>", id.as_u32())
             }
             Value::List(l) => match l.try_borrow() {
@@ -240,11 +279,25 @@ impl Machine {
                 Ok(dict_ref) => {
                     let mut items = Vec::new();
                     for (k, v) in dict_ref.iter() {
-                        let key_str = self
-                            .bytecode_registry
-                            .values()
-                            .find_map(|bc| bc.string_pool.borrow().try_resolve(*k).map(|s| s.to_string()))
-                            .unwrap_or_else(|| format!("<string#{}>", k.as_u32()));
+                        // Try shared pool first, then fall back to bytecode pools
+                        let key_str = {
+                            let pool = self.string_pool.borrow();
+                            if let Some(s) = pool.try_resolve(*k) {
+                                s.to_string()
+                            } else {
+                                drop(pool);
+                                // Search bytecode pools
+                                let mut found = None;
+                                for bytecode in self.bytecode_registry.values() {
+                                    let pool = bytecode.string_pool.borrow();
+                                    if let Some(s) = pool.try_resolve(*k) {
+                                        found = Some(s.to_string());
+                                        break;
+                                    }
+                                }
+                                found.unwrap_or_else(|| format!("<string#{}>", k.as_u32()))
+                            }
+                        };
                         items.push(format!("\"{}\": {}", key_str, self.format_value(v)));
                     }
                     format!("{{ {} }}", items.join(", "))
@@ -408,7 +461,7 @@ impl Machine {
                 let saved_globals = self.globals.clone();
                 if bytecode_id != &0 {
                     if let Some(module_globals) = self.module_globals.get(bytecode_id) {
-                        self.globals = module_globals.clone();
+                        self.globals = (**module_globals).clone();
                     }
                 }
 
@@ -497,9 +550,9 @@ impl Machine {
             parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
 
         let shared_pool = if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
-            std::rc::Rc::clone(&main_bytecode.string_pool)
+            Rc::clone(&main_bytecode.string_pool)
         } else {
-            std::rc::Rc::new(std::cell::RefCell::new(lugli_common::StringPool::with_common_strings()))
+            Rc::new(RefCell::new(lugli_common::StringPool::with_common_strings()))
         };
 
         let mut compiler = crate::Compiler::with_shared_pool(shared_pool);
@@ -569,7 +622,7 @@ impl Machine {
         }
 
         // Store module globals for cross-bytecode function calls
-        self.module_globals.insert(module_bytecode_id, module_exports.clone());
+        self.module_globals.insert(module_bytecode_id, Rc::new(module_exports.clone()));
 
         self.globals = saved_globals;
         self.current_file = saved_file;
@@ -660,131 +713,47 @@ impl Machine {
         let inst_start = if self.debug.trace_execution { Some(Instant::now()) } else { None };
 
         match instruction {
-            Instruction::Constant(index) => {
-                let value = self.get_constant(bytecode, *index)?.clone_for_stack();
-                self.stack.push(value);
-            }
-            Instruction::LoadSmallInt(n) => {
-                self.stack.push(Value::Number(*n as f64));
-            }
-            Instruction::LoadInt(n) => {
-                self.stack.push(Value::Number(*n as f64));
-            }
-            Instruction::LoadTrue => {
-                self.stack.push(Value::Bool(true));
-            }
-            Instruction::LoadFalse => {
-                self.stack.push(Value::Bool(false));
-            }
-            Instruction::LoadNull => {
-                self.stack.push(Value::Null);
-            }
-            Instruction::ReserveLocals(count) => {
-                // Push Null for each local variable to reserve stack space
-                for _ in 0..*count {
-                    self.stack.push(Value::Null);
-                }
-            }
-            Instruction::Pop => {
-                self.pop()?;
-            }
-            Instruction::Dup => {
-                let val = self.peek()?.clone_for_stack();
-                self.stack.push(val);
-            }
-            Instruction::Add => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                let result = match (&a, &b) {
-                    (Value::String(_), Value::String(_)) => {
-                        let mut pool = bytecode.string_pool.borrow_mut();
-                        a.add_with_pool(&b, &mut pool)?
-                    }
-                    _ => a.add(&b)?,
-                };
-                self.stack.push(result);
-            }
-            Instruction::Subtract => self.execute_binary_op(Value::subtract)?,
-            Instruction::Multiply => self.execute_binary_op(Value::multiply)?,
-            Instruction::Divide => self.execute_binary_op(Value::divide)?,
-            Instruction::IntegerDivide => self.execute_binary_op(Value::integer_divide)?,
-            Instruction::Modulo => self.execute_binary_op(Value::modulo)?,
-            Instruction::Power => self.execute_binary_op(Value::power)?,
-            Instruction::AddInt(n) => {
-                let left = self.pop()?;
-                if let Value::Number(a) = left {
-                    self.stack.push(Value::Number(a + (*n as f64)));
-                } else {
-                    return Err(LugliError::type_error("number", left.type_name()));
-                }
-            }
-            Instruction::SubInt(n) => {
-                let left = self.pop()?;
-                if let Value::Number(a) = left {
-                    self.stack.push(Value::Number(a - (*n as f64)));
-                } else {
-                    return Err(LugliError::type_error("number", left.type_name()));
-                }
-            }
-            Instruction::MulInt(n) => {
-                let left = self.pop()?;
-                if let Value::Number(a) = left {
-                    self.stack.push(Value::Number(a * (*n as f64)));
-                } else {
-                    return Err(LugliError::type_error("number", left.type_name()));
-                }
-            }
-            Instruction::Negate => {
-                let val = self.pop()?;
-                self.stack.push(val.negate()?);
-            }
-            Instruction::Not => {
-                let val = self.pop()?;
-                self.stack.push(Value::Bool(!val.is_truthy()));
-            }
-            Instruction::And => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(Value::Bool(a.is_truthy() && b.is_truthy()));
-            }
-            Instruction::Or => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(Value::Bool(a.is_truthy() || b.is_truthy()));
-            }
-            Instruction::Print => {
-                let val = self.pop()?;
-                println!("{}", val);
-            }
-            Instruction::Equal => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(Value::Bool(a.equals(&b)));
-            }
-            Instruction::NotEqual => {
-                let b = self.pop()?;
-                let a = self.pop()?;
-                self.stack.push(Value::Bool(!a.equals(&b)));
-            }
-            Instruction::Greater => self.execute_binary_op(Value::greater)?,
-            Instruction::GreaterEqual => self.execute_binary_op(Value::greater_equal)?,
-            Instruction::Less => self.execute_binary_op(Value::less)?,
-            Instruction::LessEqual => self.execute_binary_op(Value::less_equal)?,
-            Instruction::Jump(addr) => {
-                self.ip = *addr;
-                return Ok(true);
-            }
+            // Stack operations
+            Instruction::Constant(index) => self.exec_constant(bytecode, *index)?,
+            Instruction::LoadSmallInt(n) => self.exec_load_small_int(*n)?,
+            Instruction::LoadInt(n) => self.exec_load_int(*n)?,
+            Instruction::LoadTrue => self.exec_load_true()?,
+            Instruction::LoadFalse => self.exec_load_false()?,
+            Instruction::LoadNull => self.exec_load_null()?,
+            Instruction::ReserveLocals(count) => self.exec_reserve_locals(*count)?,
+            Instruction::Pop => self.exec_pop()?,
+            Instruction::Dup => self.exec_dup()?,
+            Instruction::Print => self.exec_print()?,
+
+            // Arithmetic and logical operations
+            Instruction::Add => self.exec_add(bytecode)?,
+            Instruction::Subtract => self.exec_subtract()?,
+            Instruction::Multiply => self.exec_multiply()?,
+            Instruction::Divide => self.exec_divide()?,
+            Instruction::IntegerDivide => self.exec_integer_divide()?,
+            Instruction::Modulo => self.exec_modulo()?,
+            Instruction::Power => self.exec_power()?,
+            Instruction::AddInt(n) => self.exec_add_int(*n)?,
+            Instruction::SubInt(n) => self.exec_sub_int(*n)?,
+            Instruction::MulInt(n) => self.exec_mul_int(*n)?,
+            Instruction::Negate => self.exec_negate()?,
+            Instruction::Not => self.exec_not()?,
+            Instruction::And => self.exec_and()?,
+            Instruction::Or => self.exec_or()?,
+            Instruction::Equal => self.exec_equal()?,
+            Instruction::NotEqual => self.exec_not_equal()?,
+            Instruction::Greater => self.exec_greater()?,
+            Instruction::GreaterEqual => self.exec_greater_equal()?,
+            Instruction::Less => self.exec_less()?,
+            Instruction::LessEqual => self.exec_less_equal()?,
+            // Control flow operations
+            Instruction::Jump(addr) => return self.exec_jump(*addr),
             Instruction::JumpIfFalse(addr) => {
-                let condition = self.pop()?;
-                if !condition.is_truthy() {
-                    self.ip = *addr;
+                if self.exec_jump_if_false(*addr)? {
                     return Ok(true);
                 }
             }
-            Instruction::Loop(start) => {
-                self.ip = *start;
-                return Ok(true);
-            }
+            Instruction::Loop(start) => return self.exec_loop(*start),
             Instruction::Call(arg_count) => {
                 let arg_count = *arg_count as usize;
                 let callee = self.peek_n(0)?.clone_for_stack(); // Callee is at the top
@@ -863,7 +832,7 @@ impl Machine {
                             // Save and restore module globals for cross-bytecode execution
                             let saved_globals = self.globals.clone();
                             if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
-                                self.globals = module_globals.clone();
+                                self.globals = (**module_globals).clone();
                             }
 
                             let saved_ip = self.ip;
@@ -913,7 +882,7 @@ impl Machine {
                             // Save and restore module globals for cross-bytecode execution
                             let saved_globals = self.globals.clone();
                             if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
-                                self.globals = module_globals.clone();
+                                self.globals = (**module_globals).clone();
                             }
 
                             let saved_ip = self.ip;
@@ -939,284 +908,24 @@ impl Machine {
                     }
                 }
             }
-            Instruction::Return => {
-                let frame = self.call_stack.pop().ok_or_else(|| LugliError::runtime("Call stack underflow"))?;
-                let return_value = self.pop().unwrap_or(Value::Null);
-
-                // Close upvalues for this frame before returning
-                let frame_base = frame.stack_base;
-                let frame_end = self.stack.len();
-                self.open_upvalues.retain(|&index, _| index < frame_base || index >= frame_end);
-
-                if self.call_stack.is_empty() {
-                    self.stack.push(return_value);
-                    return Ok(false);
-                }
-
-                self.ip = frame.return_ip;
-                self.stack.truncate(frame.stack_base);
-                self.stack.push(return_value);
-                return Ok(true);
-            }
-            Instruction::Load(index) => {
-                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
-                let target_index = frame.stack_base + index;
-                let value = self
-                    .stack
-                    .get(target_index)
-                    .ok_or_else(|| {
-                        LugliError::runtime(format!(
-                            "Stack underflow: attempted to load local {} at index {} (stack size: {})",
-                            index,
-                            target_index,
-                            self.stack.len()
-                        ))
-                    })?
-                    .clone();
-                self.stack.push(value);
-            }
-            Instruction::Store(index) => {
-                let value = self.pop()?;
-                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
-                let target_index = frame.stack_base + index;
-
-                // Grow stack if necessary
-                while self.stack.len() <= target_index {
-                    self.stack.push(Value::Null);
-                }
-
-                self.stack[target_index] = value;
-            }
-            Instruction::LoadUpvalue(index) => {
-                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
-
-                if let Some(upvalues) = &frame.closure_upvalues {
-                    let upvalue_ref = upvalues
-                        .get(*index)
-                        .ok_or_else(|| LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len())))?;
-
-                    let value = upvalue_ref.try_borrow().map_err(|_| LugliError::runtime("Cannot access upvalue while it's being modified"))?.clone();
-
-                    self.stack.push(value);
-                } else {
-                    return Err(LugliError::runtime("LoadUpvalue used in non-closure context"));
-                }
-            }
-            Instruction::StoreUpvalue(index) => {
-                let value = self.pop()?;
-                let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
-
-                if let Some(upvalues) = &frame.closure_upvalues {
-                    let upvalue_ref = upvalues
-                        .get(*index)
-                        .ok_or_else(|| LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len())))?;
-
-                    *upvalue_ref.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify upvalue while it's being used"))? = value;
-                } else {
-                    return Err(LugliError::runtime("StoreUpvalue used in non-closure context"));
-                }
-            }
-            Instruction::LoadGlobal(name_index) => {
-                let var_name = self.get_constant(bytecode, *name_index)?;
-                if let Value::String(name_id) = var_name {
-                    let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                    if let Some(value) = self.globals.get(&name) {
-                        self.stack.push(value.clone());
-                    } else {
-                        // Generate helpful error with suggestions
-                        if let Some(context) = self.get_source_context(bytecode) {
-                            let available_names: Vec<&str> = self.globals.keys().map(|s| s.as_str()).collect();
-                            let suggestion = crate::error_formatter::suggest_similar_name(&name, &available_names);
-                            return Err(LugliError::undefined_variable_with_context(name, context, suggestion));
-                        } else {
-                            return Err(LugliError::undefined_variable(name));
-                        }
-                    }
-                } else {
-                    return Err(LugliError::runtime("Variable name must be a string"));
-                }
-            }
-            Instruction::StoreGlobal(name_index) => {
-                let value = self.peek()?.clone_for_stack(); // Don't pop - leave value on stack like Store does
-                let var_name = self.get_constant(bytecode, *name_index)?;
-                if let Value::String(name_id) = var_name {
-                    let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                    self.globals.insert(name, value);
-                } else {
-                    return Err(LugliError::runtime("Variable name must be a string"));
-                }
-            }
-            Instruction::GetProperty(name_index) => {
-                let object = self.pop()?;
-                let prop_name = self.get_constant(bytecode, *name_index)?;
-                if let Value::String(name_id) = prop_name {
-                    match object {
-                        Value::Dict(dict_ref) => {
-                            let dict = dict_ref.borrow();
-                            if let Some(value) = dict.get(name_id) {
-                                self.stack.push(value.clone());
-                            } else {
-                                self.stack.push(Value::Null);
-                            }
-                        }
-                        Value::Module {
-                            exports, ..
-                        } => {
-                            let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                            if let Some(value) = exports.get(&name) {
-                                self.stack.push(value.clone());
-                            } else {
-                                return Err(LugliError::runtime(format!("Module has no export '{}'", name)));
-                            }
-                        }
-                        _ => {
-                            let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                            return Err(LugliError::runtime(format!("Cannot access property '{}' on a value of type {}", name, object.type_name())));
-                        }
-                    }
-                } else {
-                    return Err(LugliError::runtime("Property name must be a string"));
-                }
-            }
-            Instruction::SetProperty(name_index) => {
-                let value = self.pop()?;
-                let object = self.pop()?;
-                let prop_name = self.get_constant(bytecode, *name_index)?;
-
-                if let Value::String(name_id) = prop_name {
-                    if let Value::Dict(dict_ref) = &object {
-                        // Detect potential circular reference (self-assignment)
-                        if let Value::Dict(value_dict_ref) = &value
-                            && Rc::ptr_eq(dict_ref, value_dict_ref)
-                        {
-                            eprintln!("⚠️  WARNING: Assigning dictionary to itself creates a circular reference");
-                            eprintln!("   This will cause a memory leak as Rc reference count never reaches 0");
-                            eprintln!("   Consider using weak references or avoid circular structures");
-                        }
-
-                        dict_ref
-                            .try_borrow_mut()
-                            .map_err(|_| LugliError::runtime("Cannot modify struct while it's being used"))?
-                            .insert(*name_id, value.clone());
-                        // Push the value back as the expression result
-                        self.stack.push(value);
-                    } else {
-                        let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                        return Err(LugliError::runtime(format!("Cannot set property '{}' on a value of type {}", name, object.type_name())));
-                    }
-                } else {
-                    return Err(LugliError::runtime("Property name must be a string"));
-                }
-            }
-            Instruction::MakeList(count) => {
-                let mut list = Vec::with_capacity(*count);
-                for _ in 0..*count {
-                    list.push(self.pop()?);
-                }
-                list.reverse();
-                self.stack.push(Value::List(Rc::new(RefCell::new(list))));
-            }
-            Instruction::MakeDict(count) => {
-                let mut dict = HashMap::new();
-                for _ in 0..*count {
-                    let value = self.pop()?;
-                    let key = self.pop()?;
-                    if let Value::String(key_str) = key {
-                        dict.insert(key_str, value);
-                    } else {
-                        return Err(LugliError::runtime("Dictionary keys must be strings"));
-                    }
-                }
-
-                // Check if this is a struct instantiation (has __struct_type__ field)
-                let struct_type_key = bytecode.string_pool.borrow_mut().intern("__struct_type__");
-                if let Some(Value::String(struct_type_id)) = dict.get(&struct_type_key) {
-                    let struct_type = bytecode.string_pool.borrow().resolve(*struct_type_id).to_string();
-                    // Look up struct metadata from globals
-                    if let Some(Value::Dict(meta)) = self.globals.get(&struct_type) {
-                        let meta_ref = meta.borrow();
-
-                        // Get default values from struct metadata
-                        let defaults_key = bytecode.string_pool.borrow_mut().intern("__defaults__");
-                        if let Some(Value::Dict(defaults)) = meta_ref.get(&defaults_key) {
-                            let defaults_ref = defaults.borrow();
-
-                            // Apply defaults for missing fields
-                            for (field_name, default_value) in defaults_ref.iter() {
-                                if !dict.contains_key(field_name) {
-                                    dict.insert(*field_name, default_value.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-
-                self.stack.push(Value::Dict(Rc::new(RefCell::new(dict))));
-            }
-            Instruction::DefineFunction(function_index) => {
-                let function_value = self.get_constant(bytecode, *function_index)?.clone();
-                self.stack.push(function_value);
-            }
+            Instruction::Return => return self.exec_return(),
+            // Variable operations
+            Instruction::Load(index) => self.exec_load(*index)?,
+            Instruction::Store(index) => self.exec_store(*index)?,
+            Instruction::LoadUpvalue(index) => self.exec_load_upvalue(*index)?,
+            Instruction::StoreUpvalue(index) => self.exec_store_upvalue(*index)?,
+            Instruction::LoadGlobal(name_index) => self.exec_load_global(bytecode, *name_index)?,
+            Instruction::StoreGlobal(name_index) => self.exec_store_global(bytecode, *name_index)?,
+            // Object and collection operations
+            Instruction::GetProperty(name_index) => self.exec_get_property(bytecode, *name_index)?,
+            Instruction::SetProperty(name_index) => self.exec_set_property(bytecode, *name_index)?,
+            Instruction::MakeList(count) => self.exec_make_list(*count)?,
+            Instruction::MakeDict(count) => self.exec_make_dict(bytecode, *count)?,
+            Instruction::DefineFunction(function_index) => self.exec_define_function(bytecode, *function_index)?,
             Instruction::MakeClosure {
                 function_index,
                 capture_indices,
-            } => {
-                // Get the base function template
-                let function_value = self.get_constant(bytecode, *function_index)?;
-
-                if let Value::Function {
-                    name,
-                    params,
-                    body_start,
-                    bytecode_id,
-                } = function_value
-                {
-                    // Get current stack frame to calculate absolute positions
-                    let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty during closure creation"))?;
-
-                    // Capture values from the stack using open upvalues pattern
-                    // Convert local indices to absolute stack positions
-                    let mut upvalues: Vec<Rc<RefCell<Value>>> = Vec::new();
-
-                    for &local_index in capture_indices {
-                        let absolute_index = frame.stack_base + local_index;
-
-                        // Check if this stack slot already has a shared reference
-                        let upvalue = if let Some(existing) = self.open_upvalues.get(&absolute_index) {
-                            // Reuse existing shared reference
-                            Rc::clone(existing)
-                        } else {
-                            // Create new shared reference
-                            let value = self.stack.get(absolute_index).cloned().ok_or_else(|| {
-                                LugliError::runtime(format!(
-                                    "Invalid upvalue capture: local {} (absolute {}) out of bounds (stack size: {})",
-                                    local_index,
-                                    absolute_index,
-                                    self.stack.len()
-                                ))
-                            })?;
-                            let shared = Rc::new(RefCell::new(value));
-                            self.open_upvalues.insert(absolute_index, Rc::clone(&shared));
-                            shared
-                        };
-
-                        upvalues.push(upvalue);
-                    }
-
-                    // Create closure with captured upvalues
-                    let closure = Value::Closure {
-                        name: name.clone(),
-                        params: params.clone(),
-                        body_start: *body_start,
-                        bytecode_id: *bytecode_id,
-                        upvalues,
-                    };
-
-                    self.stack.push(closure);
-                } else {
-                    return Err(LugliError::runtime("MakeClosure requires a Function value"));
-                }
-            }
+            } => self.exec_make_closure(bytecode, *function_index, capture_indices)?,
             Instruction::CallMethod(method_name_index, arg_count) => {
                 let arg_count = *arg_count as usize;
                 let method_name_id = match self.get_constant(bytecode, *method_name_index)? {
@@ -1243,7 +952,8 @@ impl Machine {
                     if let Some(Value::String(struct_type_id)) = dict_ref.get(&struct_type_key) {
                         // Clone the struct type name before dropping the borrow
                         let struct_type_id = *struct_type_id;
-                        let struct_type = bytecode.string_pool.borrow().resolve(struct_type_id).to_string();
+                        let struct_type = self.resolve_string_id(struct_type_id)
+                            .ok_or_else(|| LugliError::runtime(format!("Invalid struct type id: {}", struct_type_id.as_u32())))?;
 
                         // Check if the property is a function field
                         let field_func = dict_ref.get(&method_name_id).cloned();
@@ -1370,7 +1080,7 @@ impl Machine {
                                         // Save and restore module globals for cross-bytecode execution
                                         let saved_globals = self.globals.clone();
                                         if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
-                                            self.globals = module_globals.clone();
+                                            self.globals = (**module_globals).clone();
                                         }
 
                                         let saved_ip = self.ip;
@@ -1504,274 +1214,17 @@ impl Machine {
                 self.stack.truncate(object_index);
                 self.stack.push(result);
             }
-            Instruction::GetIndex => {
-                let index = self.pop()?;
-                let object = self.pop()?;
+            // Index operations
+            Instruction::GetIndex => self.exec_get_index(bytecode)?,
+            Instruction::SetIndex => self.exec_set_index(bytecode)?,
 
-                match (&object, &index) {
-                    (Value::List(list), Value::Number(idx)) => {
-                        // Validate index is finite and in valid range
-                        if !idx.is_finite() {
-                            return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
-                        }
-                        if idx.fract() != 0.0 {
-                            return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
-                        }
-                        if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
-                            return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
-                        }
-
-                        let list_ref = list.borrow();
-                        let len = list_ref.len() as i64;
-                        let idx_i64 = *idx as i64;
-
-                        // Check bounds and return null if out of range
-                        let actual_idx_opt = if idx_i64 < 0 {
-                            let positive_offset = len + idx_i64;
-                            if positive_offset < 0 {
-                                None
-                            } else {
-                                Some(positive_offset as usize)
-                            }
-                        } else {
-                            if idx_i64 >= len {
-                                None
-                            } else {
-                                Some(idx_i64 as usize)
-                            }
-                        };
-
-                        if let Some(actual_idx) = actual_idx_opt {
-                            self.stack.push(list_ref[actual_idx].clone());
-                        } else {
-                            self.stack.push(Value::Null);
-                        }
-                    }
-                    (Value::Dict(dict), Value::String(key)) => {
-                        let dict_ref = dict.borrow();
-                        if let Some(value) = dict_ref.get(key) {
-                            self.stack.push(value.clone());
-                        } else {
-                            self.stack.push(Value::Null);
-                        }
-                    }
-                    (Value::Dict(dict), Value::Number(num)) => {
-                        // Convert number to string key
-                        let key_str = if num.fract() == 0.0 && num.abs() < 1e15 {
-                            format!("{:.0}", num) // Format as integer
-                        } else {
-                            num.to_string()
-                        };
-                        let key_id = bytecode.string_pool.borrow_mut().intern(&key_str);
-                        let dict_ref = dict.borrow();
-                        if let Some(value) = dict_ref.get(&key_id) {
-                            self.stack.push(value.clone());
-                        } else {
-                            self.stack.push(Value::Null);
-                        }
-                    }
-                    (Value::String(s), Value::Number(idx)) => {
-                        // Validate index is finite and in valid range
-                        if !idx.is_finite() {
-                            return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
-                        }
-                        if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
-                            return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
-                        }
-
-                        let string = bytecode.string_pool.borrow().resolve(*s).to_string();
-                        let chars: Vec<char> = string.chars().collect();
-                        let len = chars.len() as i64;
-                        let idx_i64 = *idx as i64;
-
-                        let actual_idx = if idx_i64 < 0 {
-                            let positive_offset = len + idx_i64;
-                            if positive_offset < 0 {
-                                return Err(LugliError::runtime(format!(
-                                    "Negative index {} out of range for string of length {} (minimum is -{})",
-                                    idx_i64, len, len
-                                )));
-                            }
-                            positive_offset as usize
-                        } else {
-                            if idx_i64 >= len {
-                                return Err(LugliError::runtime(format!("Index {} out of range for string of length {}", idx_i64, len)));
-                            }
-                            idx_i64 as usize
-                        };
-
-                        let char_str = chars[actual_idx].to_string();
-                        let char_id = bytecode.string_pool.borrow_mut().intern(&char_str);
-                        self.stack.push(Value::String(char_id));
-                    }
-                    _ => {
-                        return Err(LugliError::runtime(format!("Cannot index {} with {}", object.type_name(), index.type_name())));
-                    }
-                }
+            // Utility and module operations
+            Instruction::ToString => self.exec_to_string(bytecode)?,
+            Instruction::ImportModule { module_idx, bind_name } => {
+                self.exec_import_module(bytecode, *module_idx, bind_name)?
             }
-            Instruction::SetIndex => {
-                let value = self.pop()?;
-                let index = self.pop()?;
-                let object = self.pop()?;
-
-                match (&object, &index) {
-                    (Value::List(list), Value::Number(idx)) => {
-                        // Validate index is finite and in valid range
-                        if !idx.is_finite() {
-                            return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
-                        }
-                        if idx.fract() != 0.0 {
-                            return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
-                        }
-                        if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
-                            return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
-                        }
-
-                        let mut list_ref = list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?;
-                        let len = list_ref.len() as i64;
-                        let idx_i64 = *idx as i64;
-
-                        let actual_idx = if idx_i64 < 0 {
-                            let positive_offset = len + idx_i64;
-                            if positive_offset < 0 {
-                                return Err(LugliError::runtime(format!(
-                                    "Negative index {} out of range for list assignment (length {}, minimum is -{})",
-                                    idx_i64, len, len
-                                )));
-                            }
-                            positive_offset as usize
-                        } else {
-                            if idx_i64 >= len {
-                                return Err(LugliError::runtime(format!("Index {} out of range for list assignment (length {})", idx_i64, len)));
-                            }
-                            idx_i64 as usize
-                        };
-
-                        list_ref[actual_idx] = value.clone();
-                        self.stack.push(value); // Return the assigned value
-                    }
-                    (Value::Dict(dict), Value::String(key)) => {
-                        dict.try_borrow_mut()
-                            .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
-                            .insert(*key, value.clone());
-                        self.stack.push(value); // Return the assigned value
-                    }
-                    (Value::Dict(dict), Value::Number(num)) => {
-                        // Convert number to string key
-                        let key_str = if num.fract() == 0.0 && num.abs() < 1e15 {
-                            format!("{:.0}", num) // Format as integer
-                        } else {
-                            num.to_string()
-                        };
-                        let key_id = bytecode.string_pool.borrow_mut().intern(&key_str);
-                        dict.try_borrow_mut()
-                            .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
-                            .insert(key_id, value.clone());
-                        self.stack.push(value); // Return the assigned value
-                    }
-                    _ => {
-                        return Err(LugliError::runtime(format!("Cannot set index on {} with {}", object.type_name(), index.type_name())));
-                    }
-                }
-            }
-            Instruction::ToString => {
-                let value = self.pop()?;
-                let pool = bytecode.string_pool.borrow();
-                let string_value = match &value {
-                    Value::String(s) => pool.resolve(*s).to_string(),
-                    Value::Number(n) => {
-                        if n.is_nan() {
-                            "NaN".to_string()
-                        } else if n.is_infinite() {
-                            if n.is_sign_positive() { "Infinity".to_string() } else { "-Infinity".to_string() }
-                        } else if n.fract() == 0.0 && n.abs() < 1e15 {
-                            // Format as integer if whole number and not too large
-                            format!("{:.0}", n)
-                        } else {
-                            n.to_string()
-                        }
-                    }
-                    Value::Bool(b) => b.to_string(),
-                    Value::Null => "null".to_string(),
-                    Value::List(list) => {
-                        let list_ref = list.borrow();
-                        let elements: Vec<String> = list_ref
-                            .iter()
-                            .map(|v| match v {
-                                Value::String(s) => format!("\"{}\"", pool.resolve(*s)),
-                                _ => v.display_with_pool(&pool),
-                            })
-                            .collect();
-                        format!("[{}]", elements.join(", "))
-                    }
-                    Value::Dict(dict) => {
-                        let dict_ref = dict.borrow();
-                        let pairs: Vec<String> = dict_ref
-                            .iter()
-                            .map(|(k, v)| match v {
-                                Value::String(s) => format!("\"{}\": \"{}\"", pool.resolve(*k), pool.resolve(*s)),
-                                _ => format!("\"{}\": {}", pool.resolve(*k), v.display_with_pool(&pool)),
-                            })
-                            .collect();
-                        format!("{{{}}}", pairs.join(", "))
-                    }
-                    Value::Function {
-                        name, ..
-                    }
-                    | Value::Closure {
-                        name, ..
-                    } => format!("<function {}>", name),
-                    Value::NativeFunction {
-                        name, ..
-                    } => format!("<native function {}>", name),
-                    Value::StructInstance {
-                        name, ..
-                    } => format!("<{} instance>", name),
-                    Value::DateTime(dt) => dt.to_string(),
-                    Value::Module {
-                        path, ..
-                    } => format!("<module {}>", path),
-                };
-                drop(pool);
-                let id = bytecode.string_pool.borrow_mut().intern(&string_value);
-                self.stack.push(Value::String(id));
-            }
-            Instruction::ImportModule {
-                module_idx,
-                bind_name,
-            } => {
-                let module_path = match &bytecode.constants[*module_idx] {
-                    Value::String(s) => bytecode.string_pool.borrow().resolve(*s).to_string(),
-                    _ => return Err(LugliError::runtime("ImportModule: expected string constant")),
-                };
-
-                let exports = self.load_module(&module_path)?;
-
-                let module_value = Value::Module {
-                    path: module_path,
-                    exports,
-                };
-
-                // Store directly in globals - no stack effect
-                self.globals.insert(bind_name.clone(), module_value);
-            }
-            Instruction::ImportFrom {
-                module_idx,
-                names,
-            } => {
-                let module_path = match &bytecode.constants[*module_idx] {
-                    Value::String(s) => bytecode.string_pool.borrow().resolve(*s).to_string(),
-                    _ => return Err(LugliError::runtime("ImportFrom: expected string constant")),
-                };
-
-                let exports = self.load_module(&module_path)?;
-
-                for name in names {
-                    let value =
-                        exports.get(name).ok_or_else(|| LugliError::runtime(format!("Module '{}' does not export '{}'", module_path, name)))?.clone();
-
-                    self.globals.insert(name.clone(), value);
-                }
+            Instruction::ImportFrom { module_idx, names } => {
+                self.exec_import_from(bytecode, *module_idx, names)?
             }
         };
 
