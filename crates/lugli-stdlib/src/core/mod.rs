@@ -309,68 +309,64 @@ fn sum_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     }
 }
 
-fn min_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
+enum Comparison {
+    Min,
+    Max,
+}
+
+fn minmax_fn(args: &[Value], pool: &mut StringPool, op: Comparison) -> Result<Value, LugliError> {
+    let fn_name = match op {
+        Comparison::Min => "min",
+        Comparison::Max => "max",
+    };
+
     if args.len() != 1 {
-        return Err(LugliError::runtime("min expects 1 argument"));
+        return Err(LugliError::runtime(format!("{} expects 1 argument", fn_name)));
     }
 
     match &args[0] {
         Value::List(list) => {
             let borrowed = list.borrow();
             if borrowed.is_empty() {
-                return Err(LugliError::runtime("min() arg is an empty sequence"));
+                return Err(LugliError::runtime(format!("{}() arg is an empty sequence", fn_name)));
             }
 
-            let min = borrowed.iter().try_fold(None, |acc: Option<&Value>, v| match (acc, v) {
+            let result = borrowed.iter().try_fold(None, |acc: Option<&Value>, v| match (acc, v) {
                 (None, _) => Ok(Some(v)),
-                (Some(prev @ Value::Number(a)), Value::Number(b)) => Ok(Some(if a < b { prev } else { v })),
+                (Some(prev @ Value::Number(a)), Value::Number(b)) => {
+                    let choose_prev = match op {
+                        Comparison::Min => a < b,
+                        Comparison::Max => a > b,
+                    };
+                    Ok(Some(if choose_prev { prev } else { v }))
+                }
                 (Some(prev @ Value::String(a)), Value::String(b)) => {
                     let a_str = pool.resolve(*a);
                     let b_str = pool.resolve(*b);
-                    Ok(Some(if a_str < b_str { prev } else { v }))
+                    let choose_prev = match op {
+                        Comparison::Min => a_str < b_str,
+                        Comparison::Max => a_str > b_str,
+                    };
+                    Ok(Some(if choose_prev { prev } else { v }))
                 }
-                _ => Err(LugliError::runtime("min() expects comparable values")),
+                _ => Err(LugliError::runtime(format!("{}() expects comparable values", fn_name))),
             })?;
 
-            match min {
+            match result {
                 Some(value) => Ok(value.clone()),
-                None => Err(LugliError::runtime("min() internal error: should have been caught by empty check")),
+                None => Err(LugliError::runtime(format!("{}() internal error: should have been caught by empty check", fn_name))),
             }
         }
         _ => Err(LugliError::type_error("list", args[0].type_name())),
     }
 }
 
+fn min_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
+    minmax_fn(args, pool, Comparison::Min)
+}
+
 fn max_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("max expects 1 argument"));
-    }
-
-    match &args[0] {
-        Value::List(list) => {
-            let borrowed = list.borrow();
-            if borrowed.is_empty() {
-                return Err(LugliError::runtime("max() arg is an empty sequence"));
-            }
-
-            let max = borrowed.iter().try_fold(None, |acc: Option<&Value>, v| match (acc, v) {
-                (None, _) => Ok(Some(v)),
-                (Some(prev @ Value::Number(a)), Value::Number(b)) => Ok(Some(if a > b { prev } else { v })),
-                (Some(prev @ Value::String(a)), Value::String(b)) => {
-                    let a_str = pool.resolve(*a);
-                    let b_str = pool.resolve(*b);
-                    Ok(Some(if a_str > b_str { prev } else { v }))
-                }
-                _ => Err(LugliError::runtime("max() expects comparable values")),
-            })?;
-
-            match max {
-                Some(value) => Ok(value.clone()),
-                None => Err(LugliError::runtime("max() internal error: should have been caught by empty check")),
-            }
-        }
-        _ => Err(LugliError::type_error("list", args[0].type_name())),
-    }
+    minmax_fn(args, pool, Comparison::Max)
 }
 
 fn abs_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
