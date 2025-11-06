@@ -65,7 +65,7 @@ pub struct Machine {
     current_file: Option<PathBuf>,
     string_pool: Rc<RefCell<StringPool>>,
     bytecode_registry: HashMap<usize, Rc<Bytecode>>,
-    module_globals: HashMap<usize, HashMap<String, Value>>,
+    module_globals: HashMap<usize, Rc<HashMap<String, Value>>>,
     next_bytecode_id: usize,
     open_upvalues: HashMap<usize, Rc<RefCell<Value>>>,
     method_registry: lugli_stdlib::MethodRegistry,
@@ -453,7 +453,7 @@ impl Machine {
                 let saved_globals = self.globals.clone();
                 if bytecode_id != &0 {
                     if let Some(module_globals) = self.module_globals.get(bytecode_id) {
-                        self.globals = module_globals.clone();
+                        self.globals = (**module_globals).clone();
                     }
                 }
 
@@ -614,7 +614,7 @@ impl Machine {
         }
 
         // Store module globals for cross-bytecode function calls
-        self.module_globals.insert(module_bytecode_id, module_exports.clone());
+        self.module_globals.insert(module_bytecode_id, Rc::new(module_exports.clone()));
 
         self.globals = saved_globals;
         self.current_file = saved_file;
@@ -908,7 +908,7 @@ impl Machine {
                             // Save and restore module globals for cross-bytecode execution
                             let saved_globals = self.globals.clone();
                             if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
-                                self.globals = module_globals.clone();
+                                self.globals = (**module_globals).clone();
                             }
 
                             let saved_ip = self.ip;
@@ -958,7 +958,7 @@ impl Machine {
                             // Save and restore module globals for cross-bytecode execution
                             let saved_globals = self.globals.clone();
                             if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
-                                self.globals = module_globals.clone();
+                                self.globals = (**module_globals).clone();
                             }
 
                             let saved_ip = self.ip;
@@ -1417,7 +1417,7 @@ impl Machine {
                                         // Save and restore module globals for cross-bytecode execution
                                         let saved_globals = self.globals.clone();
                                         if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
-                                            self.globals = module_globals.clone();
+                                            self.globals = (**module_globals).clone();
                                         }
 
                                         let saved_ip = self.ip;
