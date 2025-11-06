@@ -33,7 +33,6 @@ fn run_code(code: &str) -> Result<Value, String> {
 }
 
 #[test]
-#[ignore] // TODO: Fix arithmetic precision in test assertion
 fn test_module_exports_all_globals() {
     let math_content = r#"
 let PI = 3.14159
@@ -70,7 +69,6 @@ let SQRT_2 = 1.41421
 }
 
 #[test]
-#[ignore] // TODO: Closure state sharing across imports needs investigation
 fn test_module_with_closures() {
     let counter_content = r#"
 fn make_counter() {
@@ -149,7 +147,6 @@ fn create_person(name, age) {
 }
 
 #[test]
-#[ignore] // TODO: Nested module imports (module importing module) needs work
 fn test_nested_module_imports() {
     // Module A
     let a_content = r#"
@@ -276,7 +273,6 @@ fn func_b() {
 }
 
 #[test]
-#[ignore] // TODO: List comprehension results from modules need investigation
 fn test_module_with_list_comprehensions() {
     let utils_content = r#"
 fn get_evens(numbers) {
