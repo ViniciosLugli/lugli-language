@@ -12,6 +12,9 @@ pub enum Instruction {
     LoadFalse,
     LoadNull,
 
+    // Reserve stack space for local variables in functions
+    ReserveLocals(usize),
+
     Load(usize),
     Store(usize),
 

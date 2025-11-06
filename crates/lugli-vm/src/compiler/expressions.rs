@@ -364,9 +364,6 @@ impl Compiler {
                 // Jump over function body (similar to FnDecl)
                 let jump_over_body = self.emit_jump(Instruction::Jump(0));
 
-                // Record where the function body starts
-                let body_start = self.current_instruction();
-
                 // Save compiler state
                 let saved_locals = self.locals.clone();
                 let saved_local_count = self.local_count;
@@ -395,6 +392,14 @@ impl Compiler {
                     self.declare_local(param.clone());
                 }
 
+                // Emit placeholder to reserve space for locals (will patch later)
+                let param_count = params.len();
+                let reserve_locals_ip = self.current_instruction();
+                self.emit_unknown(Instruction::ReserveLocals(0)); // Placeholder
+
+                // body_start must be set AFTER ReserveLocals so the VM executes it
+                let body_start = reserve_locals_ip;
+
                 // Compile function body
                 for stmt in body {
                     self.compile_stmt(stmt)?;
@@ -420,6 +425,15 @@ impl Compiler {
                         self.emit_unknown(Instruction::Return);
                     }
                 }
+
+                // Patch ReserveLocals with actual local count
+                let total_local_count = self.local_count;
+                let locals_to_reserve = if total_local_count > param_count {
+                    total_local_count - param_count
+                } else {
+                    0
+                };
+                self.bytecode.instructions[reserve_locals_ip] = Instruction::ReserveLocals(locals_to_reserve);
 
                 // Patch the jump to skip over the function body
                 self.patch_jump(jump_over_body)?;

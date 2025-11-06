@@ -647,6 +647,12 @@ impl Machine {
             Instruction::LoadNull => {
                 self.stack.push(Value::Null);
             }
+            Instruction::ReserveLocals(count) => {
+                // Push Null for each local variable to reserve stack space
+                for _ in 0..*count {
+                    self.stack.push(Value::Null);
+                }
+            }
             Instruction::Pop => {
                 self.pop()?;
             }
