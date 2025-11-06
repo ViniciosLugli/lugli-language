@@ -61,7 +61,8 @@ pub fn dict_get(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliErr
                 // Return default value
                 Ok(args[2].clone())
             } else {
-                Err(LugliError::runtime("Key not found in dict".to_string()))
+                // Return null when key not found (consistent with bracket notation)
+                Ok(Value::Null)
             }
         }
         _ => Err(LugliError::type_error("dict", args[0].type_name())),
