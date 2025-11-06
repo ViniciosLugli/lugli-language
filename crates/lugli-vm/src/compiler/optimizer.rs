@@ -116,9 +116,25 @@ impl PeepholeOptimizer {
                 let result = a / b;
                 Some(Instruction::LoadSmallInt(result))
             }
+            (Instruction::LoadSmallInt(a), Instruction::LoadSmallInt(b), Instruction::IntegerDivide) if *b != 0 => {
+                let result = a / b;
+                Some(Instruction::LoadSmallInt(result))
+            }
             (Instruction::LoadSmallInt(a), Instruction::LoadSmallInt(b), Instruction::Modulo) if *b != 0 => {
                 let result = a % b;
                 Some(Instruction::LoadSmallInt(result))
+            }
+            (Instruction::LoadSmallInt(a), Instruction::LoadSmallInt(b), Instruction::Power) => {
+                // Only fold small exponents to avoid overflow
+                if *b >= 0 && *b <= 4 {
+                    let base = *a as i32;
+                    let exp = *b as u32;
+                    let result = base.checked_pow(exp)?;
+                    if result >= i8::MIN as i32 && result <= i8::MAX as i32 {
+                        return Some(Instruction::LoadSmallInt(result as i8));
+                    }
+                }
+                None
             }
 
             // Boolean operations
@@ -176,31 +192,103 @@ impl PeepholeOptimizer {
     /// Algebraic simplifications
     ///
     /// Examples:
-    /// - x + 0 → x
-    /// - x * 1 → x
-    /// - x * 0 → 0
+    /// - x + 0 → x, 0 + x → x
+    /// - x - 0 → x
+    /// - x * 1 → x, 1 * x → x
+    /// - x * 0 → 0, 0 * x → 0
+    /// - x / 1 → x
+    /// - 0 / x → 0 (x != 0)
+    /// - x % 1 → 0
+    /// - x ** 1 → x
+    /// - x ** 0 → 1 (x != 0)
     fn algebraic_simplification(&self, instructions: Vec<Instruction>) -> Vec<Instruction> {
         let mut result = Vec::with_capacity(instructions.len());
         let mut i = 0;
 
         while i < instructions.len() {
             if i + 2 < instructions.len() {
-                match (&instructions[i + 1], &instructions[i + 2]) {
-                    // x + 0 → x (keep first operand, skip second and Add)
-                    (Instruction::LoadSmallInt(0), Instruction::Add) => {
+                match (&instructions[i], &instructions[i + 1], &instructions[i + 2]) {
+                    // Addition: x + 0 → x
+                    (_, Instruction::LoadSmallInt(0), Instruction::Add) => {
                         result.push(instructions[i].clone());
                         i += 3;
                         continue;
                     }
-                    // x * 1 → x
-                    (Instruction::LoadSmallInt(1), Instruction::Multiply) => {
+                    // Addition: 0 + x → x
+                    (Instruction::LoadSmallInt(0), _, Instruction::Add) => {
+                        result.push(instructions[i + 1].clone());
+                        i += 3;
+                        continue;
+                    }
+                    // Subtraction: x - 0 → x
+                    (_, Instruction::LoadSmallInt(0), Instruction::Subtract) => {
                         result.push(instructions[i].clone());
                         i += 3;
                         continue;
                     }
-                    // x * 0 → 0 (replace with just LoadSmallInt(0))
-                    (Instruction::LoadSmallInt(0), Instruction::Multiply) => {
+                    // Multiplication: x * 1 → x
+                    (_, Instruction::LoadSmallInt(1), Instruction::Multiply) => {
+                        result.push(instructions[i].clone());
+                        i += 3;
+                        continue;
+                    }
+                    // Multiplication: 1 * x → x
+                    (Instruction::LoadSmallInt(1), _, Instruction::Multiply) => {
+                        result.push(instructions[i + 1].clone());
+                        i += 3;
+                        continue;
+                    }
+                    // Multiplication: x * 0 → 0
+                    (_, Instruction::LoadSmallInt(0), Instruction::Multiply) => {
                         result.push(Instruction::LoadSmallInt(0));
+                        i += 3;
+                        continue;
+                    }
+                    // Multiplication: 0 * x → 0
+                    (Instruction::LoadSmallInt(0), _, Instruction::Multiply) => {
+                        result.push(Instruction::LoadSmallInt(0));
+                        i += 3;
+                        continue;
+                    }
+                    // Division: x / 1 → x
+                    (_, Instruction::LoadSmallInt(1), Instruction::Divide) => {
+                        result.push(instructions[i].clone());
+                        i += 3;
+                        continue;
+                    }
+                    // Division: 0 / x → 0 (safe for all non-zero x, runtime will catch x=0)
+                    (Instruction::LoadSmallInt(0), Instruction::LoadSmallInt(n), Instruction::Divide) if *n != 0 => {
+                        result.push(Instruction::LoadSmallInt(0));
+                        i += 3;
+                        continue;
+                    }
+                    // Integer division: x // 1 → x
+                    (_, Instruction::LoadSmallInt(1), Instruction::IntegerDivide) => {
+                        result.push(instructions[i].clone());
+                        i += 3;
+                        continue;
+                    }
+                    // Integer division: 0 // x → 0
+                    (Instruction::LoadSmallInt(0), Instruction::LoadSmallInt(n), Instruction::IntegerDivide) if *n != 0 => {
+                        result.push(Instruction::LoadSmallInt(0));
+                        i += 3;
+                        continue;
+                    }
+                    // Modulo: x % 1 → 0
+                    (_, Instruction::LoadSmallInt(1), Instruction::Modulo) => {
+                        result.push(Instruction::LoadSmallInt(0));
+                        i += 3;
+                        continue;
+                    }
+                    // Power: x ** 1 → x
+                    (_, Instruction::LoadSmallInt(1), Instruction::Power) => {
+                        result.push(instructions[i].clone());
+                        i += 3;
+                        continue;
+                    }
+                    // Power: x ** 0 → 1 (only safe for constant x != 0)
+                    (Instruction::LoadSmallInt(n), Instruction::LoadSmallInt(0), Instruction::Power) if *n != 0 => {
+                        result.push(Instruction::LoadSmallInt(1));
                         i += 3;
                         continue;
                     }
@@ -490,5 +578,133 @@ mod tests {
         // Should not fold due to i8 overflow
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized.len(), 3);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_sub_zero() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(42), Instruction::LoadSmallInt(0), Instruction::Subtract];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(42)]);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_zero_add() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(0), Instruction::LoadSmallInt(42), Instruction::Add];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(42)]);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_one_mul() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(1), Instruction::LoadSmallInt(42), Instruction::Multiply];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(42)]);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_zero_mul() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(0), Instruction::LoadSmallInt(42), Instruction::Multiply];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(0)]);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_div_one() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(42), Instruction::LoadSmallInt(1), Instruction::Divide];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(42)]);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_zero_div() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(0), Instruction::LoadSmallInt(5), Instruction::Divide];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(0)]);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_mod_one() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(42), Instruction::LoadSmallInt(1), Instruction::Modulo];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(0)]);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_power_one() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(42), Instruction::LoadSmallInt(1), Instruction::Power];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(42)]);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_power_zero() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(5), Instruction::LoadSmallInt(0), Instruction::Power];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(1)]);
+    }
+
+    #[test]
+    fn test_constant_folding_power() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(2), Instruction::LoadSmallInt(3), Instruction::Power];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(8)]);
+    }
+
+    #[test]
+    fn test_constant_folding_integer_divide() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(10), Instruction::LoadSmallInt(3), Instruction::IntegerDivide];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(3)]);
+    }
+
+    #[test]
+    fn test_constant_folding_power_overflow() {
+        let optimizer = PeepholeOptimizer::new();
+        // 10 ** 5 = 100000 which overflows i8
+        let instructions = vec![Instruction::LoadSmallInt(10), Instruction::LoadSmallInt(5), Instruction::Power];
+
+        // Should not fold due to overflow
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized.len(), 3);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_integer_div_one() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(42), Instruction::LoadSmallInt(1), Instruction::IntegerDivide];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(42)]);
+    }
+
+    #[test]
+    fn test_algebraic_simplification_zero_integer_div() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::LoadSmallInt(0), Instruction::LoadSmallInt(5), Instruction::IntegerDivide];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::LoadSmallInt(0)]);
     }
 }
