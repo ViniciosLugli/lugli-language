@@ -3,7 +3,7 @@ use crate::{
     module::{ModuleCache, ModuleResolver},
 };
 use hashbrown::HashMap;
-use lugli_common::{LugliError, Value};
+use lugli_common::{LugliError, StringId, StringPool, Value};
 use lugli_stdlib::get_global_functions;
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
 
@@ -63,6 +63,7 @@ pub struct Machine {
     module_cache: ModuleCache,
     module_resolver: ModuleResolver,
     current_file: Option<PathBuf>,
+    string_pool: Rc<RefCell<StringPool>>,
     bytecode_registry: HashMap<usize, Rc<Bytecode>>,
     module_globals: HashMap<usize, HashMap<String, Value>>,
     next_bytecode_id: usize,
@@ -81,6 +82,7 @@ impl Machine {
     }
 
     pub fn new() -> Self {
+        let string_pool = Rc::new(RefCell::new(StringPool::with_common_strings()));
         let global_functions = get_global_functions();
         let mut globals = HashMap::with_capacity(global_functions.len());
         for (name, func) in global_functions {
@@ -111,6 +113,7 @@ impl Machine {
             module_cache: ModuleCache::new(),
             module_resolver: ModuleResolver::new(),
             current_file: None,
+            string_pool,
             bytecode_registry: HashMap::with_capacity(16),
             module_globals: HashMap::with_capacity(16),
             next_bytecode_id: 1,
@@ -214,19 +217,47 @@ impl Machine {
         }
     }
 
+    /// Resolve a StringId using hybrid approach: try shared pool first, then bytecode pools
+    fn resolve_string_id(&self, id: StringId) -> Option<String> {
+        // Try shared pool first (fast path)
+        {
+            let pool = self.string_pool.borrow();
+            if let Some(s) = pool.try_resolve(id) {
+                return Some(s.to_string());
+            }
+        }
+
+        // Fallback: search bytecode pools
+        for bytecode in self.bytecode_registry.values() {
+            let pool = bytecode.string_pool.borrow();
+            if let Some(s) = pool.try_resolve(id) {
+                return Some(s.to_string());
+            }
+        }
+
+        None
+    }
+
     pub fn format_value(&self, value: &Value) -> String {
         use lugli_common::Value;
 
         match value {
             Value::String(id) => {
-                // Try to resolve string from any registered bytecode
+                // Try shared string pool first (fast path for modules)
+                let pool = self.string_pool.borrow();
+                if let Some(s) = pool.try_resolve(*id) {
+                    return format!("\"{}\"", s);
+                }
+                drop(pool);
+
+                // Fallback: search registered bytecode pools (for REPL/standalone bytecode)
                 for bytecode in self.bytecode_registry.values() {
                     let pool = bytecode.string_pool.borrow();
                     if let Some(s) = pool.try_resolve(*id) {
                         return format!("\"{}\"", s);
                     }
                 }
-                // Fallback if not found
+
                 format!("<string#{}>", id.as_u32())
             }
             Value::List(l) => match l.try_borrow() {
@@ -240,11 +271,25 @@ impl Machine {
                 Ok(dict_ref) => {
                     let mut items = Vec::new();
                     for (k, v) in dict_ref.iter() {
-                        let key_str = self
-                            .bytecode_registry
-                            .values()
-                            .find_map(|bc| bc.string_pool.borrow().try_resolve(*k).map(|s| s.to_string()))
-                            .unwrap_or_else(|| format!("<string#{}>", k.as_u32()));
+                        // Try shared pool first, then fall back to bytecode pools
+                        let key_str = {
+                            let pool = self.string_pool.borrow();
+                            if let Some(s) = pool.try_resolve(*k) {
+                                s.to_string()
+                            } else {
+                                drop(pool);
+                                // Search bytecode pools
+                                let mut found = None;
+                                for bytecode in self.bytecode_registry.values() {
+                                    let pool = bytecode.string_pool.borrow();
+                                    if let Some(s) = pool.try_resolve(*k) {
+                                        found = Some(s.to_string());
+                                        break;
+                                    }
+                                }
+                                found.unwrap_or_else(|| format!("<string#{}>", k.as_u32()))
+                            }
+                        };
                         items.push(format!("\"{}\": {}", key_str, self.format_value(v)));
                     }
                     format!("{{ {} }}", items.join(", "))
@@ -497,9 +542,9 @@ impl Machine {
             parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
 
         let shared_pool = if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
-            std::rc::Rc::clone(&main_bytecode.string_pool)
+            Rc::clone(&main_bytecode.string_pool)
         } else {
-            std::rc::Rc::new(std::cell::RefCell::new(lugli_common::StringPool::with_common_strings()))
+            Rc::new(RefCell::new(lugli_common::StringPool::with_common_strings()))
         };
 
         let mut compiler = crate::Compiler::with_shared_pool(shared_pool);
@@ -1131,7 +1176,8 @@ impl Machine {
                 // Check if this is a struct instantiation (has __struct_type__ field)
                 let struct_type_key = bytecode.string_pool.borrow_mut().intern("__struct_type__");
                 if let Some(Value::String(struct_type_id)) = dict.get(&struct_type_key) {
-                    let struct_type = bytecode.string_pool.borrow().resolve(*struct_type_id).to_string();
+                    let struct_type = self.resolve_string_id(*struct_type_id)
+                        .ok_or_else(|| LugliError::runtime(format!("Invalid struct type id: {}", struct_type_id.as_u32())))?;
                     // Look up struct metadata from globals
                     if let Some(Value::Dict(meta)) = self.globals.get(&struct_type) {
                         let meta_ref = meta.borrow();
@@ -1243,7 +1289,8 @@ impl Machine {
                     if let Some(Value::String(struct_type_id)) = dict_ref.get(&struct_type_key) {
                         // Clone the struct type name before dropping the borrow
                         let struct_type_id = *struct_type_id;
-                        let struct_type = bytecode.string_pool.borrow().resolve(struct_type_id).to_string();
+                        let struct_type = self.resolve_string_id(struct_type_id)
+                            .ok_or_else(|| LugliError::runtime(format!("Invalid struct type id: {}", struct_type_id.as_u32())))?;
 
                         // Check if the property is a function field
                         let field_func = dict_ref.get(&method_name_id).cloned();
