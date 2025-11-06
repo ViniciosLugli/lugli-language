@@ -78,9 +78,7 @@ pub fn string_split(args: &[Value], pool: &mut StringPool) -> Result<Value, Lugl
 }
 
 pub fn string_is_alphabetic(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("string.is_alphabetic expects 1 argument"));
-    }
+    check_arity(args, 1, "string.is_alphabetic")?;
     match &args[0] {
         Value::String(id) => {
             let s = pool.resolve(*id);
@@ -91,9 +89,7 @@ pub fn string_is_alphabetic(args: &[Value], pool: &mut StringPool) -> Result<Val
 }
 
 pub fn string_starts_with(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("string.starts_with expects 2 arguments"));
-    }
+    check_arity(args, 2, "string.starts_with")?;
     match (&args[0], &args[1]) {
         (Value::String(id1), Value::String(id2)) => {
             let s = pool.resolve(*id1);
@@ -105,9 +101,7 @@ pub fn string_starts_with(args: &[Value], pool: &mut StringPool) -> Result<Value
 }
 
 pub fn string_ends_with(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("string.ends_with expects 2 arguments"));
-    }
+    check_arity(args, 2, "string.ends_with")?;
     match (&args[0], &args[1]) {
         (Value::String(id1), Value::String(id2)) => {
             let s = pool.resolve(*id1);
@@ -133,9 +127,7 @@ pub fn string_contains(args: &[Value], pool: &mut StringPool) -> Result<Value, L
 }
 
 pub fn string_replace(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 3 {
-        return Err(LugliError::runtime("string.replace expects 3 arguments"));
-    }
+    check_arity(args, 3, "string.replace")?;
     match (&args[0], &args[1], &args[2]) {
         (Value::String(id1), Value::String(id2), Value::String(id3)) => {
             let s = pool.resolve(*id1);

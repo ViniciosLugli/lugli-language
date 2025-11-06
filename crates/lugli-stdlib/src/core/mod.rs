@@ -1,3 +1,4 @@
+use crate::validation::*;
 use crate::NativeFunction;
 use lugli_common::{LugliError, StringPool, Value};
 use std::{cell::RefCell, rc::Rc};
@@ -78,17 +79,13 @@ pub fn get_functions() -> Vec<(&'static str, NativeFunction)> {
 }
 
 fn type_of(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("type expects 1 argument"));
-    }
+    check_arity(args, 1, "type")?;
     let type_name = args[0].type_name();
     Ok(Value::String(pool.intern(type_name)))
 }
 
 fn len_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("len expects 1 argument"));
-    }
+    check_arity(args, 1, "len")?;
     match &args[0] {
         Value::String(id) => Ok(Value::Number(pool.resolve(*id).len() as f64)),
         Value::List(l) => Ok(Value::Number(l.borrow().len() as f64)),
@@ -148,10 +145,7 @@ fn range_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError>
 }
 
 fn enumerate_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("enumerate expects 1 argument"));
-    }
-
+    check_arity(args, 1, "enumerate")?;
     match &args[0] {
         Value::List(list) => {
             let borrowed = list.borrow();
@@ -181,17 +175,13 @@ fn enumerate_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliErr
 }
 
 fn str_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("str expects 1 argument"));
-    }
+    check_arity(args, 1, "str")?;
     let s = args[0].display_with_pool(pool);
     Ok(Value::String(pool.intern(&s)))
 }
 
 fn int_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("int expects 1 argument"));
-    }
+    check_arity(args, 1, "int")?;
     match &args[0] {
         Value::Number(n) => Ok(Value::Number(n.floor())),
         Value::String(id) => {
@@ -207,9 +197,7 @@ fn int_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
 }
 
 fn float_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("float expects 1 argument"));
-    }
+    check_arity(args, 1, "float")?;
     match &args[0] {
         Value::Number(n) => Ok(Value::Number(*n)),
         Value::String(id) => {
@@ -225,17 +213,12 @@ fn float_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> 
 }
 
 fn bool_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("bool expects 1 argument"));
-    }
+    check_arity(args, 1, "bool")?;
     Ok(Value::Bool(args[0].is_truthy()))
 }
 
 fn zip_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() < 2 {
-        return Err(LugliError::runtime("zip expects at least 2 arguments"));
-    }
-
+    check_min_arity(args, 2, "zip")?;
     let mut lists: Vec<Vec<Value>> = Vec::new();
     for arg in args {
         match arg {
@@ -270,10 +253,7 @@ fn all_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
 }
 
 fn any_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("any expects 1 argument"));
-    }
-
+    check_arity(args, 1, "any")?;
     match &args[0] {
         Value::List(list) => {
             let any_true = list.borrow().iter().any(|v| v.is_truthy());
@@ -284,10 +264,7 @@ fn any_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
 }
 
 fn sum_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.is_empty() || args.len() > 2 {
-        return Err(LugliError::runtime("sum expects 1 or 2 arguments"));
-    }
-
+    check_arity_range(args, 1, 2, "sum")?;
     let start = if args.len() == 2 {
         match &args[1] {
             Value::Number(n) => *n,
@@ -370,9 +347,7 @@ fn max_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
 }
 
 fn abs_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 1 {
-        return Err(LugliError::runtime("abs expects 1 argument"));
-    }
+    check_arity(args, 1, "abs")?;
     match &args[0] {
         Value::Number(n) => Ok(Value::Number(n.abs())),
         _ => Err(LugliError::type_error("number", args[0].type_name())),
@@ -380,9 +355,7 @@ fn abs_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
 }
 
 fn round_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.is_empty() || args.len() > 2 {
-        return Err(LugliError::runtime("round expects 1 or 2 arguments"));
-    }
+    check_arity_range(args, 1, 2, "round")?;
 
     let num = match &args[0] {
         Value::Number(n) => *n,
@@ -421,10 +394,7 @@ fn pow_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
 }
 
 fn map_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("map expects 2 arguments"));
-    }
-
+    check_arity(args, 2, "map")?;
     let _func = match &args[0] {
         Value::Function {
             ..
@@ -445,10 +415,7 @@ fn map_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
 }
 
 fn filter_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() != 2 {
-        return Err(LugliError::runtime("filter expects 2 arguments"));
-    }
-
+    check_arity(args, 2, "filter")?;
     let _func = match &args[0] {
         Value::Function {
             ..
@@ -469,10 +436,7 @@ fn filter_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError
 }
 
 fn reduce_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    if args.len() < 2 || args.len() > 3 {
-        return Err(LugliError::runtime("reduce expects 2 or 3 arguments"));
-    }
-
+    check_arity_range(args, 2, 3, "reduce")?;
     let _func = match &args[0] {
         Value::Function {
             ..
