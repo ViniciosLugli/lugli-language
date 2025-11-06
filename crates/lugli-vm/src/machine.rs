@@ -1454,6 +1454,9 @@ impl Machine {
                         if !idx.is_finite() {
                             return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
                         }
+                        if idx.fract() != 0.0 {
+                            return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
+                        }
                         if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
                             return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
                         }
@@ -1552,6 +1555,9 @@ impl Machine {
                         // Validate index is finite and in valid range
                         if !idx.is_finite() {
                             return Err(LugliError::runtime(format!("Index must be a finite number, got {}", idx)));
+                        }
+                        if idx.fract() != 0.0 {
+                            return Err(LugliError::runtime(format!("Index must be an integer, got {}", idx)));
                         }
                         if *idx < i64::MIN as f64 || *idx > i64::MAX as f64 {
                             return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
