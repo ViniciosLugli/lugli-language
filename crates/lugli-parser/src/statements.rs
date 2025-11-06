@@ -44,13 +44,37 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let name = self.consume_identifier("Expected variable name")?;
+        let mut pattern = self.parse_pattern()?;
+
+        if self.check(&TokenKind::Comma) {
+            let mut patterns = vec![pattern];
+            while self.match_any(&[TokenKind::Comma]) {
+                patterns.push(self.parse_pattern()?);
+            }
+            pattern = lugli_ast::Pattern::List(patterns);
+        }
 
         // Parse optional type hint
         let type_hint = if self.match_any(&[TokenKind::Colon]) { Some(self.parse_type_hint()?) } else { None };
 
         let initializer = if self.match_any(&[TokenKind::Equal]) {
-            Some(self.expression()?)
+            let first_expr = self.expression()?;
+
+            if self.check(&TokenKind::Comma) {
+                let mut exprs = vec![first_expr];
+                while self.match_any(&[TokenKind::Comma]) {
+                    exprs.push(self.expression()?);
+                }
+                let list_id = self.span_map.alloc_id();
+                let list_span = self.merge_spans(start_span, self.previous_span());
+                self.span_map.insert(list_id, list_span);
+                Some(lugli_ast::Expr::List {
+                    id: list_id,
+                    elements: exprs,
+                })
+            } else {
+                Some(first_expr)
+            }
         } else if is_const {
             return Err(ParseError::Custom {
                 message: "Const variables must be initialized".to_string(),
@@ -69,7 +93,7 @@ impl<'a> Parser<'a> {
 
         Ok(Stmt::VarDecl {
             id,
-            name,
+            pattern,
             type_hint,
             initializer,
             is_const,
@@ -277,8 +301,8 @@ impl<'a> Parser<'a> {
         let start_span = self.current_span();
         self.consume(&TokenKind::For, "Expected 'for'")?;
 
-        let variable = self.consume_identifier("Expected variable name")?;
-        self.consume(&TokenKind::In, "Expected 'in' after for variable")?;
+        let pattern = self.parse_pattern()?;
+        self.consume(&TokenKind::In, "Expected 'in' after for pattern")?;
 
         let iterable = self.expression()?;
         let body = self.block_body()?;
@@ -290,7 +314,7 @@ impl<'a> Parser<'a> {
 
         Ok(Stmt::For {
             id,
-            variable,
+            pattern,
             iterable,
             body,
         })

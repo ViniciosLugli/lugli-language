@@ -4,7 +4,7 @@ use lugli_lexer::TokenKind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ComprehensionClause {
-    pub variable: String,
+    pub pattern: Pattern,
     pub iterable: Expr,
     pub condition: Option<Expr>,
 }
@@ -122,6 +122,8 @@ pub struct MatchArm {
 pub enum Pattern {
     Literal(LiteralValue),
     Identifier(String),
+    List(Vec<Pattern>),
+    Dict(Vec<(String, Pattern)>),
     Wildcard,
 }
 

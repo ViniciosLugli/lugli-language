@@ -488,7 +488,6 @@ impl Compiler {
                     skip_jump: Option<usize>,
                 }
                 let mut loops: Vec<LoopInfo> = Vec::new();
-                let mut var_names: Vec<String> = Vec::new();
 
                 // Generate nested loops for each clause
                 for (clause_idx, clause) in clauses.iter().enumerate() {
@@ -503,10 +502,6 @@ impl Compiler {
                     self.emit_unknown(Instruction::Constant(zero_constant));
                     self.emit_unknown(Instruction::Store(index_local));
 
-                    // Declare the loop variable
-                    let var_local = self.declare_local(clause.variable.clone());
-                    var_names.push(clause.variable.clone());
-
                     // Loop start
                     let loop_start = self.current_instruction();
 
@@ -519,11 +514,13 @@ impl Compiler {
                     self.emit_unknown(Instruction::Less);
                     let exit_jump = self.emit_jump(Instruction::JumpIfFalse(0));
 
-                    // Get element at current index
+                    // Get element at current index and bind to pattern
                     self.emit_unknown(Instruction::Load(iterable_local));
                     self.emit_unknown(Instruction::Load(index_local));
                     self.emit_unknown(Instruction::GetIndex);
-                    self.emit_unknown(Instruction::Store(var_local));
+
+                    // Bind pattern with element value on stack
+                    self.compile_pattern_binding(&clause.pattern)?;
 
                     // Optional condition check for this clause
                     let skip_jump = if let Some(cond) = &clause.condition {
@@ -575,10 +572,9 @@ impl Compiler {
                 // Load result list onto stack
                 self.emit_unknown(Instruction::Load(result_local));
 
-                // Clean up locals
-                let locals_created = 1 + clauses.len() * 3; // result + (iterable, index, var) per clause
-                self.local_count -= locals_created;
-                self.locals.retain(|name, _| !name.starts_with("__comp_") && !var_names.contains(name));
+                // Clean up locals (compiler-generated temps only)
+                // Pattern variables will be cleaned up by scope management
+                self.locals.retain(|name, _| !name.starts_with("__comp_"));
 
                 Ok(())
             }
@@ -621,6 +617,12 @@ impl Compiler {
                             arm_locals.push(name.clone());
                             self.emit_unknown(Instruction::Dup);
                             self.emit_unknown(Instruction::Store(var_local)); // Store pops the dup
+                            let true_const = self.add_constant(Value::Bool(true));
+                            self.emit_unknown(Instruction::Constant(true_const));
+                        }
+                        Pattern::List(_) | Pattern::Dict(_) => {
+                            // Complex patterns in match arms not yet supported
+                            // Treat as wildcard for now
                             let true_const = self.add_constant(Value::Bool(true));
                             self.emit_unknown(Instruction::Constant(true_const));
                         }
