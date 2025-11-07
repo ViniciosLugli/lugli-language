@@ -81,13 +81,13 @@ fn show_help() {
 }
 
 fn show_variables(vm: &Machine, _bytecodes: &[lugli_vm::Bytecode]) {
-    if vm.globals.is_empty() {
+    if vm.globals().is_empty() {
         println!("{}", "No variables defined yet.".yellow());
         return;
     }
 
     println!("\n{}", "Current Variables:".bright_cyan().bold());
-    let mut vars: Vec<_> = vm.globals.iter().collect();
+    let mut vars: Vec<_> = vm.globals().iter().collect();
     vars.sort_by_key(|(k, _)| *k);
 
     for (name, value) in vars {
@@ -108,13 +108,13 @@ fn clear_screen() {
 
 fn reset_vm(vm: &mut Machine) {
     let native_functions: Vec<_> =
-        vm.globals.iter().filter(|(_, v)| matches!(v, lugli_common::Value::NativeFunction { .. })).map(|(k, v)| (k.clone(), v.clone())).collect();
+        vm.globals().iter().filter(|(_, v)| matches!(v, lugli_common::Value::NativeFunction { .. })).map(|(k, v)| (k.clone(), v.clone())).collect();
 
     vm.reset();
 
     // Restore native functions
     for (name, func) in native_functions {
-        vm.globals.insert(name, func);
+        vm.globals_mut().insert(name, func);
     }
 
     println!("{}", "VM state reset. All user variables cleared.".bright_green());
@@ -141,7 +141,7 @@ fn show_history(editor: &Editor<super::ReplHelper, FileHistory>) {
 }
 
 fn show_type(vm: &Machine, var_name: &str) -> Result<(), String> {
-    match vm.globals.get(var_name) {
+    match vm.globals().get(var_name) {
         Some(value) => {
             println!("{}: {}", var_name.bright_green(), value.type_name().bright_cyan());
             Ok(())

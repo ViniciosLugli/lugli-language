@@ -14,7 +14,7 @@ impl Machine {
             }
             _ => a.add(&b)?,
         };
-        self.stack.push(result);
+        self.push(result);
         Ok(())
     }
 
@@ -33,7 +33,7 @@ impl Machine {
     pub(super) fn exec_add_int(&mut self, n: i8) -> Result<(), LugliError> {
         let left = self.pop()?;
         if let Value::Number(a) = left {
-            self.stack.push(Value::Number(a + (n as f64)));
+            self.push(Value::Number(a + (n as f64)));
             Ok(())
         } else {
             Err(LugliError::type_error("number", left.type_name()))
@@ -43,7 +43,7 @@ impl Machine {
     pub(super) fn exec_sub_int(&mut self, n: i8) -> Result<(), LugliError> {
         let left = self.pop()?;
         if let Value::Number(a) = left {
-            self.stack.push(Value::Number(a - (n as f64)));
+            self.push(Value::Number(a - (n as f64)));
             Ok(())
         } else {
             Err(LugliError::type_error("number", left.type_name()))
@@ -53,7 +53,7 @@ impl Machine {
     pub(super) fn exec_mul_int(&mut self, n: i8) -> Result<(), LugliError> {
         let left = self.pop()?;
         if let Value::Number(a) = left {
-            self.stack.push(Value::Number(a * (n as f64)));
+            self.push(Value::Number(a * (n as f64)));
             Ok(())
         } else {
             Err(LugliError::type_error("number", left.type_name()))
@@ -62,41 +62,41 @@ impl Machine {
 
     pub(super) fn exec_negate(&mut self) -> Result<(), LugliError> {
         let val = self.pop()?;
-        self.stack.push(val.negate()?);
+        self.push(val.negate()?);
         Ok(())
     }
 
     pub(super) fn exec_not(&mut self) -> Result<(), LugliError> {
         let val = self.pop()?;
-        self.stack.push(Value::Bool(!val.is_truthy()));
+        self.push(Value::Bool(!val.is_truthy()));
         Ok(())
     }
 
     pub(super) fn exec_and(&mut self) -> Result<(), LugliError> {
         let b = self.pop()?;
         let a = self.pop()?;
-        self.stack.push(Value::Bool(a.is_truthy() && b.is_truthy()));
+        self.push(Value::Bool(a.is_truthy() && b.is_truthy()));
         Ok(())
     }
 
     pub(super) fn exec_or(&mut self) -> Result<(), LugliError> {
         let b = self.pop()?;
         let a = self.pop()?;
-        self.stack.push(Value::Bool(a.is_truthy() || b.is_truthy()));
+        self.push(Value::Bool(a.is_truthy() || b.is_truthy()));
         Ok(())
     }
 
     pub(super) fn exec_equal(&mut self) -> Result<(), LugliError> {
         let b = self.pop()?;
         let a = self.pop()?;
-        self.stack.push(Value::Bool(a.equals(&b)));
+        self.push(Value::Bool(a.equals(&b)));
         Ok(())
     }
 
     pub(super) fn exec_not_equal(&mut self) -> Result<(), LugliError> {
         let b = self.pop()?;
         let a = self.pop()?;
-        self.stack.push(Value::Bool(!a.equals(&b)));
+        self.push(Value::Bool(!a.equals(&b)));
         Ok(())
     }
 

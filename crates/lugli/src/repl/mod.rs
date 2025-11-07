@@ -77,7 +77,7 @@ pub fn start() -> Result<(), CliError> {
                                 match lugli_vm::run_with_vm(&mut vm, &bytecode) {
                                     Ok(value) => {
                                         // Store last result in _ variable
-                                        vm.globals.insert("_".to_string(), value.clone());
+                                        vm.globals_mut().insert("_".to_string(), value.clone());
 
                                         if !matches!(value, lugli_common::Value::Null) {
                                             println!("{}", format_value(&value, &bytecode));
@@ -135,7 +135,7 @@ fn get_history_path() -> PathBuf { if let Some(home) = dirs::home_dir() { home.j
 
 fn update_completion_variables(vm: &Machine, variables: &Rc<RefCell<Vec<String>>>) {
     let user_vars: Vec<String> =
-        vm.globals.keys().filter(|k| !matches!(vm.globals.get(*k), Some(lugli_common::Value::NativeFunction { .. }))).cloned().collect();
+        vm.globals().keys().filter(|k| !matches!(vm.globals().get(*k), Some(lugli_common::Value::NativeFunction { .. }))).cloned().collect();
     *variables.borrow_mut() = user_vars;
 }
 
