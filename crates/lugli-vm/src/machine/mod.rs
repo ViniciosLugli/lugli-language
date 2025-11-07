@@ -731,6 +731,7 @@ impl Machine {
             Instruction::AddInt(n) => self.exec_add_int(*n)?,
             Instruction::SubInt(n) => self.exec_sub_int(*n)?,
             Instruction::MulInt(n) => self.exec_mul_int(*n)?,
+            Instruction::AddLocals(a, b) => self.exec_add_locals(*a, *b, bytecode)?,
             Instruction::Negate => self.exec_negate()?,
             Instruction::Not => self.exec_not()?,
             Instruction::And => self.exec_and()?,
@@ -745,6 +746,16 @@ impl Machine {
             Instruction::Jump(addr) => return self.exec_jump(*addr),
             Instruction::JumpIfFalse(addr) => {
                 if self.exec_jump_if_false(*addr)? {
+                    return Ok(true);
+                }
+            }
+            Instruction::JumpIfEqual(addr) => {
+                if self.exec_jump_if_equal(*addr)? {
+                    return Ok(true);
+                }
+            }
+            Instruction::JumpIfNotEqual(addr) => {
+                if self.exec_jump_if_not_equal(*addr)? {
                     return Ok(true);
                 }
             }

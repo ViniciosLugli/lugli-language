@@ -18,6 +18,28 @@ impl Machine {
         }
     }
 
+    pub(super) fn exec_jump_if_equal(&mut self, addr: usize) -> Result<bool, LugliError> {
+        let b = self.pop()?;
+        let a = self.pop()?;
+        if a.equals(&b) {
+            self.context.jump_to(addr);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub(super) fn exec_jump_if_not_equal(&mut self, addr: usize) -> Result<bool, LugliError> {
+        let b = self.pop()?;
+        let a = self.pop()?;
+        if !a.equals(&b) {
+            self.context.jump_to(addr);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     pub(super) fn exec_loop(&mut self, start: usize) -> Result<bool, LugliError> {
         self.context.jump_to(start);
         Ok(true)
