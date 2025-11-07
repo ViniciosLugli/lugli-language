@@ -31,8 +31,9 @@ pub struct ExecutionContext {
     /// The value stack
     stack: Vec<Value>,
 
-    /// Global variables
-    globals: HashMap<String, Value>,
+    /// Global variables with copy-on-write semantics
+    /// Wrapped in Rc<RefCell<>> to enable O(1) snapshots for module isolation
+    globals: Rc<RefCell<HashMap<String, Value>>>,
 
     /// Call stack frames
     call_stack: Vec<CallFrame>,
@@ -51,7 +52,7 @@ impl ExecutionContext {
 
         Self {
             stack: Vec::with_capacity(256),
-            globals: HashMap::new(),
+            globals: Rc::new(RefCell::new(HashMap::new())),
             call_stack,
             open_upvalues: HashMap::with_capacity(32),
             ip: 0,
@@ -64,7 +65,7 @@ impl ExecutionContext {
 
         Self {
             stack: Vec::with_capacity(256),
-            globals,
+            globals: Rc::new(RefCell::new(globals)),
             call_stack,
             open_upvalues: HashMap::with_capacity(32),
             ip: 0,
@@ -116,40 +117,78 @@ impl ExecutionContext {
     }
 
     // Global variable operations
+
+    /// Define a new global variable (copy-on-write)
     pub fn define_global(&mut self, name: String, value: Value) {
-        self.globals.insert(name, value);
+        // If Rc has multiple owners, make a copy before mutating (COW)
+        if Rc::strong_count(&self.globals) > 1 {
+            let new_globals = self.globals.borrow().clone();
+            self.globals = Rc::new(RefCell::new(new_globals));
+        }
+
+        self.globals.borrow_mut().insert(name, value);
     }
 
-    pub fn get_global(&self, name: &str) -> Option<&Value> {
-        self.globals.get(name)
+    /// Get a global variable (clones the value)
+    pub fn get_global(&self, name: &str) -> Option<Value> {
+        self.globals.borrow().get(name).cloned()
     }
 
-    pub fn get_global_mut(&mut self, name: &str) -> Option<&mut Value> {
-        self.globals.get_mut(name)
-    }
-
+    /// Set an existing global variable (copy-on-write)
     pub fn set_global(&mut self, name: &str, value: Value) -> Result<(), LugliError> {
-        if !self.globals.contains_key(name) {
+        if !self.globals.borrow().contains_key(name) {
             return Err(LugliError::runtime(format!("Undefined variable '{}'", name)));
         }
-        self.globals.insert(name.to_string(), value);
+
+        // If Rc has multiple owners, make a copy before mutating (COW)
+        if Rc::strong_count(&self.globals) > 1 {
+            let new_globals = self.globals.borrow().clone();
+            self.globals = Rc::new(RefCell::new(new_globals));
+        }
+
+        self.globals.borrow_mut().insert(name.to_string(), value);
         Ok(())
     }
 
-    pub fn globals(&self) -> &HashMap<String, Value> {
-        &self.globals
+    /// Get immutable reference to globals HashMap (requires manual borrow)
+    pub fn globals(&self) -> Rc<RefCell<HashMap<String, Value>>> {
+        Rc::clone(&self.globals)
     }
 
-    pub fn globals_mut(&mut self) -> &mut HashMap<String, Value> {
-        &mut self.globals
+    /// Get mutable access to globals (triggers COW if shared)
+    pub fn globals_mut(&mut self) -> Rc<RefCell<HashMap<String, Value>>> {
+        // If Rc has multiple owners, make a copy before mutating (COW)
+        if Rc::strong_count(&self.globals) > 1 {
+            let new_globals = self.globals.borrow().clone();
+            self.globals = Rc::new(RefCell::new(new_globals));
+        }
+
+        Rc::clone(&self.globals)
     }
 
+    /// Clear all global variables
     pub fn clear_globals(&mut self) {
-        self.globals.clear();
+        // If Rc has multiple owners, just replace with new empty map
+        if Rc::strong_count(&self.globals) > 1 {
+            self.globals = Rc::new(RefCell::new(HashMap::new()));
+        } else {
+            self.globals.borrow_mut().clear();
+        }
     }
 
+    /// Replace globals with a new HashMap
     pub fn set_globals(&mut self, globals: HashMap<String, Value>) {
-        self.globals = globals;
+        self.globals = Rc::new(RefCell::new(globals));
+    }
+
+    /// Snapshot globals for module isolation (O(1) operation)
+    pub fn snapshot_globals(&self) -> Rc<RefCell<HashMap<String, Value>>> {
+        Rc::clone(&self.globals)
+    }
+
+    /// Restore globals from a snapshot (O(1) operation)
+    pub fn restore_globals(&mut self, snapshot: Rc<RefCell<HashMap<String, Value>>>) {
+        self.globals = snapshot;
     }
 
     // Call stack operations
@@ -226,7 +265,7 @@ impl ExecutionContext {
     // Full reset operations
     pub fn reset(&mut self) {
         self.stack.clear();
-        self.globals.clear();
+        self.clear_globals();
         self.ip = 0;
         self.call_stack.clear();
         self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
@@ -279,11 +318,11 @@ mod tests {
     fn test_context_globals() {
         let mut ctx = ExecutionContext::new();
         ctx.define_global("x".to_string(), Value::Number(10.0));
-        assert_eq!(ctx.get_global("x"), Some(&Value::Number(10.0)));
+        assert_eq!(ctx.get_global("x"), Some(Value::Number(10.0)));
         assert_eq!(ctx.get_global("y"), None);
 
         assert!(ctx.set_global("x", Value::Number(20.0)).is_ok());
-        assert_eq!(ctx.get_global("x"), Some(&Value::Number(20.0)));
+        assert_eq!(ctx.get_global("x"), Some(Value::Number(20.0)));
 
         assert!(ctx.set_global("y", Value::Number(30.0)).is_err());
     }
@@ -350,8 +389,66 @@ mod tests {
         ctx.reset();
 
         assert_eq!(ctx.stack_len(), 0);
-        assert_eq!(ctx.globals().len(), 0);
+        assert_eq!(ctx.globals().borrow().len(), 0);
         assert_eq!(ctx.current_ip(), 0);
         assert_eq!(ctx.call_depth(), 1); // Script frame restored
+    }
+
+    #[test]
+    fn test_cow_globals_isolation() {
+        let mut ctx = ExecutionContext::new();
+        ctx.define_global("x".to_string(), Value::Number(10.0));
+
+        // Snapshot
+        let snapshot = ctx.snapshot_globals();
+
+        // Modify
+        ctx.set_global("x", Value::Number(20.0)).unwrap();
+
+        // Snapshot should be unchanged
+        assert_eq!(snapshot.borrow().get("x"), Some(&Value::Number(10.0)));
+        assert_eq!(ctx.get_global("x"), Some(Value::Number(20.0)));
+    }
+
+    #[test]
+    fn test_cow_triggers_copy() {
+        let mut ctx = ExecutionContext::new();
+        ctx.define_global("x".to_string(), Value::Number(10.0));
+
+        let snapshot = ctx.snapshot_globals();
+
+        // This should trigger COW
+        ctx.set_global("x", Value::Number(20.0)).unwrap();
+
+        // After COW, snapshot and ctx should have different Rc instances
+        assert!(!Rc::ptr_eq(&snapshot, &ctx.globals()));
+
+        // Snapshot should still have the old value
+        assert_eq!(snapshot.borrow().get("x"), Some(&Value::Number(10.0)));
+
+        // Context should have the new value
+        assert_eq!(ctx.get_global("x"), Some(Value::Number(20.0)));
+    }
+
+    #[test]
+    fn test_snapshot_restore() {
+        let mut ctx = ExecutionContext::new();
+        ctx.define_global("x".to_string(), Value::Number(10.0));
+        ctx.define_global("y".to_string(), Value::Number(20.0));
+
+        // Snapshot
+        let snapshot = ctx.snapshot_globals();
+
+        // Modify
+        ctx.define_global("z".to_string(), Value::Number(30.0));
+        ctx.set_global("x", Value::Number(100.0)).unwrap();
+
+        // Restore
+        ctx.restore_globals(snapshot);
+
+        // Should have original values
+        assert_eq!(ctx.get_global("x"), Some(Value::Number(10.0)));
+        assert_eq!(ctx.get_global("y"), Some(Value::Number(20.0)));
+        assert_eq!(ctx.get_global("z"), None); // z was added after snapshot
     }
 }

@@ -95,11 +95,11 @@ impl Machine {
     }
 
     // Public accessors for external use (e.g., REPL)
-    pub fn globals(&self) -> &hashbrown::HashMap<String, Value> {
+    pub fn globals(&self) -> Rc<RefCell<hashbrown::HashMap<String, Value>>> {
         self.context.globals()
     }
 
-    pub fn globals_mut(&mut self) -> &mut hashbrown::HashMap<String, Value> {
+    pub fn globals_mut(&mut self) -> Rc<RefCell<hashbrown::HashMap<String, Value>>> {
         self.context.globals_mut()
     }
 
@@ -163,7 +163,7 @@ impl Machine {
         // Mark phase: collect all bytecode IDs referenced by globals
         let mut live_bytecodes = HashSet::new();
 
-        for value in self.context.globals().values() {
+        for value in self.context.globals().borrow().values() {
             self.mark_bytecode_ids(value, &mut live_bytecodes);
         }
 
@@ -446,11 +446,11 @@ impl Machine {
                 self.context.push_frame(frame);
 
                 // Save and restore module globals for cross-bytecode execution
-                let saved_globals = self.context.globals().clone();
+                let saved_globals = self.context.snapshot_globals();
                 if bytecode_id != &0
                     && let Some(module_globals) = self.modules.get_module_globals(*bytecode_id)
                 {
-                    self.context.set_globals((**module_globals).clone());
+                    self.context.set_globals(module_globals.borrow().clone());
                 }
 
                 // Jump to function body
@@ -461,7 +461,7 @@ impl Machine {
 
                 // Always restore IP and globals, even on error
                 self.context.jump_to(saved_ip);
-                self.context.set_globals(saved_globals);
+                self.context.restore_globals(saved_globals);
 
                 // Handle execution result
                 match execution_result {
@@ -552,7 +552,8 @@ impl Machine {
 
         let module_bytecode_id = self.modules.register_bytecode(module_bytecode.clone());
 
-        let saved_globals = self.context.globals().clone();
+        // Snapshot current globals for module isolation (O(1) operation with COW)
+        let saved_globals = self.context.snapshot_globals();
         let saved_file = self.modules.current_file().map(|p| p.to_path_buf());
         let saved_stack_len = self.context.stack_len();
         let saved_ip = self.context.current_ip();
@@ -590,10 +591,11 @@ impl Machine {
 
         result?;
 
-        let mut module_exports = self.context.globals().clone();
+        // Snapshot module exports (O(1) operation with COW)
+        let module_exports = self.context.snapshot_globals();
 
         // Update all functions in exports to have correct bytecode_id
-        for (_, value) in module_exports.iter_mut() {
+        for (_, value) in module_exports.borrow_mut().iter_mut() {
             match value {
                 Value::Function {
                     bytecode_id, ..
@@ -610,9 +612,10 @@ impl Machine {
         }
 
         // Store module globals for cross-bytecode function calls
-        self.modules.save_module_globals(module_bytecode_id, module_exports.clone());
+        self.modules.save_module_globals(module_bytecode_id, Rc::clone(&module_exports));
 
-        self.context.set_globals(saved_globals);
+        // Restore original globals (O(1) operation)
+        self.context.restore_globals(saved_globals);
         self.modules.set_current_file(saved_file);
         self.context.truncate_stack(saved_stack_len);
         self.context.jump_to(saved_ip);
@@ -627,11 +630,13 @@ impl Machine {
 
         self.modules.unmark_module_loading(&resolved_path);
 
-        let module = crate::module::Module::with_globals(resolved_path.clone(), module_bytecode, module_exports.clone());
+        // Module exports need to be converted to HashMap for Module::with_globals
+        let exports_map = module_exports.borrow().clone();
+        let module = crate::module::Module::with_globals(resolved_path.clone(), module_bytecode, exports_map.clone());
 
         self.modules.module_cache_mut().insert(resolved_path, module);
 
-        Ok(module_exports)
+        Ok(exports_map)
     }
 
     pub fn run(&mut self, bytecode: &Bytecode) -> Result<Value, LugliError> {
@@ -822,7 +827,7 @@ impl Machine {
                             // Save and restore module globals for cross-bytecode execution
                             let saved_globals = self.context.globals().clone();
                             if let Some(module_globals) = self.modules.get_module_globals(bytecode_id) {
-                                self.context.set_globals((**module_globals).clone());
+                                self.context.set_globals(module_globals.borrow().clone());
                             }
 
                             let saved_ip = self.context.current_ip();
@@ -830,7 +835,7 @@ impl Machine {
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
                             self.context.jump_to(saved_ip); // Restore IP; execute_instruction will increment it
-                            self.context.set_globals(saved_globals); // Restore original globals
+                            self.context.restore_globals(saved_globals); // Restore original globals
                             exec_result?;
 
                             // Return value is now on stack
@@ -872,7 +877,7 @@ impl Machine {
                             // Save and restore module globals for cross-bytecode execution
                             let saved_globals = self.context.globals().clone();
                             if let Some(module_globals) = self.modules.get_module_globals(bytecode_id) {
-                                self.context.set_globals((**module_globals).clone());
+                                self.context.set_globals(module_globals.borrow().clone());
                             }
 
                             let saved_ip = self.context.current_ip();
@@ -880,7 +885,7 @@ impl Machine {
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
                             self.context.jump_to(saved_ip); // Restore IP; execute_instruction will increment it
-                            self.context.set_globals(saved_globals); // Restore original globals
+                            self.context.restore_globals(saved_globals); // Restore original globals
                             exec_result?;
 
                             // Return value is now on stack
@@ -1034,7 +1039,7 @@ impl Machine {
                         let struct_method_name = format!("{}_{}", struct_type, method_name);
 
                         // Look up the method in globals first, then check all loaded modules
-                        let func = self.context.get_global(&struct_method_name).cloned().or_else(|| self.modules.module_cache().find_in_exports(&struct_method_name));
+                        let func = self.context.get_global(&struct_method_name).or_else(|| self.modules.module_cache().find_in_exports(&struct_method_name));
 
                         if let Some(func) = func {
                             match func {
@@ -1078,7 +1083,7 @@ impl Machine {
                                         // Save and restore module globals for cross-bytecode execution
                                         let saved_globals = self.context.globals().clone();
                                         if let Some(module_globals) = self.modules.get_module_globals(bytecode_id) {
-                                            self.context.set_globals((**module_globals).clone());
+                                            self.context.set_globals(module_globals.borrow().clone());
                                         }
 
                                         let saved_ip = self.context.current_ip();
@@ -1087,7 +1092,7 @@ impl Machine {
                                         let exec_result = self.execute_function_until_return(&method_bytecode, saved_call_stack_len);
 
                                         self.context.jump_to(saved_ip); // Restore IP; execute_instruction will increment it
-                                        self.context.set_globals(saved_globals); // Restore original globals
+                                        self.context.restore_globals(saved_globals); // Restore original globals
                                         exec_result?;
 
                                         // Return value is now on stack, but we need to clean up

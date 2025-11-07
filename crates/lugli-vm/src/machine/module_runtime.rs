@@ -4,7 +4,7 @@ use crate::{
 };
 use hashbrown::HashMap;
 use lugli_common::{LugliError, Value};
-use std::{path::{Path, PathBuf}, rc::Rc};
+use std::{cell::RefCell, path::{Path, PathBuf}, rc::Rc};
 
 /// Manages module loading, caching, and bytecode registry
 pub struct ModuleRuntime {
@@ -18,7 +18,7 @@ pub struct ModuleRuntime {
     bytecode_registry: HashMap<usize, Rc<Bytecode>>,
 
     /// Module-specific globals (bytecode_id → globals)
-    module_globals: HashMap<usize, Rc<HashMap<String, Value>>>,
+    module_globals: HashMap<usize, Rc<RefCell<HashMap<String, Value>>>>,
 
     /// Next bytecode ID to assign
     next_bytecode_id: usize,
@@ -90,11 +90,11 @@ impl ModuleRuntime {
     }
 
     // Module globals operations
-    pub fn save_module_globals(&mut self, bytecode_id: usize, globals: HashMap<String, Value>) {
-        self.module_globals.insert(bytecode_id, Rc::new(globals));
+    pub fn save_module_globals(&mut self, bytecode_id: usize, globals: Rc<RefCell<HashMap<String, Value>>>) {
+        self.module_globals.insert(bytecode_id, globals);
     }
 
-    pub fn get_module_globals(&self, bytecode_id: usize) -> Option<&Rc<HashMap<String, Value>>> {
+    pub fn get_module_globals(&self, bytecode_id: usize) -> Option<&Rc<RefCell<HashMap<String, Value>>>> {
         self.module_globals.get(&bytecode_id)
     }
 
@@ -189,10 +189,11 @@ mod tests {
         let mut globals = HashMap::new();
         globals.insert("x".to_string(), Value::Number(42.0));
 
-        runtime.save_module_globals(1, globals);
+        let globals_rc = Rc::new(RefCell::new(globals));
+        runtime.save_module_globals(1, globals_rc);
 
         let retrieved = runtime.get_module_globals(1).unwrap();
-        assert_eq!(retrieved.get("x"), Some(&Value::Number(42.0)));
+        assert_eq!(retrieved.borrow().get("x"), Some(&Value::Number(42.0)));
         assert!(runtime.get_module_globals(2).is_none());
     }
 
@@ -218,7 +219,7 @@ mod tests {
         let id = runtime.register_bytecode(bytecode);
         let mut globals = HashMap::new();
         globals.insert("x".to_string(), Value::Number(10.0));
-        runtime.save_module_globals(id, globals);
+        runtime.save_module_globals(id, Rc::new(RefCell::new(globals)));
         runtime.set_current_file(Some(PathBuf::from("/test.lg")));
 
         // Reset
