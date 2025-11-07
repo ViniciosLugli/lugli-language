@@ -227,9 +227,14 @@ impl PeepholeOptimizer {
                         i += 2;
                         continue;
                     }
-                    // Note: MulInt(0) optimization is complex due to stack management
-                    // and needs careful handling of Dup instructions for assignments.
-                    // Left unoptimized for safety.
+                    // MulInt(0) → Pop the value, push 0 instead
+                    (_, Instruction::MulInt(0)) => {
+                        result.push(instructions[i].clone()); // Keep the instruction that pushes the value
+                        result.push(Instruction::Pop);         // Pop that value
+                        result.push(Instruction::LoadSmallInt(0)); // Push 0
+                        i += 2;
+                        continue;
+                    }
                     _ => {}
                 }
             }
