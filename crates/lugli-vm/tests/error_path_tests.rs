@@ -4,7 +4,8 @@ use lugli_vm::{Bytecode, Vm};
 fn compile_source(source: &str) -> Bytecode {
     let mut parser = Parser::new(source).expect("Parser creation should succeed");
     let (program, span_map) = parser.parse().expect("Parse should succeed");
-    compile(&program, span_map).expect("Compile should succeed")
+    let vm = Vm::new();
+    vm.compile(&program, span_map).expect("Compile should succeed")
 }
 
 #[test]
@@ -17,7 +18,7 @@ fn test_stack_overflow_protection() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -30,7 +31,7 @@ fn test_division_by_zero_error() {
     let source = "let x = 10 / 0";
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -47,7 +48,7 @@ fn test_index_out_of_bounds_positive() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     // Should succeed (returns null)
@@ -63,7 +64,7 @@ fn test_index_out_of_bounds_negative() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     // Should succeed (returns null)
@@ -75,7 +76,7 @@ fn test_undefined_variable_error() {
     let source = "let x = undefined_var";
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -88,7 +89,7 @@ fn test_type_error_on_invalid_operation() {
     let source = r#"let x = "string" + 42"#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     // This might work (string concatenation) or fail - test that it doesn't panic
@@ -103,7 +104,7 @@ fn test_invalid_method_call() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -119,7 +120,7 @@ fn test_function_arity_mismatch() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -140,7 +141,7 @@ fn test_nested_error_propagation() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -159,7 +160,7 @@ fn test_error_in_loop() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -176,7 +177,7 @@ fn test_error_in_match_expression() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -190,7 +191,7 @@ fn test_empty_list_pop() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     // Should either return null or error gracefully
@@ -205,7 +206,7 @@ fn test_large_number_operations() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     // Should handle infinity or large numbers gracefully
@@ -217,7 +218,7 @@ fn test_modulo_by_zero() {
     let source = "let x = 10 % 0";
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -233,7 +234,7 @@ fn test_property_access_on_non_object() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());
@@ -247,7 +248,7 @@ fn test_call_non_function() {
     "#;
 
     let bytecode = compile_source(source);
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let result = vm.run(&bytecode);
 
     assert!(result.is_err());

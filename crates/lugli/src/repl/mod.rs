@@ -77,7 +77,7 @@ pub fn start() -> Result<(), CliError> {
                                 match vm.run(&bytecode) {
                                     Ok(value) => {
                                         // Store last result in _ variable
-                                        vm.machine_mut().globals_mut().insert("_".to_string(), value.clone());
+                                        vm.machine_mut().globals_mut().borrow_mut().insert("_".to_string(), value.clone());
 
                                         if !matches!(value, lugli_common::Value::Null) {
                                             println!("{}", format_value(&value, &bytecode));
@@ -134,8 +134,14 @@ pub fn start() -> Result<(), CliError> {
 fn get_history_path() -> PathBuf { if let Some(home) = dirs::home_dir() { home.join(HISTORY_FILE) } else { PathBuf::from(HISTORY_FILE) } }
 
 fn update_completion_variables(vm: &Vm, variables: &Rc<RefCell<Vec<String>>>) {
-    let user_vars: Vec<String> =
-        vm.machine().globals().keys().filter(|k| !matches!(vm.machine().globals().get(*k), Some(lugli_common::Value::NativeFunction { .. }))).cloned().collect();
+    let user_vars: Vec<String> = vm
+        .machine()
+        .globals()
+        .borrow()
+        .iter()
+        .filter(|(_, v)| !matches!(v, lugli_common::Value::NativeFunction { .. }))
+        .map(|(k, _)| k.clone())
+        .collect();
     *variables.borrow_mut() = user_vars;
 }
 

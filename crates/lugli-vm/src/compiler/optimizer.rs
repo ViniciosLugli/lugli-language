@@ -22,8 +22,8 @@ impl PeepholeOptimizer {
     pub fn new() -> Self {
         Self {
             optimize_constants: true,
-            optimize_jumps: true,      // Re-enabled with offset tracking
-            optimize_dead_code: true,  // Re-enabled with closure safeguards
+            optimize_jumps: false,      // Disabled - has bugs with jump target calculation
+            optimize_dead_code: false,  // Disabled - too aggressive, removes function definitions
         }
     }
 
@@ -52,8 +52,10 @@ impl PeepholeOptimizer {
                 optimized = self.jump_threading(optimized);
             }
 
-            // Instruction fusion - always enabled for performance
-            optimized = self.instruction_fusion(optimized);
+            // Instruction fusion - disabled due to jump target bugs
+            // FIXME: instruction_fusion changes instruction count but doesn't update jump targets
+            // This causes Jump instructions to skip DefineFunction/StoreGlobal incorrectly
+            // optimized = self.instruction_fusion(optimized);
 
             changed = optimized.len() != before_len;
             pass_count += 1;
@@ -641,6 +643,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "DCE disabled - too aggressive"]
     fn test_dead_code_constant_pop() {
         let optimizer = PeepholeOptimizer::new();
         let instructions = vec![Instruction::LoadSmallInt(42), Instruction::Pop, Instruction::LoadSmallInt(1)];
@@ -806,6 +809,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Instruction fusion disabled - has bugs with jump target updates"]
     fn test_instruction_fusion_jump_if_not_equal() {
         let optimizer = PeepholeOptimizer::new();
         let instructions = vec![Instruction::Equal, Instruction::JumpIfFalse(10)];
@@ -815,6 +819,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Instruction fusion disabled - has bugs with jump target updates"]
     fn test_instruction_fusion_jump_if_equal() {
         let optimizer = PeepholeOptimizer::new();
         let instructions = vec![Instruction::NotEqual, Instruction::JumpIfFalse(10)];
@@ -824,6 +829,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Instruction fusion disabled - has bugs with jump target updates"]
     fn test_instruction_fusion_add_locals() {
         let optimizer = PeepholeOptimizer::new();
         let instructions = vec![Instruction::Load(0), Instruction::Load(1), Instruction::Add];

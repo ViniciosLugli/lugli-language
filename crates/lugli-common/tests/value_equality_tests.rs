@@ -70,24 +70,24 @@ fn test_closure_equality_with_upvalues() {
     let upval2 = Rc::new(RefCell::new(Value::Number(10.0)));
 
     let closure1 = Value::Closure {
-        name: "test".to_string(),
-        params: vec!["x".to_string()],
+        name: Rc::from("test"),
+        params: Rc::new(vec!["x".to_string()]),
         body_start: 100,
         bytecode_id: 0,
         upvalues: vec![upval1.clone()],
     };
 
     let closure2 = Value::Closure {
-        name: "test".to_string(),
-        params: vec!["x".to_string()],
+        name: Rc::from("test"),
+        params: Rc::new(vec!["x".to_string()]),
         body_start: 100,
         bytecode_id: 0,
         upvalues: vec![upval1.clone()],
     };
 
     let closure3 = Value::Closure {
-        name: "test".to_string(),
-        params: vec!["x".to_string()],
+        name: Rc::from("test"),
+        params: Rc::new(vec!["x".to_string()]),
         body_start: 100,
         bytecode_id: 0,
         upvalues: vec![upval2],

@@ -1,12 +1,13 @@
 use lugli_common::Value;
 use lugli_parser::Parser;
-use lugli_vm::{Bytecode, compile, run};
+use lugli_vm::{Bytecode, Vm};
 
 fn run_and_get_value(source: &str) -> (Bytecode, Value) {
     let mut parser = Parser::new(source).unwrap();
     let (ast, span_map) = parser.parse().unwrap();
-    let bytecode = compile(&ast, span_map).unwrap();
-    let result = run(&bytecode).unwrap();
+    let mut vm = Vm::new();
+    let bytecode = vm.compile(&ast, span_map).unwrap();
+    let result = vm.run(&bytecode).unwrap();
     (bytecode, result)
 }
 
