@@ -13,7 +13,7 @@
 // - Dead code elimination: ❌ DISABLED (too aggressive with closures)
 
 use lugli_parser::Parser;
-use lugli_vm::{Instruction, compile};
+use lugli_vm::{Instruction, Vm};
 
 /// Helper to compile source code and extract the instructions
 fn compile_and_get_instructions(source: &str) -> Vec<Instruction> {

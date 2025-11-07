@@ -53,53 +53,6 @@ pub enum VmError {
     VmError(String),
 }
 
-// Legacy API functions (maintained for backward compatibility)
-// Use Vm API instead for new code
-
-#[deprecated(since = "0.5.0", note = "Use `Vm::new().compile()` instead")]
-pub fn compile(program: &lugli_ast::Program, span_map: lugli_ast::SpanMap) -> Result<Bytecode, VmError> {
-    let vm = Vm::new();
-    vm.compile(program, span_map)
-}
-
-#[deprecated(since = "0.5.0", note = "Use `Vm::builder().with_source().build().compile()` instead")]
-pub fn compile_with_source(program: &lugli_ast::Program, span_map: lugli_ast::SpanMap, file_path: &str, source: &str) -> Result<Bytecode, VmError> {
-    let vm = Vm::builder()
-        .with_source(file_path.to_string(), source.to_string())
-        .build();
-    vm.compile(program, span_map)
-}
-
-#[deprecated(since = "0.5.0", note = "Use `Vm::new().run()` instead")]
-pub fn run(bytecode: &Bytecode) -> Result<Value, VmError> {
-    let mut vm = Vm::new();
-    vm.run(bytecode)
-}
-
-#[deprecated(since = "0.5.0", note = "Use `Vm::new().compile_and_run()` instead")]
-pub fn compile_and_run(program: &lugli_ast::Program, span_map: lugli_ast::SpanMap) -> Result<Value, VmError> {
-    let mut vm = Vm::new();
-    vm.compile_and_run(program, span_map)
-}
-
-#[deprecated(since = "0.5.0", note = "Use `Vm::builder().with_source().build().compile_and_run()` instead")]
-pub fn compile_and_run_with_source(
-    program: &lugli_ast::Program,
-    span_map: lugli_ast::SpanMap,
-    file_path: &str,
-    source: &str,
-) -> Result<Value, VmError> {
-    let mut vm = Vm::builder()
-        .with_source(file_path.to_string(), source.to_string())
-        .build();
-    vm.compile_and_run(program, span_map)
-}
-
-#[deprecated(since = "0.5.0", note = "Use `Vm::machine_mut()` and call `.run()` directly")]
-pub fn run_with_vm(vm: &mut Machine, bytecode: &Bytecode) -> Result<Value, VmError> {
-    vm.run(bytecode).map_err(VmError::RuntimeError)
-}
-
 pub fn get_bytecode_stats(bytecode: &Bytecode) -> (usize, usize, usize) {
     let instruction_count = bytecode.instructions.len();
     let constant_count = bytecode.constants.len();

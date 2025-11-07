@@ -5,7 +5,7 @@ mod validator;
 
 use crate::cli::CliError;
 use colored::Colorize;
-use lugli_vm::Machine;
+use lugli_vm::Vm;
 use rustyline::{Config, Editor, error::ReadlineError};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
@@ -38,7 +38,7 @@ pub fn start() -> Result<(), CliError> {
         eprintln!("{}: Failed to load history: {}", "Warning".yellow().bold(), e);
     }
 
-    let mut vm = Machine::new();
+    let mut vm = Vm::new();
     let mut bytecodes: Vec<lugli_vm::Bytecode> = Vec::new();
 
     loop {
@@ -72,12 +72,12 @@ pub fn start() -> Result<(), CliError> {
                 // Parse and execute
                 match lugli_parser::parse(line) {
                     Ok((program, span_map)) => {
-                        match lugli_vm::compile(&program, span_map) {
+                        match vm.compile(&program, span_map) {
                             Ok(bytecode) => {
-                                match lugli_vm::run_with_vm(&mut vm, &bytecode) {
+                                match vm.run(&bytecode) {
                                     Ok(value) => {
                                         // Store last result in _ variable
-                                        vm.globals_mut().insert("_".to_string(), value.clone());
+                                        vm.machine_mut().globals_mut().insert("_".to_string(), value.clone());
 
                                         if !matches!(value, lugli_common::Value::Null) {
                                             println!("{}", format_value(&value, &bytecode));
@@ -133,9 +133,9 @@ pub fn start() -> Result<(), CliError> {
 
 fn get_history_path() -> PathBuf { if let Some(home) = dirs::home_dir() { home.join(HISTORY_FILE) } else { PathBuf::from(HISTORY_FILE) } }
 
-fn update_completion_variables(vm: &Machine, variables: &Rc<RefCell<Vec<String>>>) {
+fn update_completion_variables(vm: &Vm, variables: &Rc<RefCell<Vec<String>>>) {
     let user_vars: Vec<String> =
-        vm.globals().keys().filter(|k| !matches!(vm.globals().get(*k), Some(lugli_common::Value::NativeFunction { .. }))).cloned().collect();
+        vm.machine().globals().keys().filter(|k| !matches!(vm.machine().globals().get(*k), Some(lugli_common::Value::NativeFunction { .. }))).cloned().collect();
     *variables.borrow_mut() = user_vars;
 }
 
