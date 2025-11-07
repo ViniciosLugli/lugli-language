@@ -23,7 +23,7 @@ impl PeepholeOptimizer {
         Self {
             optimize_constants: true,
             optimize_jumps: true,      // Re-enabled with offset tracking
-            optimize_dead_code: false, // Keep disabled - still too aggressive
+            optimize_dead_code: true,  // Re-enabled with closure safeguards
         }
     }
 
@@ -576,7 +576,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Dead code elimination temporarily disabled (too aggressive with closures)
     fn test_dead_code_constant_pop() {
         let optimizer = PeepholeOptimizer::new();
         let instructions = vec![Instruction::LoadSmallInt(42), Instruction::Pop, Instruction::LoadSmallInt(1)];
