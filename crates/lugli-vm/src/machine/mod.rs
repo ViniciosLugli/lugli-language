@@ -1,15 +1,16 @@
-use crate::{
-    Bytecode, Instruction,
-    module::{ModuleCache, ModuleResolver},
-};
+use crate::{Bytecode, Instruction};
 use hashbrown::HashMap;
 use lugli_common::{LugliError, StringId, StringPool, Value};
 use lugli_stdlib::get_global_functions;
-use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
 // Execution context
 mod context;
 pub use context::{CallFrame, ExecutionContext};
+
+// Module runtime
+mod module_runtime;
+pub use module_runtime::ModuleRuntime;
 
 // Instruction handler modules
 mod arithmetic_ops;
@@ -51,15 +52,12 @@ pub struct Machine {
     // Execution context encapsulates runtime state
     context: ExecutionContext,
 
-    // Non-execution state
+    // Module runtime encapsulates module system
+    modules: ModuleRuntime,
+
+    // Remaining infrastructure
     pub debug: DebugContext,
-    module_cache: ModuleCache,
-    module_resolver: ModuleResolver,
-    current_file: Option<PathBuf>,
     string_pool: Rc<RefCell<StringPool>>,
-    bytecode_registry: HashMap<usize, Rc<Bytecode>>,
-    module_globals: HashMap<usize, Rc<HashMap<String, Value>>>,
-    next_bytecode_id: usize,
     method_registry: lugli_stdlib::MethodRegistry,
     method_cache: HashMap<(usize, usize), u32>,
     gc: lugli_common::GarbageCollector,
@@ -129,14 +127,9 @@ impl Machine {
 
         Self {
             context: ExecutionContext::with_globals(globals),
+            modules: ModuleRuntime::new(),
             debug,
-            module_cache: ModuleCache::new(),
-            module_resolver: ModuleResolver::new(),
-            current_file: None,
             string_pool,
-            bytecode_registry: HashMap::with_capacity(16),
-            module_globals: HashMap::with_capacity(16),
-            next_bytecode_id: 1,
             method_registry: lugli_stdlib::MethodRegistry::new(),
             method_cache: HashMap::with_capacity(256),
             gc: lugli_common::GarbageCollector::new(),
@@ -145,14 +138,11 @@ impl Machine {
 
     pub fn reset(&mut self) {
         self.context.reset();
+        self.modules.reset();
         self.debug = DebugContext::default();
         if self.debug.trace_execution || self.debug.trace_stack || self.debug.trace_calls {
             self.debug.start_time = Some(Instant::now());
         }
-        self.module_cache.clear();
-        self.current_file = None;
-        self.bytecode_registry.clear();
-        self.next_bytecode_id = 1; // Start at 1, main bytecode uses ID 0
     }
 
     pub fn reset_for_repl(&mut self) {
@@ -174,7 +164,7 @@ impl Machine {
         }
 
         // Sweep phase: remove unreferenced bytecodes
-        self.bytecode_registry.retain(|&id, _| live_bytecodes.contains(&id));
+        self.modules.retain_bytecodes(|&id, _| live_bytecodes.contains(&id));
     }
 
     /// Get current GC statistics
@@ -236,8 +226,8 @@ impl Machine {
             }
         }
 
-        // Fallback: search bytecode pools
-        for bytecode in self.bytecode_registry.values() {
+        // Fallback: search bytecode pools from module runtime
+        if let Some(bytecode) = self.modules.get_bytecode(0) {
             let pool = bytecode.string_pool.borrow();
             if let Some(s) = pool.try_resolve(id) {
                 return Some(s.to_string());
@@ -259,8 +249,8 @@ impl Machine {
                 }
                 drop(pool);
 
-                // Fallback: search registered bytecode pools (for REPL/standalone bytecode)
-                for bytecode in self.bytecode_registry.values() {
+                // Fallback: search registered bytecode pool (for REPL/standalone bytecode)
+                if let Some(bytecode) = self.modules.get_bytecode(0) {
                     let pool = bytecode.string_pool.borrow();
                     if let Some(s) = pool.try_resolve(*id) {
                         return format!("\"{}\"", s);
@@ -287,16 +277,17 @@ impl Machine {
                                 s.to_string()
                             } else {
                                 drop(pool);
-                                // Search bytecode pools
-                                let mut found = None;
-                                for bytecode in self.bytecode_registry.values() {
+                                // Search bytecode pool
+                                if let Some(bytecode) = self.modules.get_bytecode(0) {
                                     let pool = bytecode.string_pool.borrow();
                                     if let Some(s) = pool.try_resolve(*k) {
-                                        found = Some(s.to_string());
-                                        break;
+                                        s.to_string()
+                                    } else {
+                                        format!("<string#{}>", k.as_u32())
                                     }
+                                } else {
+                                    format!("<string#{}>", k.as_u32())
                                 }
-                                found.unwrap_or_else(|| format!("<string#{}>", k.as_u32()))
                             }
                         };
                         items.push(format!("\"{}\": {}", key_str, self.format_value(v)));
@@ -429,8 +420,8 @@ impl Machine {
 
                 // Look up the correct bytecode from the registry
                 let function_bytecode = self
-                    .bytecode_registry
-                    .get(bytecode_id)
+                    .modules
+                    .get_bytecode(*bytecode_id)
                     .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found in registry", bytecode_id)))?
                     .clone();
 
@@ -453,7 +444,7 @@ impl Machine {
                 // Save and restore module globals for cross-bytecode execution
                 let saved_globals = self.context.globals().clone();
                 if bytecode_id != &0
-                    && let Some(module_globals) = self.module_globals.get(bytecode_id)
+                    && let Some(module_globals) = self.modules.get_module_globals(*bytecode_id)
                 {
                     self.context.set_globals((**module_globals).clone());
                 }
@@ -519,22 +510,22 @@ impl Machine {
     }
 
     fn load_module(&mut self, module_path: &str) -> Result<HashMap<String, Value>, LugliError> {
-        let resolved_path = self.module_resolver.resolve(module_path, self.current_file.as_deref())?;
+        let resolved_path = self.modules.resolve_module_path(module_path, self.modules.current_file())?;
 
         // Prevent self-import
-        if let Some(current) = self.current_file.as_ref().filter(|c| resolved_path == **c) {
+        if let Some(current) = self.modules.current_file().filter(|c| resolved_path == **c) {
             return Err(LugliError::runtime(format!("Module cannot import itself: '{}'", current.display())));
         }
 
-        if self.module_cache.is_loading(&resolved_path) {
+        if self.modules.is_module_loading(&resolved_path) {
             return Err(LugliError::runtime(format!("Circular import detected: module '{}' is already being loaded", resolved_path.display())));
         }
 
-        if let Some(cached_module) = self.module_cache.get(&resolved_path) {
+        if let Some(cached_module) = self.modules.module_cache().get(&resolved_path) {
             return Ok(cached_module.exports.clone());
         }
 
-        self.module_cache.mark_loading(resolved_path.clone());
+        self.modules.mark_module_loading(resolved_path.clone());
 
         let source = std::fs::read_to_string(&resolved_path)
             .map_err(|e| LugliError::runtime(format!("Failed to read module '{}': {}", resolved_path.display(), e)))?;
@@ -544,7 +535,7 @@ impl Machine {
         let (ast, span_map) =
             parser.parse().map_err(|e| LugliError::runtime(format!("Parse error in module '{}': {}", resolved_path.display(), e)))?;
 
-        let shared_pool = if let Some(main_bytecode) = self.bytecode_registry.get(&0) {
+        let shared_pool = if let Some(main_bytecode) = self.modules.get_bytecode(0) {
             Rc::clone(&main_bytecode.string_pool)
         } else {
             Rc::new(RefCell::new(lugli_common::StringPool::with_common_strings()))
@@ -555,12 +546,10 @@ impl Machine {
             .compile(&ast, span_map)
             .map_err(|e| LugliError::runtime(format!("Compile error in module '{}': {}", resolved_path.display(), e)))?;
 
-        let module_bytecode_id = self.next_bytecode_id;
-        self.next_bytecode_id += 1;
-        self.bytecode_registry.insert(module_bytecode_id, Rc::new(module_bytecode.clone()));
+        let module_bytecode_id = self.modules.register_bytecode(module_bytecode.clone());
 
         let saved_globals = self.context.globals().clone();
-        let saved_file = self.current_file.clone();
+        let saved_file = self.modules.current_file().map(|p| p.to_path_buf());
         let saved_stack_len = self.context.stack_len();
         let saved_ip = self.context.current_ip();
         let saved_call_stack_len = self.context.call_depth();
@@ -576,7 +565,7 @@ impl Machine {
                 },
             );
         }
-        self.current_file = Some(resolved_path.clone());
+        self.modules.set_current_file(Some(resolved_path.clone()));
 
         self.context.jump_to(0);
         let mut result = Ok(());
@@ -617,10 +606,10 @@ impl Machine {
         }
 
         // Store module globals for cross-bytecode function calls
-        self.module_globals.insert(module_bytecode_id, Rc::new(module_exports.clone()));
+        self.modules.save_module_globals(module_bytecode_id, module_exports.clone());
 
         self.context.set_globals(saved_globals);
-        self.current_file = saved_file;
+        self.modules.set_current_file(saved_file);
         self.context.truncate_stack(saved_stack_len);
         self.context.jump_to(saved_ip);
         while self.context.call_depth() > saved_call_stack_len {
@@ -632,19 +621,18 @@ impl Machine {
             self.context.clear_call_stack();
         }
 
-        self.module_cache.unmark_loading(&resolved_path);
+        self.modules.unmark_module_loading(&resolved_path);
 
         let module = crate::module::Module::with_globals(resolved_path.clone(), module_bytecode, module_exports.clone());
 
-        self.module_cache.insert(resolved_path, module);
+        self.modules.module_cache_mut().insert(resolved_path, module);
 
         Ok(module_exports)
     }
 
     pub fn run(&mut self, bytecode: &Bytecode) -> Result<Value, LugliError> {
         // Register main bytecode with ID 0
-        let bytecode_rc = Rc::new(bytecode.clone());
-        self.bytecode_registry.insert(0, bytecode_rc.clone());
+        self.modules.register_main_bytecode(bytecode.clone());
 
         self.context.jump_to(0);
         while self.context.current_ip() < bytecode.instructions.len() {
@@ -817,8 +805,8 @@ impl Machine {
                         if bytecode_id != 0 {
                             // Cross-bytecode call - need to execute in function's bytecode
                             let function_bytecode = self
-                                .bytecode_registry
-                                .get(&bytecode_id)
+                                .modules
+                                .get_bytecode(bytecode_id)
                                 .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
                                 .clone();
 
@@ -829,7 +817,7 @@ impl Machine {
 
                             // Save and restore module globals for cross-bytecode execution
                             let saved_globals = self.context.globals().clone();
-                            if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
+                            if let Some(module_globals) = self.modules.get_module_globals(bytecode_id) {
                                 self.context.set_globals((**module_globals).clone());
                             }
 
@@ -867,8 +855,8 @@ impl Machine {
                         if bytecode_id != 0 {
                             // Cross-bytecode call - need to execute in closure's bytecode
                             let function_bytecode = self
-                                .bytecode_registry
-                                .get(&bytecode_id)
+                                .modules
+                                .get_bytecode(bytecode_id)
                                 .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
                                 .clone();
 
@@ -879,7 +867,7 @@ impl Machine {
 
                             // Save and restore module globals for cross-bytecode execution
                             let saved_globals = self.context.globals().clone();
-                            if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
+                            if let Some(module_globals) = self.modules.get_module_globals(bytecode_id) {
                                 self.context.set_globals((**module_globals).clone());
                             }
 
@@ -1005,8 +993,8 @@ impl Machine {
                                     if *bytecode_id != 0 {
                                         // Cross-bytecode call
                                         let function_bytecode = self
-                                            .bytecode_registry
-                                            .get(bytecode_id)
+                                            .modules
+                                            .get_bytecode(*bytecode_id)
                                             .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
                                             .clone();
 
@@ -1042,7 +1030,7 @@ impl Machine {
                         let struct_method_name = format!("{}_{}", struct_type, method_name);
 
                         // Look up the method in globals first, then check all loaded modules
-                        let func = self.context.get_global(&struct_method_name).cloned().or_else(|| self.module_cache.find_in_exports(&struct_method_name));
+                        let func = self.context.get_global(&struct_method_name).cloned().or_else(|| self.modules.module_cache().find_in_exports(&struct_method_name));
 
                         if let Some(func) = func {
                             match func {
@@ -1073,8 +1061,8 @@ impl Machine {
                                     if bytecode_id != 0 {
                                         // Cross-bytecode call - need to execute in method's bytecode
                                         let method_bytecode = self
-                                            .bytecode_registry
-                                            .get(&bytecode_id)
+                                            .modules
+                                            .get_bytecode(bytecode_id)
                                             .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
                                             .clone();
 
@@ -1085,7 +1073,7 @@ impl Machine {
 
                                         // Save and restore module globals for cross-bytecode execution
                                         let saved_globals = self.context.globals().clone();
-                                        if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
+                                        if let Some(module_globals) = self.modules.get_module_globals(bytecode_id) {
                                             self.context.set_globals((**module_globals).clone());
                                         }
 
