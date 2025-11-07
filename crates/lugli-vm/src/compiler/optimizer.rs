@@ -206,6 +206,38 @@ impl PeepholeOptimizer {
         let mut i = 0;
 
         while i < instructions.len() {
+            // Try 2-instruction patterns first (immediate operand optimizations)
+            if i + 1 < instructions.len() {
+                match (&instructions[i], &instructions[i + 1]) {
+                    // AddInt(0) → noop (keep previous value)
+                    (_, Instruction::AddInt(0)) => {
+                        result.push(instructions[i].clone());
+                        i += 2;
+                        continue;
+                    }
+                    // SubInt(0) → noop
+                    (_, Instruction::SubInt(0)) => {
+                        result.push(instructions[i].clone());
+                        i += 2;
+                        continue;
+                    }
+                    // MulInt(1) → noop
+                    (_, Instruction::MulInt(1)) => {
+                        result.push(instructions[i].clone());
+                        i += 2;
+                        continue;
+                    }
+                    // MulInt(0) → Pop, then load 0
+                    (_, Instruction::MulInt(0)) => {
+                        result.push(Instruction::Pop);
+                        result.push(Instruction::LoadSmallInt(0));
+                        i += 2;
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+
             if i + 2 < instructions.len() {
                 match (&instructions[i], &instructions[i + 1], &instructions[i + 2]) {
                     // Addition: x + 0 → x
