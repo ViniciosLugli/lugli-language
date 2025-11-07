@@ -173,3 +173,221 @@ fn debug_vardecl_plus_expression() {
 
     assert!(matches!(result, Value::Number(n) if (n - 8.0).abs() < 0.001));
 }
+
+// ============================================================================
+// EDGE CASE TESTS - Security, Error Handling, Circular Dependencies
+// ============================================================================
+
+#[test]
+fn test_missing_module_error() {
+    let code = "import nonexistent_module";
+    let result = run_code(code);
+
+    assert!(result.is_err(), "Should error on missing module");
+    let err_msg = result.unwrap_err();
+    assert!(
+        err_msg.contains("not found") || err_msg.contains("No such file") || err_msg.contains("cannot"),
+        "Error should mention module not found, got: {}",
+        err_msg
+    );
+}
+
+#[test]
+fn test_circular_import_detection() {
+    let test_dir = PathBuf::from("test_modules_circular");
+    fs::create_dir_all(&test_dir).unwrap();
+
+    // Create a.lg that imports b
+    let a_content = format!("import {}.b\nlet x = 1", test_dir.display());
+    fs::write(test_dir.join("a.lg"), &a_content).unwrap();
+
+    // Create b.lg that imports a (circular!)
+    let b_content = format!("import {}.a\nlet y = 2", test_dir.display());
+    fs::write(test_dir.join("b.lg"), &b_content).unwrap();
+
+    // Try to import a, which will try to import b, which will try to import a again
+    let code = format!("import {}.a", test_dir.display());
+    let result = run_code(&code);
+
+    fs::remove_dir_all(&test_dir).unwrap();
+
+    assert!(result.is_err(), "Should detect circular import");
+    let err_msg = result.unwrap_err();
+    assert!(
+        err_msg.contains("circular") || err_msg.contains("cycle") || err_msg.contains("recursive"),
+        "Error should mention circular import, got: {}",
+        err_msg
+    );
+}
+
+#[test]
+fn test_relative_parent_directory_rejected() {
+    // Security test: .. should be rejected to prevent directory traversal
+    let code = "import ../../../etc/passwd";
+    let result = run_code(code);
+
+    // Should either error during parsing or runtime
+    assert!(result.is_err(), "Should reject parent directory imports");
+}
+
+#[test]
+fn test_absolute_path_rejected() {
+    // Security test: absolute paths should be rejected
+    let code = "import /etc/passwd";
+    let result = run_code(code);
+
+    // Should either error during parsing or runtime
+    assert!(result.is_err(), "Should reject absolute path imports");
+}
+
+#[test]
+fn test_nested_module_imports() {
+    let test_dir = PathBuf::from("test_modules_nested");
+    fs::create_dir_all(&test_dir).unwrap();
+
+    // Create c.lg with a value
+    fs::write(test_dir.join("c.lg"), "let value = 42").unwrap();
+
+    // Create b.lg that imports c
+    let b_content = format!(
+        "import {}.c\nfn get_value() {{ return c.value }}",
+        test_dir.display()
+    );
+    fs::write(test_dir.join("b.lg"), &b_content).unwrap();
+
+    // Create a.lg that imports b
+    let a_content = format!("import {}.b", test_dir.display());
+    fs::write(test_dir.join("a.lg"), &a_content).unwrap();
+
+    // Import a, which imports b, which imports c
+    let code = format!(
+        "import {}.a\na.b.get_value()",
+        test_dir.display()
+    );
+    let result = run_code(&code);
+
+    fs::remove_dir_all(&test_dir).unwrap();
+
+    match result {
+        Ok(Value::Number(n)) => assert_eq!(n, 42.0, "Nested module import should work"),
+        Ok(other) => panic!("Expected Number(42), got {:?}", other),
+        Err(e) => panic!("Nested import failed: {}", e),
+    }
+}
+
+#[test]
+fn test_from_import_nonexistent_item() {
+    let test_dir = setup_test_module("nonexistent_item");
+
+    let code = format!(
+        r#"from {}.math import nonexistent_function"#,
+        test_dir.display()
+    );
+
+    let result = run_code(&code);
+    cleanup_test_module("nonexistent_item");
+
+    assert!(result.is_err(), "Should error when importing nonexistent item");
+    let err_msg = result.unwrap_err();
+    assert!(
+        err_msg.contains("not found") || err_msg.contains("does not exist") || err_msg.contains("cannot") || err_msg.contains("no export"),
+        "Error should mention item not found, got: {}",
+        err_msg
+    );
+}
+
+#[test]
+fn test_module_with_syntax_error() {
+    let test_dir = PathBuf::from("test_modules_syntax_error");
+    fs::create_dir_all(&test_dir).unwrap();
+
+    // Create a module with syntax error
+    fs::write(
+        test_dir.join("broken.lg"),
+        "let x = \n this is invalid syntax"
+    ).unwrap();
+
+    let code = format!("import {}.broken", test_dir.display());
+    let result = run_code(&code);
+
+    fs::remove_dir_all(&test_dir).unwrap();
+
+    assert!(result.is_err(), "Should error on module with syntax error");
+}
+
+#[test]
+fn test_module_with_runtime_error() {
+    let test_dir = PathBuf::from("test_modules_runtime_error");
+    fs::create_dir_all(&test_dir).unwrap();
+
+    // Create a module that will cause runtime error
+    fs::write(
+        test_dir.join("divzero.lg"),
+        "let x = 1 / 0"
+    ).unwrap();
+
+    let code = format!("import {}.divzero", test_dir.display());
+    let result = run_code(&code);
+
+    fs::remove_dir_all(&test_dir).unwrap();
+
+    assert!(result.is_err(), "Should error on module with runtime error");
+    let err_msg = result.unwrap_err();
+    assert!(
+        err_msg.contains("division") || err_msg.contains("zero"),
+        "Error should mention division by zero, got: {}",
+        err_msg
+    );
+}
+
+#[test]
+fn test_import_preserves_module_scope() {
+    let test_dir = setup_test_module("scope_test");
+
+    // Module defines private variable
+    fs::write(
+        test_dir.join("scoped.lg"),
+        "let private_var = 100\nfn get_private() { return private_var }"
+    ).unwrap();
+
+    let code = format!(
+        r#"
+        import {}.scoped
+        scoped.get_private()
+    "#,
+        test_dir.display()
+    );
+
+    let result = run_code(&code);
+    cleanup_test_module("scope_test");
+
+    match result {
+        Ok(Value::Number(n)) => assert_eq!(n, 100.0),
+        Ok(other) => panic!("Expected Number(100), got {:?}", other),
+        Err(e) => panic!("Module scope test failed: {}", e),
+    }
+}
+
+#[test]
+fn test_multiple_from_imports_same_module() {
+    let test_dir = setup_test_module("multiple_from");
+
+    let code = format!(
+        r#"
+        from {}.math import add
+        from {}.math import multiply
+        add(2, 3) + multiply(4, 5)
+    "#,
+        test_dir.display(),
+        test_dir.display()
+    );
+
+    let result = run_code(&code);
+    cleanup_test_module("multiple_from");
+
+    match result {
+        Ok(Value::Number(n)) => assert_eq!(n, 25.0), // 5 + 20
+        Ok(other) => panic!("Expected Number(25), got {:?}", other),
+        Err(e) => panic!("Multiple from imports failed: {}", e),
+    }
+}
