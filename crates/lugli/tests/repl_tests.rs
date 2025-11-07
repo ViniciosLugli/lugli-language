@@ -13,7 +13,7 @@ fn test_repl_variable_persistence() {
     lugli_vm::run_with_vm(&mut vm, &bytecode1).unwrap();
 
     // Verify variable exists
-    assert!(vm.globals.contains_key("x"));
+    assert!(vm.globals().contains_key("x"));
 
     vm.reset_for_repl();
 
@@ -38,7 +38,7 @@ fn test_repl_string_display() {
     lugli_vm::run_with_vm(&mut vm, &bytecode).unwrap();
 
     // Get the value and format it
-    let value = vm.globals.get("name").unwrap();
+    let value = vm.globals().get("name").unwrap();
     let formatted = vm.format_value(value);
 
     // Should display actual string, not <string#N>
@@ -60,7 +60,7 @@ fn test_repl_bounded_bytecode_retention() {
 
     // All variables should still exist
     for i in 0..20 {
-        assert!(vm.globals.contains_key(&format!("x{}", i)));
+        assert!(vm.globals().contains_key(&format!("x{}", i)));
     }
 
     // But we shouldn't have 20 bytecodes in memory (should be max 10)
@@ -78,7 +78,7 @@ fn test_repl_list_display() {
     let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode).unwrap();
 
-    let value = vm.globals.get("items").unwrap();
+    let value = vm.globals().get("items").unwrap();
     let formatted = vm.format_value(value);
 
     assert_eq!(formatted, "[1, 2, 3]");
@@ -94,7 +94,7 @@ fn test_repl_dict_display() {
     let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode).unwrap();
 
-    let value = vm.globals.get("person").unwrap();
+    let value = vm.globals().get("person").unwrap();
     let formatted = vm.format_value(value);
 
     // Dict order may vary, just check it contains the right parts
@@ -122,7 +122,7 @@ fn test_repl_error_recovery() {
     assert!(result.is_err());
 
     // Previous variable should still exist
-    assert!(vm.globals.contains_key("x"));
+    assert!(vm.globals().contains_key("x"));
 
     vm.reset_for_repl();
 
@@ -132,7 +132,7 @@ fn test_repl_error_recovery() {
     let bytecode3 = lugli_vm::compile(&program3, span_map3).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode3).unwrap();
 
-    assert!(vm.globals.contains_key("z"));
+    assert!(vm.globals().contains_key("z"));
 }
 
 #[test]
@@ -147,7 +147,7 @@ fn test_repl_function_definition() {
     let result = lugli_vm::run_with_vm(&mut vm, &bytecode).unwrap();
 
     assert_eq!(result, Value::Number(12.0));
-    assert!(vm.globals.contains_key("add"));
+    assert!(vm.globals().contains_key("add"));
 }
 
 #[test]
@@ -161,7 +161,7 @@ fn test_repl_multiline_expression() {
     let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode).unwrap();
 
-    assert!(vm.globals.contains_key("items"));
+    assert!(vm.globals().contains_key("items"));
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn test_repl_struct_definition() {
     let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode).unwrap();
 
-    assert!(vm.globals.contains_key("Point"));
+    assert!(vm.globals().contains_key("Point"));
 
     vm.reset_for_repl();
 
@@ -184,7 +184,7 @@ fn test_repl_struct_definition() {
     let bytecode2 = lugli_vm::compile(&program2, span_map2).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode2).unwrap();
 
-    assert!(vm.globals.contains_key("p"));
+    assert!(vm.globals().contains_key("p"));
 }
 
 #[test]
@@ -225,7 +225,7 @@ fn test_repl_nested_structures() {
     let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode).unwrap();
 
-    let value = vm.globals.get("data").unwrap();
+    let value = vm.globals().get("data").unwrap();
     let formatted = vm.format_value(value);
 
     // Should format nested structures
@@ -260,9 +260,9 @@ fn test_repl_multiple_assignments() {
     let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode).unwrap();
 
-    assert!(vm.globals.contains_key("a"));
-    assert!(vm.globals.contains_key("b"));
-    assert!(vm.globals.contains_key("c"));
+    assert!(vm.globals().contains_key("a"));
+    assert!(vm.globals().contains_key("b"));
+    assert!(vm.globals().contains_key("c"));
 }
 
 #[test]
@@ -282,7 +282,7 @@ fn test_repl_reassignment() {
     let bytecode2 = lugli_vm::compile(&program2, span_map2).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode2).unwrap();
 
-    let value = vm.globals.get("x").unwrap();
+    let value = vm.globals().get("x").unwrap();
     assert_eq!(value, &Value::Number(20.0));
 }
 
@@ -296,7 +296,7 @@ fn test_repl_format_value_with_function() {
     let bytecode = lugli_vm::compile(&program, span_map).unwrap();
     lugli_vm::run_with_vm(&mut vm, &bytecode).unwrap();
 
-    let value = vm.globals.get("test").unwrap();
+    let value = vm.globals().get("test").unwrap();
     let formatted = vm.format_value(value);
 
     assert!(formatted.contains("test"));

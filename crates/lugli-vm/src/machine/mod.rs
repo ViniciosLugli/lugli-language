@@ -7,6 +7,10 @@ use lugli_common::{LugliError, StringId, StringPool, Value};
 use lugli_stdlib::get_global_functions;
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
 
+// Execution context
+mod context;
+pub use context::{CallFrame, ExecutionContext};
+
 // Instruction handler modules
 mod arithmetic_ops;
 mod control_flow;
@@ -17,25 +21,6 @@ mod variable_ops;
 
 const MAX_STACK_SIZE: usize = 10_000;
 const MAX_CALL_DEPTH: usize = 1000;
-
-#[derive(Debug, Clone)]
-struct CallFrame {
-    function_name: Rc<str>,
-    return_ip: usize,
-    stack_base: usize,
-    closure_upvalues: Option<Vec<Rc<RefCell<Value>>>>,
-}
-
-impl CallFrame {
-    fn new(function_name: impl Into<Rc<str>>, return_ip: usize, stack_base: usize, upvalues: Option<Vec<Rc<RefCell<Value>>>>) -> Self {
-        Self {
-            function_name: function_name.into(),
-            return_ip,
-            stack_base,
-            closure_upvalues: upvalues,
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct DebugContext {
@@ -63,10 +48,10 @@ impl Default for DebugContext {
 }
 
 pub struct Machine {
-    pub stack: Vec<Value>,
-    pub globals: HashMap<String, Value>,
-    pub ip: usize,
-    call_stack: Vec<CallFrame>,
+    // Execution context encapsulates runtime state
+    context: ExecutionContext,
+
+    // Non-execution state
     pub debug: DebugContext,
     module_cache: ModuleCache,
     module_resolver: ModuleResolver,
@@ -75,17 +60,50 @@ pub struct Machine {
     bytecode_registry: HashMap<usize, Rc<Bytecode>>,
     module_globals: HashMap<usize, Rc<HashMap<String, Value>>>,
     next_bytecode_id: usize,
-    open_upvalues: HashMap<usize, Rc<RefCell<Value>>>,
     method_registry: lugli_stdlib::MethodRegistry,
     method_cache: HashMap<(usize, usize), u32>,
     gc: lugli_common::GarbageCollector,
 }
 
 impl Machine {
+    // Stack delegation methods
+    fn push(&mut self, value: Value) {
+        self.context.push(value);
+    }
+
+    fn pop(&mut self) -> Result<Value, LugliError> {
+        self.context.pop()
+            .ok_or_else(|| LugliError::runtime("Stack underflow"))
+    }
+
+    fn peek(&self) -> Result<&Value, LugliError> {
+        self.context.peek(0)
+            .ok_or_else(|| LugliError::runtime("Stack underflow"))
+    }
+
+    fn peek_n(&self, n: usize) -> Result<&Value, LugliError> {
+        self.context.peek(n)
+            .ok_or_else(|| LugliError::runtime(format!("Stack underflow in peek_n({})", n)))
+    }
+
+    fn peek_mut(&mut self, distance: usize) -> Result<&mut Value, LugliError> {
+        self.context.peek_mut(distance)
+            .ok_or_else(|| LugliError::runtime("Stack underflow"))
+    }
+
+    // Public accessors for external use (e.g., REPL)
+    pub fn globals(&self) -> &hashbrown::HashMap<String, Value> {
+        self.context.globals()
+    }
+
+    pub fn globals_mut(&mut self) -> &mut hashbrown::HashMap<String, Value> {
+        self.context.globals_mut()
+    }
+
     fn execute_binary_op(&mut self, op: fn(&Value, &Value) -> Result<Value, LugliError>) -> Result<(), LugliError> {
         let b = self.pop()?;
         let a = self.pop()?;
-        self.stack.push(op(&a, &b)?);
+        self.push(op(&a, &b)?);
         Ok(())
     }
 
@@ -109,14 +127,8 @@ impl Machine {
             debug.start_time = Some(Instant::now());
         }
 
-        let mut call_stack = Vec::with_capacity(64);
-        call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
-
         Self {
-            stack: Vec::with_capacity(256),
-            globals,
-            ip: 0,
-            call_stack,
+            context: ExecutionContext::with_globals(globals),
             debug,
             module_cache: ModuleCache::new(),
             module_resolver: ModuleResolver::new(),
@@ -125,7 +137,6 @@ impl Machine {
             bytecode_registry: HashMap::with_capacity(16),
             module_globals: HashMap::with_capacity(16),
             next_bytecode_id: 1,
-            open_upvalues: HashMap::with_capacity(32),
             method_registry: lugli_stdlib::MethodRegistry::new(),
             method_cache: HashMap::with_capacity(256),
             gc: lugli_common::GarbageCollector::new(),
@@ -133,11 +144,7 @@ impl Machine {
     }
 
     pub fn reset(&mut self) {
-        self.stack.clear();
-        self.globals.clear();
-        self.ip = 0;
-        self.call_stack.clear();
-        self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
+        self.context.reset();
         self.debug = DebugContext::default();
         if self.debug.trace_execution || self.debug.trace_stack || self.debug.trace_calls {
             self.debug.start_time = Some(Instant::now());
@@ -146,19 +153,13 @@ impl Machine {
         self.current_file = None;
         self.bytecode_registry.clear();
         self.next_bytecode_id = 1; // Start at 1, main bytecode uses ID 0
-        self.open_upvalues.clear();
     }
 
     pub fn reset_for_repl(&mut self) {
-        self.stack.clear();
-        self.ip = 0;
-        self.call_stack.clear();
-        self.call_stack.push(CallFrame::new("<script>".to_string(), 0, 0, None));
+        self.context.reset_for_repl();
 
         // GC bytecodes: only keep those referenced by globals
         self.gc_bytecodes();
-
-        self.open_upvalues.clear();
     }
 
     /// Garbage collect bytecodes that are no longer referenced by globals
@@ -168,7 +169,7 @@ impl Machine {
         // Mark phase: collect all bytecode IDs referenced by globals
         let mut live_bytecodes = HashSet::new();
 
-        for value in self.globals.values() {
+        for value in self.context.globals().values() {
             self.mark_bytecode_ids(value, &mut live_bytecodes);
         }
 
@@ -308,20 +309,12 @@ impl Machine {
         }
     }
 
-    fn peek(&self) -> Result<&Value, LugliError> { self.stack.last().ok_or_else(|| LugliError::runtime("Stack underflow")) }
-
-    fn peek_n(&self, n: usize) -> Result<&Value, LugliError> {
-        let index = self.stack.len().checked_sub(1 + n).ok_or_else(|| LugliError::runtime("Stack underflow in peek_n"))?;
-        self.stack.get(index).ok_or_else(|| LugliError::runtime("Invalid stack access"))
-    }
-
-    fn pop(&mut self) -> Result<Value, LugliError> { self.stack.pop().ok_or_else(|| LugliError::runtime("Stack underflow")) }
 
     fn generate_stack_trace(&self, bytecode: &Bytecode) -> Vec<String> {
         let mut traces = Vec::new();
 
-        for (i, frame) in self.call_stack.iter().rev().enumerate() {
-            let ip = if i == 0 { self.ip } else { frame.return_ip };
+        for (i, frame) in self.context.call_stack().iter().rev().enumerate() {
+            let ip = if i == 0 { self.context.current_ip() } else { frame.return_ip };
 
             let trace = if let Some(location) = bytecode.get_location(ip) {
                 if location.line > 0 {
@@ -352,7 +345,7 @@ impl Machine {
     }
 
     fn get_source_context(&self, bytecode: &Bytecode) -> Option<lugli_common::SourceContext> {
-        let location = bytecode.get_location(self.ip)?;
+        let location = bytecode.get_location(self.context.current_ip())?;
         if location.line == 0 {
             return None;
         }
@@ -442,45 +435,45 @@ impl Machine {
                     .clone();
 
                 // Save current state for cleanup on error
-                let saved_stack_len = self.stack.len();
-                let saved_ip = self.ip;
-                let saved_call_stack_len = self.call_stack.len();
+                let saved_stack_len = self.context.stack_len();
+                let saved_ip = self.context.current_ip();
+                let saved_call_stack_len = self.context.call_depth();
 
                 // Push function and arguments onto stack (function call protocol)
-                self.stack.push(function.clone());
+                self.push(function.clone());
                 for arg in args {
-                    self.stack.push(arg.clone());
+                    self.push(arg.clone());
                 }
 
                 // Set up call frame - stack_base points to first argument (after function)
                 let stack_base = saved_stack_len + 1; // +1 to skip the function itself
                 let frame = CallFrame::new(name.clone(), usize::MAX, stack_base, None);
-                self.call_stack.push(frame);
+                self.context.push_frame(frame);
 
                 // Save and restore module globals for cross-bytecode execution
-                let saved_globals = self.globals.clone();
+                let saved_globals = self.context.globals().clone();
                 if bytecode_id != &0
                     && let Some(module_globals) = self.module_globals.get(bytecode_id)
                 {
-                    self.globals = (**module_globals).clone();
+                    self.context.set_globals((**module_globals).clone());
                 }
 
                 // Jump to function body
-                self.ip = *body_start;
+                self.context.jump_to(*body_start);
 
                 // Execute function body and handle result/errors - use the correct bytecode!
                 let execution_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
 
                 // Always restore IP and globals, even on error
-                self.ip = saved_ip;
-                self.globals = saved_globals;
+                self.context.jump_to(saved_ip);
+                self.context.set_globals(saved_globals);
 
                 // Handle execution result
                 match execution_result {
                     Ok(()) => {
                         // Function returned successfully, get return value
-                        if self.stack.len() > saved_stack_len {
-                            self.stack.pop().ok_or_else(|| LugliError::runtime("Internal error: Function return value missing from stack"))
+                        if self.context.stack_len() > saved_stack_len {
+                            self.pop()
                         } else {
                             // Stack underflow - function didn't leave return value
                             Err(LugliError::runtime(format!("Function '{}' returned without value on stack", name)))
@@ -488,8 +481,10 @@ impl Machine {
                     }
                     Err(e) => {
                         // Error during execution - cleanup before propagating
-                        self.stack.truncate(saved_stack_len);
-                        self.call_stack.truncate(saved_call_stack_len);
+                        self.context.truncate_stack(saved_stack_len);
+                        while self.context.call_depth() > saved_call_stack_len {
+                            self.context.pop_frame();
+                        }
                         Err(e)
                     }
                 }
@@ -503,17 +498,17 @@ impl Machine {
             // Check if function returned (call frame popped) FIRST, before bounds check
             // Return instruction may set IP to usize::MAX as a signal, so check this first
             // Use <= because when Return pops the frame, len becomes equal to target_depth
-            if self.call_stack.len() <= target_call_depth {
+            if self.context.call_depth() <= target_call_depth {
                 return Ok(());
             }
 
             // Bounds check
-            if self.ip >= bytecode.instructions.len() {
+            if self.context.current_ip() >= bytecode.instructions.len() {
                 return Err(LugliError::runtime("Function execution ran past end of bytecode"));
             }
 
             // Execute one instruction
-            let instruction = &bytecode.instructions[self.ip];
+            let instruction = &bytecode.instructions[self.context.current_ip()];
             let continue_execution = self.execute_instruction(instruction, bytecode)?;
 
             // Stop if instruction indicated halt
@@ -564,15 +559,15 @@ impl Machine {
         self.next_bytecode_id += 1;
         self.bytecode_registry.insert(module_bytecode_id, Rc::new(module_bytecode.clone()));
 
-        let saved_globals = self.globals.clone();
+        let saved_globals = self.context.globals().clone();
         let saved_file = self.current_file.clone();
-        let saved_stack_len = self.stack.len();
-        let saved_ip = self.ip;
-        let saved_call_stack = self.call_stack.clone();
+        let saved_stack_len = self.context.stack_len();
+        let saved_ip = self.context.current_ip();
+        let saved_call_stack_len = self.context.call_depth();
 
-        self.globals = HashMap::new();
+        self.context.clear_globals();
         for (name, func) in get_global_functions() {
-            self.globals.insert(
+            self.context.define_global(
                 name.to_string(),
                 Value::NativeFunction {
                     name: name.to_string(),
@@ -583,10 +578,10 @@ impl Machine {
         }
         self.current_file = Some(resolved_path.clone());
 
-        self.ip = 0;
+        self.context.jump_to(0);
         let mut result = Ok(());
-        while self.ip < module_bytecode.instructions.len() {
-            let instruction = &module_bytecode.instructions[self.ip];
+        while self.context.current_ip() < module_bytecode.instructions.len() {
+            let instruction = &module_bytecode.instructions[self.context.current_ip()];
             match self.execute_instruction(instruction, &module_bytecode) {
                 Ok(should_continue) => {
                     if !should_continue {
@@ -602,7 +597,7 @@ impl Machine {
 
         result?;
 
-        let mut module_exports = self.globals.clone();
+        let mut module_exports = self.context.globals().clone();
 
         // Update all functions in exports to have correct bytecode_id
         for (_, value) in module_exports.iter_mut() {
@@ -624,11 +619,18 @@ impl Machine {
         // Store module globals for cross-bytecode function calls
         self.module_globals.insert(module_bytecode_id, Rc::new(module_exports.clone()));
 
-        self.globals = saved_globals;
+        self.context.set_globals(saved_globals);
         self.current_file = saved_file;
-        self.stack.truncate(saved_stack_len);
-        self.ip = saved_ip;
-        self.call_stack = saved_call_stack;
+        self.context.truncate_stack(saved_stack_len);
+        self.context.jump_to(saved_ip);
+        while self.context.call_depth() > saved_call_stack_len {
+            self.context.pop_frame();
+        }
+        // Restore the original call stack by rebuilding it
+        if self.context.call_depth() < saved_call_stack_len {
+            // This shouldn't happen in normal operation, but we handle it defensively
+            self.context.clear_call_stack();
+        }
 
         self.module_cache.unmark_loading(&resolved_path);
 
@@ -644,9 +646,9 @@ impl Machine {
         let bytecode_rc = Rc::new(bytecode.clone());
         self.bytecode_registry.insert(0, bytecode_rc.clone());
 
-        self.ip = 0;
-        while self.ip < bytecode.instructions.len() {
-            let instruction = &bytecode.instructions[self.ip];
+        self.context.jump_to(0);
+        while self.context.current_ip() < bytecode.instructions.len() {
+            let instruction = &bytecode.instructions[self.context.current_ip()];
             match self.execute_instruction(instruction, bytecode) {
                 Ok(should_continue) => {
                     if !should_continue {
@@ -674,11 +676,11 @@ impl Machine {
 
     fn execute_instruction(&mut self, instruction: &Instruction, bytecode: &Bytecode) -> Result<bool, LugliError> {
         // Stack overflow protection
-        if self.stack.len() > MAX_STACK_SIZE {
+        if self.context.stack_len() > MAX_STACK_SIZE {
             return Err(LugliError::runtime(format!("Stack overflow: exceeded maximum stack size of {} values", MAX_STACK_SIZE)));
         }
 
-        if self.call_stack.len() > MAX_CALL_DEPTH {
+        if self.context.call_depth() > MAX_CALL_DEPTH {
             return Err(LugliError::runtime(format!("Maximum recursion depth exceeded: {} nested calls", MAX_CALL_DEPTH)));
         }
 
@@ -687,7 +689,7 @@ impl Machine {
 
         // Debug tracing
         if self.debug.trace_execution {
-            eprintln!("[TRACE] IP:{:04} | {:?}", self.ip, instruction);
+            eprintln!("[TRACE] IP:{:04} | {:?}", self.context.current_ip(), instruction);
         }
 
         // TODO: GC is currently disabled because:
@@ -702,8 +704,8 @@ impl Machine {
         //     self.gc.collect(&roots);
         // }
 
-        if self.debug.trace_stack && !self.stack.is_empty() {
-            eprintln!("[STACK] depth:{} top:{:?}", self.stack.len(), self.stack.last());
+        if self.debug.trace_stack && self.context.stack_len() > 0 {
+            eprintln!("[STACK] depth:{} top:{:?}", self.context.stack_len(), self.context.peek(0));
         }
 
         let inst_start = if self.debug.trace_execution { Some(Instant::now()) } else { None };
@@ -779,15 +781,15 @@ impl Machine {
                         if self.debug.trace_calls {
                             eprintln!("[CALL] Executing native function: {}", name);
                         }
-                        let args_start_index = self.stack.len().checked_sub(arg_count + 1).ok_or_else(|| {
+                        let args_start_index = self.context.stack_len().checked_sub(arg_count + 1).ok_or_else(|| {
                             LugliError::runtime(format!(
                                 "Stack underflow: need {} arguments but stack only has {} elements",
                                 arg_count,
-                                self.stack.len()
+                                self.context.stack_len()
                             ))
                         })?;
-                        let args_end_index = self.stack.len() - 1;
-                        let args = self.stack.get(args_start_index..args_end_index).ok_or_else(|| {
+                        let args_end_index = self.context.stack_len() - 1;
+                        let args = self.context.stack().get(args_start_index..args_end_index).ok_or_else(|| {
                             LugliError::runtime(format!(
                                 "Stack corruption: invalid argument range [{}, {}) for function '{}'",
                                 args_start_index, args_end_index, name
@@ -797,8 +799,8 @@ impl Machine {
                             let mut pool = bytecode.string_pool.borrow_mut();
                             callback(args, &mut pool)?
                         };
-                        self.stack.truncate(self.stack.len() - arg_count - 1);
-                        self.stack.push(result);
+                        self.context.truncate_stack(self.context.stack_len() - arg_count - 1);
+                        self.push(result);
                     }
                     Value::Function {
                         name,
@@ -820,32 +822,32 @@ impl Machine {
                                 .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
                                 .clone();
 
-                            let saved_call_stack_len = self.call_stack.len();
-                            let stack_base = self.stack.len() - arg_count - 1;
-                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
-                            self.call_stack.push(frame);
+                            let saved_call_stack_len = self.context.call_depth();
+                            let stack_base = self.context.stack_len() - arg_count - 1;
+                            let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, None);
+                            self.context.push_frame(frame);
 
                             // Save and restore module globals for cross-bytecode execution
-                            let saved_globals = self.globals.clone();
+                            let saved_globals = self.context.globals().clone();
                             if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
-                                self.globals = (**module_globals).clone();
+                                self.context.set_globals((**module_globals).clone());
                             }
 
-                            let saved_ip = self.ip;
-                            self.ip = body_start;
+                            let saved_ip = self.context.current_ip();
+                            self.context.jump_to(body_start);
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
-                            self.ip = saved_ip; // Restore IP; execute_instruction will increment it
-                            self.globals = saved_globals; // Restore original globals
+                            self.context.jump_to(saved_ip); // Restore IP; execute_instruction will increment it
+                            self.context.set_globals(saved_globals); // Restore original globals
                             exec_result?;
 
                             // Return value is now on stack
                         } else {
                             // Same-bytecode call - normal path
-                            let stack_base = self.stack.len() - arg_count - 1;
-                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
-                            self.call_stack.push(frame);
-                            self.ip = body_start;
+                            let stack_base = self.context.stack_len() - arg_count - 1;
+                            let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, None);
+                            self.context.push_frame(frame);
+                            self.context.jump_to(body_start);
                             return Ok(true);
                         }
                     }
@@ -870,32 +872,32 @@ impl Machine {
                                 .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
                                 .clone();
 
-                            let saved_call_stack_len = self.call_stack.len();
-                            let stack_base = self.stack.len() - arg_count - 1;
-                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, Some(upvalues.clone()));
-                            self.call_stack.push(frame);
+                            let saved_call_stack_len = self.context.call_depth();
+                            let stack_base = self.context.stack_len() - arg_count - 1;
+                            let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, Some(upvalues.clone()));
+                            self.context.push_frame(frame);
 
                             // Save and restore module globals for cross-bytecode execution
-                            let saved_globals = self.globals.clone();
+                            let saved_globals = self.context.globals().clone();
                             if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
-                                self.globals = (**module_globals).clone();
+                                self.context.set_globals((**module_globals).clone());
                             }
 
-                            let saved_ip = self.ip;
-                            self.ip = body_start;
+                            let saved_ip = self.context.current_ip();
+                            self.context.jump_to(body_start);
 
                             let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
-                            self.ip = saved_ip; // Restore IP; execute_instruction will increment it
-                            self.globals = saved_globals; // Restore original globals
+                            self.context.jump_to(saved_ip); // Restore IP; execute_instruction will increment it
+                            self.context.set_globals(saved_globals); // Restore original globals
                             exec_result?;
 
                             // Return value is now on stack
                         } else {
                             // Same-bytecode call - normal path
-                            let stack_base = self.stack.len() - arg_count - 1;
-                            let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, Some(upvalues.clone()));
-                            self.call_stack.push(frame);
-                            self.ip = body_start;
+                            let stack_base = self.context.stack_len() - arg_count - 1;
+                            let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, Some(upvalues.clone()));
+                            self.context.push_frame(frame);
+                            self.context.jump_to(body_start);
                             return Ok(true);
                         }
                     }
@@ -932,16 +934,16 @@ impl Machine {
 
                 // Get the object (it's below the arguments on the stack)
                 // Validate stack has enough elements (object + args)
-                if self.stack.len() < arg_count + 1 {
+                if self.context.stack_len() < arg_count + 1 {
                     return Err(LugliError::runtime(format!(
                         "Stack underflow in CallMethod: need {} elements (1 object + {} args), have {}",
                         arg_count + 1,
                         arg_count,
-                        self.stack.len()
+                        self.context.stack_len()
                     )));
                 }
-                let object_index = self.stack.len() - arg_count - 1;
-                let object = self.stack[object_index].clone(); // Clone to avoid long borrow
+                let object_index = self.context.stack_len() - arg_count - 1;
+                let object = self.context.stack()[object_index].clone(); // Clone to avoid long borrow
 
                 // Check for struct method calls first
                 if let Value::Dict(ref d) = object {
@@ -982,15 +984,21 @@ impl Machine {
 
                                     // For property function calls, we don't pass self
                                     // Collect arguments, remove object+args from stack, push just args
-                                    let args_start = self.stack.len() - arg_count;
-                                    let args: Vec<Value> = self.stack.drain(args_start..).collect();
+                                    let args: Vec<Value> = {
+                                        let mut temp = Vec::new();
+                                        for _ in 0..arg_count {
+                                            temp.push(self.pop()?);
+                                        }
+                                        temp.reverse();
+                                        temp
+                                    };
 
                                     // Remove the object from the stack
-                                    self.stack.pop();
+                                    self.pop()?;
 
                                     // Push arguments back
                                     for arg in args {
-                                        self.stack.push(arg);
+                                        self.push(arg);
                                     }
 
                                     // Now set up the call frame
@@ -1002,24 +1010,24 @@ impl Machine {
                                             .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
                                             .clone();
 
-                                        let saved_call_stack_len = self.call_stack.len();
-                                        let stack_base = self.stack.len() - arg_count;
-                                        let frame = CallFrame::new("".to_string(), self.ip + 1, stack_base, None);
-                                        self.call_stack.push(frame);
+                                        let saved_call_stack_len = self.context.call_depth();
+                                        let stack_base = self.context.stack_len() - arg_count;
+                                        let frame = CallFrame::new("".to_string(), self.context.current_ip() + 1, stack_base, None);
+                                        self.context.push_frame(frame);
 
-                                        let saved_ip = self.ip;
-                                        self.ip = *body_start;
+                                        let saved_ip = self.context.current_ip();
+                                        self.context.jump_to(*body_start);
 
                                         let exec_result = self.execute_function_until_return(&function_bytecode, saved_call_stack_len);
-                                        self.ip = saved_ip + 1;
+                                        self.context.jump_to(saved_ip + 1);
                                         exec_result?;
                                         return Ok(false);
                                     } else {
                                         // Same-bytecode call
-                                        let stack_base = self.stack.len() - arg_count;
-                                        let frame = CallFrame::new("".to_string(), self.ip + 1, stack_base, None);
-                                        self.call_stack.push(frame);
-                                        self.ip = *body_start;
+                                        let stack_base = self.context.stack_len() - arg_count;
+                                        let frame = CallFrame::new("".to_string(), self.context.current_ip() + 1, stack_base, None);
+                                        self.context.push_frame(frame);
+                                        self.context.jump_to(*body_start);
                                         return Ok(true);
                                     }
                                 }
@@ -1034,7 +1042,7 @@ impl Machine {
                         let struct_method_name = format!("{}_{}", struct_type, method_name);
 
                         // Look up the method in globals first, then check all loaded modules
-                        let func = self.globals.get(&struct_method_name).cloned().or_else(|| self.module_cache.find_in_exports(&struct_method_name));
+                        let func = self.context.get_global(&struct_method_name).cloned().or_else(|| self.module_cache.find_in_exports(&struct_method_name));
 
                         if let Some(func) = func {
                             match func {
@@ -1070,42 +1078,42 @@ impl Machine {
                                             .ok_or_else(|| LugliError::runtime(format!("Internal error: Bytecode ID {} not found", bytecode_id)))?
                                             .clone();
 
-                                        let saved_call_stack_len = self.call_stack.len();
-                                        let stack_base = self.stack.len() - arg_count - 1; // Include the object
-                                        let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
-                                        self.call_stack.push(frame);
+                                        let saved_call_stack_len = self.context.call_depth();
+                                        let stack_base = self.context.stack_len() - arg_count - 1; // Include the object
+                                        let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, None);
+                                        self.context.push_frame(frame);
 
                                         // Save and restore module globals for cross-bytecode execution
-                                        let saved_globals = self.globals.clone();
+                                        let saved_globals = self.context.globals().clone();
                                         if let Some(module_globals) = self.module_globals.get(&bytecode_id) {
-                                            self.globals = (**module_globals).clone();
+                                            self.context.set_globals((**module_globals).clone());
                                         }
 
-                                        let saved_ip = self.ip;
-                                        self.ip = body_start;
+                                        let saved_ip = self.context.current_ip();
+                                        self.context.jump_to(body_start);
 
                                         let exec_result = self.execute_function_until_return(&method_bytecode, saved_call_stack_len);
 
-                                        self.ip = saved_ip; // Restore IP; execute_instruction will increment it
-                                        self.globals = saved_globals; // Restore original globals
+                                        self.context.jump_to(saved_ip); // Restore IP; execute_instruction will increment it
+                                        self.context.set_globals(saved_globals); // Restore original globals
                                         exec_result?;
 
                                         // Return value is now on stack, but we need to clean up
                                         // The stack has: [... object, arg1, ..., argN, return_value]
                                         // We need to remove object and args, keep only return_value
                                         let return_value = self.pop().unwrap_or(Value::Null);
-                                        self.stack.truncate(object_index);
-                                        self.stack.push(return_value);
+                                        self.context.truncate_stack(object_index);
+                                        self.push(return_value);
 
                                         // Manually increment IP since we're returning early
-                                        self.ip += 1;
+                                        self.context.advance_ip(1);
                                         return Ok(true); // Cross-bytecode method call complete
                                     } else {
                                         // Same-bytecode call - normal path
-                                        let stack_base = self.stack.len() - arg_count - 1; // Include the object
-                                        let frame = CallFrame::new(name.clone(), self.ip + 1, stack_base, None);
-                                        self.call_stack.push(frame);
-                                        self.ip = body_start;
+                                        let stack_base = self.context.stack_len() - arg_count - 1; // Include the object
+                                        let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, None);
+                                        self.context.push_frame(frame);
+                                        self.context.jump_to(body_start);
                                         return Ok(true); // Function call will handle stack management
                                     }
                                 }
@@ -1113,17 +1121,17 @@ impl Machine {
                                     callback, ..
                                 } => {
                                     // For native functions, collect args including self
-                                    let args_start = self.stack.len() - arg_count - 1;
-                                    let args = self.stack.get(args_start..).ok_or_else(|| {
+                                    let args_start = self.context.stack_len() - arg_count - 1;
+                                    let args = self.context.stack().get(args_start..).ok_or_else(|| {
                                         LugliError::runtime(format!("Stack corruption: invalid argument start index {} for method call", args_start))
                                     })?;
                                     let result = callback(args, &mut bytecode.string_pool.borrow_mut())?;
 
                                     // Pop arguments and object, push result
-                                    self.stack.truncate(object_index);
-                                    self.stack.push(result);
+                                    self.context.truncate_stack(object_index);
+                                    self.push(result);
                                     // Manually increment IP since we're returning early
-                                    self.ip += 1;
+                                    self.context.advance_ip(1);
                                     return Ok(true);
                                 }
                                 _ => {
@@ -1142,10 +1150,10 @@ impl Machine {
                     && arg_count == 1
                 {
                     // Save current IP to restore after function calls
-                    let callmethod_ip = self.ip;
+                    let callmethod_ip = self.context.current_ip();
 
-                    let args_start = self.stack.len() - arg_count;
-                    let function = self.stack[args_start].clone();
+                    let args_start = self.context.stack_len() - arg_count;
+                    let function = self.context.stack()[args_start].clone();
 
                     let result_list = if method_name == "filter" {
                         self.list_filter(l.clone(), &function, bytecode)?
@@ -1154,12 +1162,12 @@ impl Machine {
                     };
 
                     // Pop arguments and object, push result
-                    self.stack.truncate(object_index);
-                    self.stack.push(result_list);
+                    self.context.truncate_stack(object_index);
+                    self.push(result_list);
 
                     // Set IP to continue after this CallMethod instruction
                     // The main loop will increment IP, so we don't need to add 1
-                    self.ip = callmethod_ip + 1;
+                    self.context.jump_to(callmethod_ip + 1);
 
                     // Return false to indicate we handled IP advancement
                     return Ok(false);
@@ -1170,8 +1178,8 @@ impl Machine {
                     Value::String(_) | Value::List(_) | Value::Dict(_) => {
                         // Get receiver and arguments for registry call
                         let args_start = object_index;
-                        let args_end = self.stack.len();
-                        let args: Vec<Value> = self.stack[args_start..args_end].to_vec();
+                        let args_end = self.context.stack_len();
+                        let args: Vec<Value> = self.context.stack()[args_start..args_end].to_vec();
 
                         // Hash-based method lookup with cache
                         let type_id = object.type_id();
@@ -1197,8 +1205,8 @@ impl Machine {
                             exports.get(&method_name).ok_or_else(|| LugliError::runtime(format!("Module has no export '{}'", method_name)))?.clone();
 
                         // Get the arguments from stack
-                        let args_start = self.stack.len() - arg_count;
-                        let args: Vec<Value> = self.stack[args_start..].to_vec();
+                        let args_start = self.context.stack_len() - arg_count;
+                        let args: Vec<Value> = self.context.stack()[args_start..].to_vec();
 
                         // Call the function
                         self.call_user_function(&function, &args, bytecode)?
@@ -1209,8 +1217,8 @@ impl Machine {
                 };
 
                 // Pop arguments and object, push result
-                self.stack.truncate(object_index);
-                self.stack.push(result);
+                self.context.truncate_stack(object_index);
+                self.push(result);
             }
             // Index operations
             Instruction::GetIndex => self.exec_get_index(bytecode)?,
@@ -1236,7 +1244,7 @@ impl Machine {
             }
         }
 
-        self.ip += 1;
+        self.context.advance_ip(1);
         Ok(true)
     }
 }

@@ -5,40 +5,40 @@ use lugli_common::{LugliError, Value};
 // Variable operation instruction handlers
 impl Machine {
     pub(super) fn exec_load(&mut self, index: usize) -> Result<(), LugliError> {
-        let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
+        let frame = self.context.current_frame().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
         let target_index = frame.stack_base + index;
         let value = self
-            .stack
+            .context.stack()
             .get(target_index)
             .ok_or_else(|| {
                 LugliError::runtime(format!(
                     "Stack underflow: attempted to load local {} at index {} (stack size: {})",
                     index,
                     target_index,
-                    self.stack.len()
+                    self.context.stack_len()
                 ))
             })?
             .clone();
-        self.stack.push(value);
+        self.push(value);
         Ok(())
     }
 
     pub(super) fn exec_store(&mut self, index: usize) -> Result<(), LugliError> {
         let value = self.pop()?;
-        let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
+        let frame = self.context.current_frame().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
         let target_index = frame.stack_base + index;
 
         // Grow stack if necessary
-        while self.stack.len() <= target_index {
-            self.stack.push(Value::Null);
+        while self.context.stack_len() <= target_index {
+            self.push(Value::Null);
         }
 
-        self.stack[target_index] = value;
+        self.context.stack_mut()[target_index] = value;
         Ok(())
     }
 
     pub(super) fn exec_load_upvalue(&mut self, index: usize) -> Result<(), LugliError> {
-        let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
+        let frame = self.context.current_frame().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
 
         if let Some(upvalues) = &frame.closure_upvalues {
             let upvalue_ref = upvalues
@@ -47,7 +47,7 @@ impl Machine {
 
             let value = upvalue_ref.try_borrow().map_err(|_| LugliError::runtime("Cannot access upvalue while it's being modified"))?.clone();
 
-            self.stack.push(value);
+            self.push(value);
             Ok(())
         } else {
             Err(LugliError::runtime("LoadUpvalue used in non-closure context"))
@@ -56,7 +56,7 @@ impl Machine {
 
     pub(super) fn exec_store_upvalue(&mut self, index: usize) -> Result<(), LugliError> {
         let value = self.pop()?;
-        let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
+        let frame = self.context.current_frame().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
 
         if let Some(upvalues) = &frame.closure_upvalues {
             let upvalue_ref = upvalues
@@ -74,13 +74,13 @@ impl Machine {
         let var_name = self.get_constant(bytecode, name_index)?;
         if let Value::String(name_id) = var_name {
             let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-            if let Some(value) = self.globals.get(&name) {
-                self.stack.push(value.clone());
+            if let Some(value) = self.context.get_global(&name) {
+                self.push(value.clone());
                 Ok(())
             } else {
                 // Generate helpful error with suggestions
                 if let Some(context) = self.get_source_context(bytecode) {
-                    let available_names: Vec<&str> = self.globals.keys().map(|s| s.as_str()).collect();
+                    let available_names: Vec<&str> = self.context.globals().keys().map(|s| s.as_str()).collect();
                     let suggestion = crate::error_formatter::suggest_similar_name(&name, &available_names);
                     Err(LugliError::undefined_variable_with_context(name, context, suggestion))
                 } else {
@@ -97,7 +97,7 @@ impl Machine {
         let var_name = self.get_constant(bytecode, name_index)?;
         if let Value::String(name_id) = var_name {
             let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-            self.globals.insert(name, value);
+            self.context.define_global(name, value);
             Ok(())
         } else {
             Err(LugliError::runtime("Variable name must be a string"))

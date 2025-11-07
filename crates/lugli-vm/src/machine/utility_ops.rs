@@ -63,7 +63,7 @@ impl Machine {
         };
         drop(pool);
         let id = bytecode.string_pool.borrow_mut().intern(&string_value);
-        self.stack.push(Value::String(id));
+        self.push(Value::String(id));
         Ok(())
     }
 
@@ -81,7 +81,7 @@ impl Machine {
         };
 
         // Store directly in globals - no stack effect
-        self.globals.insert(bind_name.to_string(), module_value);
+        self.context.define_global(bind_name.to_string(), module_value);
         Ok(())
     }
 
@@ -95,7 +95,7 @@ impl Machine {
 
         for name in names {
             if let Some(value) = exports.get(name) {
-                self.globals.insert(name.clone(), value.clone());
+                self.context.define_global(name.clone(), value.clone());
             } else {
                 return Err(LugliError::runtime(format!("Module '{}' has no export '{}'", module_path, name)));
             }
