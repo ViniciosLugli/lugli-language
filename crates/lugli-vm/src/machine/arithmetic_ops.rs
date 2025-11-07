@@ -60,6 +60,23 @@ impl Machine {
         }
     }
 
+    pub(super) fn exec_add_locals(&mut self, a_idx: usize, b_idx: usize, bytecode: &Bytecode) -> Result<(), LugliError> {
+        let frame = self.context.current_frame().ok_or_else(|| LugliError::runtime("No call frame"))?;
+        let base = frame.stack_base;
+        let a = self.context.stack().get(base + a_idx).ok_or_else(|| LugliError::runtime(format!("Local {} out of bounds", a_idx)))?.clone();
+        let b = self.context.stack().get(base + b_idx).ok_or_else(|| LugliError::runtime(format!("Local {} out of bounds", b_idx)))?.clone();
+
+        let result = match (&a, &b) {
+            (Value::String(_), Value::String(_)) => {
+                let mut pool = bytecode.string_pool.borrow_mut();
+                a.add_with_pool(&b, &mut pool)?
+            }
+            _ => a.add(&b)?,
+        };
+        self.push(result);
+        Ok(())
+    }
+
     pub(super) fn exec_negate(&mut self) -> Result<(), LugliError> {
         let val = self.pop()?;
         self.push(val.negate()?);

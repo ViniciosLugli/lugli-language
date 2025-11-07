@@ -48,6 +48,13 @@ pub enum Instruction {
     Jump(usize),
     JumpIfFalse(usize),
     Loop(usize),
+
+    // Fused comparison + jump instructions for common patterns
+    JumpIfEqual(usize),     // Fuses Equal + JumpIfTrue
+    JumpIfNotEqual(usize),  // Fuses Equal + JumpIfFalse
+
+    // Fused local variable operations
+    AddLocals(usize, usize),  // Fuses Load(a) + Load(b) + Add
     Call(u8),
     CallMethod(usize, u8),
     Return,

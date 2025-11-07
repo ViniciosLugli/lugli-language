@@ -52,6 +52,9 @@ impl PeepholeOptimizer {
                 optimized = self.jump_threading(optimized);
             }
 
+            // Instruction fusion - always enabled for performance
+            optimized = self.instruction_fusion(optimized);
+
             changed = optimized.len() != before_len;
             pass_count += 1;
         }
@@ -501,7 +504,11 @@ impl PeepholeOptimizer {
     fn is_potential_jump_target(&self, pos: usize, instructions: &[Instruction]) -> bool {
         for inst in instructions {
             match inst {
-                Instruction::Jump(target) | Instruction::JumpIfFalse(target) | Instruction::Loop(target) => {
+                Instruction::Jump(target)
+                | Instruction::JumpIfFalse(target)
+                | Instruction::JumpIfEqual(target)
+                | Instruction::JumpIfNotEqual(target)
+                | Instruction::Loop(target) => {
                     if *target == pos {
                         return true;
                     }
@@ -510,6 +517,64 @@ impl PeepholeOptimizer {
             }
         }
         false
+    }
+
+    /// Fuse common instruction patterns into specialized instructions
+    ///
+    /// Patterns:
+    /// - Equal + JumpIfTrue → JumpIfEqual
+    /// - Equal + JumpIfFalse → JumpIfNotEqual
+    /// - Load(a) + Load(b) + Add → AddLocals(a, b)
+    fn instruction_fusion(&self, instructions: Vec<Instruction>) -> Vec<Instruction> {
+        let mut result = Vec::with_capacity(instructions.len());
+        let mut i = 0;
+
+        while i < instructions.len() {
+            // Pattern: Equal + JumpIfFalse → JumpIfNotEqual
+            // (JumpIfFalse after Equal means jump if NOT equal)
+            if i + 1 < instructions.len()
+                && matches!(instructions[i], Instruction::Equal)
+                && matches!(instructions[i + 1], Instruction::JumpIfFalse(_))
+            {
+                if let Instruction::JumpIfFalse(target) = instructions[i + 1] {
+                    result.push(Instruction::JumpIfNotEqual(target));
+                    i += 2;
+                    continue;
+                }
+            }
+
+            // Pattern: NotEqual + JumpIfFalse → JumpIfEqual
+            // (JumpIfFalse after NotEqual means jump if equal)
+            if i + 1 < instructions.len()
+                && matches!(instructions[i], Instruction::NotEqual)
+                && matches!(instructions[i + 1], Instruction::JumpIfFalse(_))
+            {
+                if let Instruction::JumpIfFalse(target) = instructions[i + 1] {
+                    result.push(Instruction::JumpIfEqual(target));
+                    i += 2;
+                    continue;
+                }
+            }
+
+            // Pattern: Load(a) + Load(b) + Add → AddLocals(a, b)
+            if i + 2 < instructions.len()
+                && matches!(instructions[i], Instruction::Load(_))
+                && matches!(instructions[i + 1], Instruction::Load(_))
+                && matches!(instructions[i + 2], Instruction::Add)
+            {
+                if let (Instruction::Load(a), Instruction::Load(b)) = (&instructions[i], &instructions[i + 1]) {
+                    result.push(Instruction::AddLocals(*a, *b));
+                    i += 3;
+                    continue;
+                }
+            }
+
+            // No fusion, keep instruction
+            result.push(instructions[i].clone());
+            i += 1;
+        }
+
+        result
     }
 }
 
@@ -738,5 +803,32 @@ mod tests {
 
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized, vec![Instruction::LoadSmallInt(0)]);
+    }
+
+    #[test]
+    fn test_instruction_fusion_jump_if_not_equal() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::Equal, Instruction::JumpIfFalse(10)];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::JumpIfNotEqual(10)]);
+    }
+
+    #[test]
+    fn test_instruction_fusion_jump_if_equal() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::NotEqual, Instruction::JumpIfFalse(10)];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::JumpIfEqual(10)]);
+    }
+
+    #[test]
+    fn test_instruction_fusion_add_locals() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::Load(0), Instruction::Load(1), Instruction::Add];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::AddLocals(0, 1)]);
     }
 }
