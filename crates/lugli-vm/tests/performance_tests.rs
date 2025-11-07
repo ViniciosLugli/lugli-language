@@ -402,3 +402,28 @@ fn test_moderate_string_building() {
         assert_eq!(n, 50.0);
     }
 }
+
+#[test]
+fn test_format_deep_nesting() {
+    // Test that deeply nested structures don't cause stack overflow
+    // This creates a 60-level nested structure which should be caught by MAX_FORMAT_DEPTH (50)
+    let source = r#"
+        let root = { "value": 1, "child": null }
+        let current = root
+
+        mut i = 0
+        while i < 60 {
+            current["child"] = { "value": i, "child": null }
+            current = current["child"]
+            i = i + 1
+        }
+
+        # This should not crash - format_value has depth limit
+        print(root)
+        root
+    "#;
+
+    let result = run_test(source);
+    // Should succeed without stack overflow
+    assert!(result.is_ok());
+}
