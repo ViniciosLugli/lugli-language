@@ -28,9 +28,7 @@ pub fn run_file(file_path: &str) -> Result<(), CliError> {
         CliError::Runtime(formatter.format(&lugli_error))
     })?;
 
-    let mut vm = Vm::builder()
-        .with_source(file_path.to_string(), source)
-        .build();
+    let mut vm = Vm::builder().with_source(file_path.to_string(), source).build();
 
     match vm.compile_and_run(&program, span_map) {
         Ok(_) => Ok(()),

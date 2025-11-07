@@ -49,30 +49,18 @@ impl InstructionDispatcher {
     }
 
     /// Direct method call without caching (used for dynamic dispatch)
-    pub fn dispatch(
-        &self,
-        type_name: &str,
-        method_name: &str,
-        args: &[Value],
-        pool: &mut StringPool,
-    ) -> Result<Value, LugliError> {
+    pub fn dispatch(&self, type_name: &str, method_name: &str, args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
         self.method_registry.call(type_name, method_name, args, pool)
     }
 
     /// Check if a method exists for a type
-    pub fn has_method(&self, type_name: &str, method_name: &str) -> bool {
-        self.method_registry.has_method(type_name, method_name)
-    }
+    pub fn has_method(&self, type_name: &str, method_name: &str) -> bool { self.method_registry.has_method(type_name, method_name) }
 
     /// Clear the method cache (useful for testing or hot-reloading)
-    pub fn clear_cache(&mut self) {
-        self.method_cache.clear();
-    }
+    pub fn clear_cache(&mut self) { self.method_cache.clear(); }
 
     /// Get cache statistics
-    pub fn cache_size(&self) -> usize {
-        self.method_cache.len()
-    }
+    pub fn cache_size(&self) -> usize { self.method_cache.len() }
 
     /// Get cache hit rate (requires tracking, not yet implemented)
     pub fn cache_stats(&self) -> CacheStats {
@@ -84,9 +72,7 @@ impl InstructionDispatcher {
 }
 
 impl Default for InstructionDispatcher {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 #[derive(Debug, Clone)]
@@ -180,11 +166,7 @@ mod tests {
         let dispatcher = InstructionDispatcher::new();
         let mut pool = StringPool::new();
 
-        let list = Value::List(std::rc::Rc::new(std::cell::RefCell::new(vec![
-            Value::Number(1.0),
-            Value::Number(2.0),
-            Value::Number(3.0),
-        ])));
+        let list = Value::List(std::rc::Rc::new(std::cell::RefCell::new(vec![Value::Number(1.0), Value::Number(2.0), Value::Number(3.0)])));
         let args = vec![list];
 
         let result = dispatcher.dispatch("list", "len", &args, &mut pool);

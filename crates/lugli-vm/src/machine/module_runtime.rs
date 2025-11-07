@@ -4,7 +4,11 @@ use crate::{
 };
 use hashbrown::HashMap;
 use lugli_common::{LugliError, Value};
-use std::{cell::RefCell, path::{Path, PathBuf}, rc::Rc};
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 /// Manages module loading, caching, and bytecode registry
 pub struct ModuleRuntime {
@@ -47,13 +51,9 @@ impl ModuleRuntime {
         id
     }
 
-    pub fn register_main_bytecode(&mut self, bytecode: Bytecode) {
-        self.bytecode_registry.insert(0, Rc::new(bytecode));
-    }
+    pub fn register_main_bytecode(&mut self, bytecode: Bytecode) { self.bytecode_registry.insert(0, Rc::new(bytecode)); }
 
-    pub fn get_bytecode(&self, id: usize) -> Option<&Rc<Bytecode>> {
-        self.bytecode_registry.get(&id)
-    }
+    pub fn get_bytecode(&self, id: usize) -> Option<&Rc<Bytecode>> { self.bytecode_registry.get(&id) }
 
     pub fn clear_bytecode_registry(&mut self) {
         self.bytecode_registry.clear();
@@ -61,55 +61,35 @@ impl ModuleRuntime {
     }
 
     pub fn retain_bytecodes<F>(&mut self, f: F)
-    where
-        F: FnMut(&usize, &mut Rc<Bytecode>) -> bool,
-    {
+    where F: FnMut(&usize, &mut Rc<Bytecode>) -> bool {
         self.bytecode_registry.retain(f);
     }
 
     // Module cache operations
-    pub fn module_cache(&self) -> &ModuleCache {
-        &self.module_cache
-    }
+    pub fn module_cache(&self) -> &ModuleCache { &self.module_cache }
 
-    pub fn module_cache_mut(&mut self) -> &mut ModuleCache {
-        &mut self.module_cache
-    }
+    pub fn module_cache_mut(&mut self) -> &mut ModuleCache { &mut self.module_cache }
 
-    pub fn clear_module_cache(&mut self) {
-        self.module_cache.clear();
-    }
+    pub fn clear_module_cache(&mut self) { self.module_cache.clear(); }
 
     // Module resolver operations
-    pub fn module_resolver(&self) -> &ModuleResolver {
-        &self.module_resolver
-    }
+    pub fn module_resolver(&self) -> &ModuleResolver { &self.module_resolver }
 
-    pub fn module_resolver_mut(&mut self) -> &mut ModuleResolver {
-        &mut self.module_resolver
-    }
+    pub fn module_resolver_mut(&mut self) -> &mut ModuleResolver { &mut self.module_resolver }
 
     // Module globals operations
     pub fn save_module_globals(&mut self, bytecode_id: usize, globals: Rc<RefCell<HashMap<String, Value>>>) {
         self.module_globals.insert(bytecode_id, globals);
     }
 
-    pub fn get_module_globals(&self, bytecode_id: usize) -> Option<&Rc<RefCell<HashMap<String, Value>>>> {
-        self.module_globals.get(&bytecode_id)
-    }
+    pub fn get_module_globals(&self, bytecode_id: usize) -> Option<&Rc<RefCell<HashMap<String, Value>>>> { self.module_globals.get(&bytecode_id) }
 
-    pub fn clear_module_globals(&mut self) {
-        self.module_globals.clear();
-    }
+    pub fn clear_module_globals(&mut self) { self.module_globals.clear(); }
 
     // Current file operations
-    pub fn set_current_file(&mut self, path: Option<PathBuf>) {
-        self.current_file = path;
-    }
+    pub fn set_current_file(&mut self, path: Option<PathBuf>) { self.current_file = path; }
 
-    pub fn current_file(&self) -> Option<&Path> {
-        self.current_file.as_deref()
-    }
+    pub fn current_file(&self) -> Option<&Path> { self.current_file.as_deref() }
 
     // Full reset
     pub fn reset(&mut self) {
@@ -121,37 +101,23 @@ impl ModuleRuntime {
     }
 
     // Module loading helper (resolves path)
-    pub fn resolve_module_path(
-        &self,
-        module_path: &str,
-        base_path: Option<&Path>,
-    ) -> Result<PathBuf, LugliError> {
+    pub fn resolve_module_path(&self, module_path: &str, base_path: Option<&Path>) -> Result<PathBuf, LugliError> {
         self.module_resolver.resolve(module_path, base_path)
     }
 
     // Check if module is already cached
-    pub fn is_module_cached(&self, path: &Path) -> bool {
-        self.module_cache.get(path).is_some()
-    }
+    pub fn is_module_cached(&self, path: &Path) -> bool { self.module_cache.get(path).is_some() }
 
     // Check if module is currently being loaded (circular import detection)
-    pub fn is_module_loading(&self, path: &Path) -> bool {
-        self.module_cache.is_loading(path)
-    }
+    pub fn is_module_loading(&self, path: &Path) -> bool { self.module_cache.is_loading(path) }
 
-    pub fn mark_module_loading(&mut self, path: PathBuf) {
-        self.module_cache.mark_loading(path);
-    }
+    pub fn mark_module_loading(&mut self, path: PathBuf) { self.module_cache.mark_loading(path); }
 
-    pub fn unmark_module_loading(&mut self, path: &Path) {
-        self.module_cache.unmark_loading(path);
-    }
+    pub fn unmark_module_loading(&mut self, path: &Path) { self.module_cache.unmark_loading(path); }
 }
 
 impl Default for ModuleRuntime {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]

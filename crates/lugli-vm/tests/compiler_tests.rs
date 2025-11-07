@@ -53,7 +53,11 @@ fn test_compiler_literal_expressions() {
     };
 
     let span_map = make_span_map(2);
-    let result = { let mut vm = Vm::new(); vm.compile_and_run(&program, span_map) }.unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(42.0));
 }
 
@@ -88,7 +92,11 @@ fn test_compiler_binary_expressions() {
     };
 
     let span_map = make_span_map(6);
-    let result = { let mut vm = Vm::new(); vm.compile_and_run(&program, span_map) }.unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(50.0));
 }
 
@@ -120,7 +128,11 @@ fn test_compiler_variable_declaration_and_access() {
     };
 
     let span_map = make_span_map(4);
-    let result = { let mut vm = Vm::new(); vm.compile_and_run(&program, span_map) }.unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(42.0));
 }
 
@@ -205,7 +217,11 @@ fn test_compiler_list_creation() {
     };
 
     let span_map = make_span_map(5);
-    let result = { let mut vm = Vm::new(); vm.compile_and_run(&program, span_map) }.unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
 
     if let Value::List(list) = result {
         let list_ref = list.borrow();
@@ -311,7 +327,11 @@ fn test_compiler_global_variable_assignment() {
     };
 
     let span_map = make_span_map(8);
-    let result = { let mut vm = Vm::new(); vm.compile_and_run(&program, span_map) }.unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(20.0));
 }
 
@@ -496,7 +516,10 @@ fn test_compiler_error_undefined_variable() {
     };
 
     let span_map = make_span_map(2);
-    let result = { let mut vm = Vm::new(); vm.compile_and_run(&program, span_map) };
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    };
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("undefined_var"));
 }
@@ -548,6 +571,10 @@ fn test_compiler_multiple_variable_declarations() {
     };
 
     let span_map = make_span_map(8);
-    let result = { let mut vm = Vm::new(); vm.compile_and_run(&program, span_map) }.unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(30.0));
 }

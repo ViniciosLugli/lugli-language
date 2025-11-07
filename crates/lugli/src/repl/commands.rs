@@ -87,13 +87,7 @@ fn show_variables(vm: &Vm, _bytecodes: &[lugli_vm::Bytecode]) {
     }
 
     println!("\n{}", "Current Variables:".bright_cyan().bold());
-    let mut vars: Vec<(String, lugli_common::Value)> = vm
-        .machine()
-        .globals()
-        .borrow()
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
+    let mut vars: Vec<(String, lugli_common::Value)> = vm.machine().globals().borrow().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
     vars.sort_by_key(|(k, _)| k.clone());
 
     for (name, value) in vars {

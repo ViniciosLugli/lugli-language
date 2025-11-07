@@ -22,8 +22,8 @@ impl PeepholeOptimizer {
     pub fn new() -> Self {
         Self {
             optimize_constants: true,
-            optimize_jumps: false,      // Disabled - has bugs with jump target calculation
-            optimize_dead_code: false,  // Disabled - too aggressive, removes function definitions
+            optimize_jumps: false,     // Disabled - has bugs with jump target calculation
+            optimize_dead_code: false, // Disabled - too aggressive, removes function definitions
         }
     }
 
@@ -527,6 +527,7 @@ impl PeepholeOptimizer {
     /// - Equal + JumpIfTrue → JumpIfEqual
     /// - Equal + JumpIfFalse → JumpIfNotEqual
     /// - Load(a) + Load(b) + Add → AddLocals(a, b)
+    #[allow(dead_code)]
     fn instruction_fusion(&self, instructions: Vec<Instruction>) -> Vec<Instruction> {
         let mut result = Vec::with_capacity(instructions.len());
         let mut i = 0;

@@ -70,38 +70,25 @@ pub struct Machine {
 
 impl Machine {
     // Stack delegation methods
-    fn push(&mut self, value: Value) {
-        self.context.push(value);
-    }
+    fn push(&mut self, value: Value) { self.context.push(value); }
 
-    fn pop(&mut self) -> Result<Value, LugliError> {
-        self.context.pop()
-            .ok_or_else(|| LugliError::runtime("Stack underflow"))
-    }
+    fn pop(&mut self) -> Result<Value, LugliError> { self.context.pop().ok_or_else(|| LugliError::runtime("Stack underflow")) }
 
-    fn peek(&self) -> Result<&Value, LugliError> {
-        self.context.peek(0)
-            .ok_or_else(|| LugliError::runtime("Stack underflow"))
-    }
+    fn peek(&self) -> Result<&Value, LugliError> { self.context.peek(0).ok_or_else(|| LugliError::runtime("Stack underflow")) }
 
     fn peek_n(&self, n: usize) -> Result<&Value, LugliError> {
-        self.context.peek(n)
-            .ok_or_else(|| LugliError::runtime(format!("Stack underflow in peek_n({})", n)))
+        self.context.peek(n).ok_or_else(|| LugliError::runtime(format!("Stack underflow in peek_n({})", n)))
     }
 
+    #[allow(dead_code)]
     fn peek_mut(&mut self, distance: usize) -> Result<&mut Value, LugliError> {
-        self.context.peek_mut(distance)
-            .ok_or_else(|| LugliError::runtime("Stack underflow"))
+        self.context.peek_mut(distance).ok_or_else(|| LugliError::runtime("Stack underflow"))
     }
 
     // Public accessors for external use (e.g., REPL)
-    pub fn globals(&self) -> Rc<RefCell<hashbrown::HashMap<String, Value>>> {
-        self.context.globals()
-    }
+    pub fn globals(&self) -> Rc<RefCell<hashbrown::HashMap<String, Value>>> { self.context.globals() }
 
-    pub fn globals_mut(&mut self) -> Rc<RefCell<hashbrown::HashMap<String, Value>>> {
-        self.context.globals_mut()
-    }
+    pub fn globals_mut(&mut self) -> Rc<RefCell<hashbrown::HashMap<String, Value>>> { self.context.globals_mut() }
 
     fn execute_binary_op(&mut self, op: fn(&Value, &Value) -> Result<Value, LugliError>) -> Result<(), LugliError> {
         let b = self.pop()?;
@@ -243,9 +230,7 @@ impl Machine {
 
     const MAX_FORMAT_DEPTH: usize = 50;
 
-    pub fn format_value(&self, value: &Value) -> String {
-        self.format_value_with_depth(value, 0)
-    }
+    pub fn format_value(&self, value: &Value) -> String { self.format_value_with_depth(value, 0) }
 
     fn format_value_with_depth(&self, value: &Value, depth: usize) -> String {
         use lugli_common::Value;
@@ -294,11 +279,7 @@ impl Machine {
                                 // Search bytecode pool
                                 if let Some(bytecode) = self.modules.get_bytecode(0) {
                                     let pool = bytecode.string_pool.borrow();
-                                    if let Some(s) = pool.try_resolve(*k) {
-                                        s.to_string()
-                                    } else {
-                                        format!("<string#{}>", k.as_u32())
-                                    }
+                                    if let Some(s) = pool.try_resolve(*k) { s.to_string() } else { format!("<string#{}>", k.as_u32()) }
                                 } else {
                                     format!("<string#{}>", k.as_u32())
                                 }
@@ -313,7 +294,6 @@ impl Machine {
             _ => value.to_string(),
         }
     }
-
 
     fn generate_stack_trace(&self, bytecode: &Bytecode) -> Vec<String> {
         let mut traces = Vec::new();
@@ -1060,7 +1040,8 @@ impl Machine {
                         let struct_method_name = format!("{}_{}", struct_type, method_name);
 
                         // Look up the method in globals first, then check all loaded modules
-                        let func = self.context.get_global(&struct_method_name).or_else(|| self.modules.module_cache().find_in_exports(&struct_method_name));
+                        let func =
+                            self.context.get_global(&struct_method_name).or_else(|| self.modules.module_cache().find_in_exports(&struct_method_name));
 
                         if let Some(func) = func {
                             match func {
@@ -1201,14 +1182,7 @@ impl Machine {
 
                         // Hash-based method lookup with cache via dispatcher
                         let mut pool = bytecode.string_pool.borrow_mut();
-                        self.dispatcher.dispatch_cached(
-                            object.type_id(),
-                            object.type_name(),
-                            *method_name_index,
-                            &method_name,
-                            &args,
-                            &mut pool,
-                        )?
+                        self.dispatcher.dispatch_cached(object.type_id(), object.type_name(), *method_name_index, &method_name, &args, &mut pool)?
                     }
                     Value::Module {
                         exports, ..

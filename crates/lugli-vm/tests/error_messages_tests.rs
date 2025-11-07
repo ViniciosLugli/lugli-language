@@ -9,9 +9,7 @@ let bar = foe + 5
 "#;
 
     let (program, span_map) = parse(source).unwrap();
-    let mut vm = Vm::builder()
-        .with_source("test.lg".to_string(), source.to_string())
-        .build();
+    let mut vm = Vm::builder().with_source("test.lg".to_string(), source.to_string()).build();
     let bytecode = vm.compile(&program, span_map).unwrap();
 
     let result = vm.run(&bytecode);
@@ -46,9 +44,7 @@ let y = unknown_var
 "#;
 
     let (program, span_map) = parse(source).unwrap();
-    let mut vm = Vm::builder()
-        .with_source("test.lg".to_string(), source.to_string())
-        .build();
+    let mut vm = Vm::builder().with_source("test.lg".to_string(), source.to_string()).build();
     let bytecode = vm.compile(&program, span_map).unwrap();
 
     let result = vm.run(&bytecode);
@@ -78,9 +74,7 @@ let y = x / 0
 "#;
 
     let (program, span_map) = parse(source).unwrap();
-    let mut vm = Vm::builder()
-        .with_source("test.lg".to_string(), source.to_string())
-        .build();
+    let mut vm = Vm::builder().with_source("test.lg".to_string(), source.to_string()).build();
     let bytecode = vm.compile(&program, span_map).unwrap();
 
     let result = vm.run(&bytecode);

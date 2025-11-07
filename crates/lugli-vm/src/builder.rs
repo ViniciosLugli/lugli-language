@@ -67,9 +67,7 @@ impl VmBuilder {
 }
 
 impl Default for VmBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 /// Unified VM interface with fluent API
@@ -81,9 +79,7 @@ pub struct Vm {
 
 impl Vm {
     /// Create a VM builder for custom configuration
-    pub fn builder() -> VmBuilder {
-        VmBuilder::new()
-    }
+    pub fn builder() -> VmBuilder { VmBuilder::new() }
 
     /// Create a new VM with default settings
     pub fn new() -> Self {
@@ -102,15 +98,11 @@ impl Vm {
             Compiler::new()
         };
 
-        compiler
-            .compile(program, span_map)
-            .map_err(|e| VmError::CompilationError(e.to_string()))
+        compiler.compile(program, span_map).map_err(|e| VmError::CompilationError(e.to_string()))
     }
 
     /// Run compiled bytecode
-    pub fn run(&mut self, bytecode: &Bytecode) -> Result<Value, VmError> {
-        self.machine.run(bytecode).map_err(VmError::RuntimeError)
-    }
+    pub fn run(&mut self, bytecode: &Bytecode) -> Result<Value, VmError> { self.machine.run(bytecode).map_err(VmError::RuntimeError) }
 
     /// Compile and run in one step
     pub fn compile_and_run(&mut self, program: &Program, span_map: SpanMap) -> Result<Value, VmError> {
@@ -119,30 +111,20 @@ impl Vm {
     }
 
     /// Get access to the underlying machine (for advanced use)
-    pub fn machine(&self) -> &Machine {
-        &self.machine
-    }
+    pub fn machine(&self) -> &Machine { &self.machine }
 
     /// Get mutable access to the underlying machine (for advanced use)
-    pub fn machine_mut(&mut self) -> &mut Machine {
-        &mut self.machine
-    }
+    pub fn machine_mut(&mut self) -> &mut Machine { &mut self.machine }
 
     /// Reset the VM to initial state (useful for REPL)
-    pub fn reset(&mut self) {
-        self.machine.reset();
-    }
+    pub fn reset(&mut self) { self.machine.reset(); }
 
     /// Reset for REPL (preserves globals)
-    pub fn reset_for_repl(&mut self) {
-        self.machine.reset_for_repl();
-    }
+    pub fn reset_for_repl(&mut self) { self.machine.reset_for_repl(); }
 }
 
 impl Default for Vm {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]
@@ -158,9 +140,7 @@ mod tests {
 
     #[test]
     fn test_vm_builder_with_source() {
-        let vm = Vm::builder()
-            .with_source("test.lg".to_string(), "let x = 1".to_string())
-            .build();
+        let vm = Vm::builder().with_source("test.lg".to_string(), "let x = 1".to_string()).build();
 
         assert_eq!(vm.source_file, Some("test.lg".to_string()));
         assert_eq!(vm.source_code, Some("let x = 1".to_string()));

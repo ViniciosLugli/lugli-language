@@ -326,7 +326,8 @@ impl<'a> Parser<'a> {
             }
 
             // Check for f-string prefix (f" or f') when NOT inside a string
-            if delimiter_stack.is_empty() && ch == 'f'
+            if delimiter_stack.is_empty()
+                && ch == 'f'
                 && let Some(&quote) = chars.peek()
                 && (quote == '"' || quote == '\'')
             {
