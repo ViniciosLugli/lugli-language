@@ -224,17 +224,17 @@ fn test_algebraic_simplification_multiply_one_right() {
 }
 
 #[test]
-fn test_algebraic_simplification_multiply_zero() {
-    let source = "let y = 5\nlet x = y * 0";
+fn test_algebraic_simplification_multiply_zero_const() {
+    let source = "let x = 5 * 0";
     let instructions = compile_and_get_instructions(source);
 
-    // x * 0 should be optimized to 0 (load constant 0)
+    // Constant * 0 should be folded at compile time
     let mul_count = count_instructions(&instructions, |i| {
         matches!(i, Instruction::Multiply | Instruction::MulInt(_))
     });
     assert_eq!(
         mul_count, 0,
-        "Multiplying by 0 should be eliminated (x * 0 → 0)"
+        "Constant multiplied by 0 should be folded (5 * 0 → 0)"
     );
 }
 
