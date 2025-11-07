@@ -1,7 +1,7 @@
 mod helpers;
 use helpers::run_test;
 use lugli_parser::Parser;
-use lugli_vm::compile_and_run;
+use lugli_vm::Vm;
 
 #[test]
 fn test_basic_array_indexing() {
@@ -463,7 +463,7 @@ fn test_negative_index_assignment_out_of_bounds() {
 
     let mut parser = Parser::new(source).unwrap();
     let (ast, span_map) = parser.parse().unwrap();
-    let result = compile_and_run(&ast, span_map);
+    let result = { let mut vm = Vm::new(); vm.compile_and_run(&ast, span_map) };
     assert!(result.is_err(), "Assignment at index -4 should fail for length 3");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("out of range") || err_msg.contains("Negative index"), "Error should mention out of range, got: {}", err_msg);
@@ -478,7 +478,7 @@ fn test_float_index_validation_positive() {
 
     let mut parser = Parser::new(source).unwrap();
     let (ast, span_map) = parser.parse().unwrap();
-    let result = compile_and_run(&ast, span_map);
+    let result = { let mut vm = Vm::new(); vm.compile_and_run(&ast, span_map) };
     assert!(result.is_err(), "Float index 1.5 should be rejected");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);
@@ -493,7 +493,7 @@ fn test_float_index_validation_negative() {
 
     let mut parser = Parser::new(source).unwrap();
     let (ast, span_map) = parser.parse().unwrap();
-    let result = compile_and_run(&ast, span_map);
+    let result = { let mut vm = Vm::new(); vm.compile_and_run(&ast, span_map) };
     assert!(result.is_err(), "Float index -1.5 should be rejected");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);
@@ -508,7 +508,7 @@ fn test_float_index_validation_near_integer() {
 
     let mut parser = Parser::new(source).unwrap();
     let (ast, span_map) = parser.parse().unwrap();
-    let result = compile_and_run(&ast, span_map);
+    let result = { let mut vm = Vm::new(); vm.compile_and_run(&ast, span_map) };
     assert!(result.is_err(), "Float index 1.9999 should be rejected");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);
@@ -544,7 +544,7 @@ fn test_float_index_assignment_validation() {
 
     let mut parser = Parser::new(source).unwrap();
     let (ast, span_map) = parser.parse().unwrap();
-    let result = compile_and_run(&ast, span_map);
+    let result = { let mut vm = Vm::new(); vm.compile_and_run(&ast, span_map) };
     assert!(result.is_err(), "Float index assignment should be rejected");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);
@@ -560,7 +560,7 @@ fn test_float_index_in_expression() {
 
     let mut parser = Parser::new(source).unwrap();
     let (ast, span_map) = parser.parse().unwrap();
-    let result = compile_and_run(&ast, span_map);
+    let result = { let mut vm = Vm::new(); vm.compile_and_run(&ast, span_map) };
     assert!(result.is_err(), "Variable float index should be rejected");
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("must be an integer"), "Error should mention integer requirement, got: {}", err_msg);

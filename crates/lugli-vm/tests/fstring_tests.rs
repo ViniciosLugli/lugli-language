@@ -1,5 +1,5 @@
 use lugli_parser::Parser;
-use lugli_vm::{compile, run};
+use lugli_vm::Vm;
 
 fn run_code(code: &str) -> String {
     let mut parser = Parser::new(code).unwrap();

@@ -1,5 +1,5 @@
 use lugli_parser::Parser;
-use lugli_vm::{Bytecode, Machine, compile};
+use lugli_vm::{Bytecode, Vm};
 
 fn compile_source(source: &str) -> Bytecode {
     let mut parser = Parser::new(source).expect("Parser creation should succeed");

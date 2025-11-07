@@ -1,12 +1,12 @@
 /// Advanced integration tests that simulate real-world usage scenarios
 /// These tests validate that Lugli can handle complex, practical programs
 use lugli_common::Value;
-use lugli_vm::compile_and_run;
+use lugli_vm::Vm;
 
 /// Helper to run Lugli code and return the result
 fn run_code(source: &str) -> Result<Value, String> {
     let (program, span_map) = lugli_parser::parse(source).map_err(|e| e.to_string())?;
-    compile_and_run(&program, span_map).map_err(|e| e.to_string())
+    { let mut vm = Vm::new(); vm.compile_and_run(&program, span_map) }.map_err(|e| e.to_string())
 }
 
 /// Helper to run code and extract a number result
