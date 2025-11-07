@@ -206,8 +206,8 @@ mod function_tests {
     #[test]
     fn test_function_creation() {
         let function = Value::Function {
-            name: "my_function".to_string(),
-            params: vec!["a".to_string(), "b".to_string()],
+            name: Rc::from("my_function"),
+            params: Rc::new(vec!["a".to_string(), "b".to_string()]),
             body_start: 0,
             bytecode_id: 0,
         };
@@ -221,7 +221,7 @@ mod function_tests {
             ..
         } = function
         {
-            assert_eq!(name, "my_function");
+            assert_eq!(name.as_ref(), "my_function");
             assert_eq!(params.len(), 2);
             assert_eq!(body_start, 0);
         } else {
@@ -307,16 +307,16 @@ mod closure_tests {
         let upvalues2 = vec![Rc::new(RefCell::new(Value::Number(10.0)))];
 
         let closure1 = Value::Closure {
-            name: "add".to_string(),
-            params: vec!["y".to_string()],
+            name: Rc::from("add"),
+            params: Rc::new(vec!["y".to_string()]),
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues1,
         };
 
         let closure2 = Value::Closure {
-            name: "add".to_string(),
-            params: vec!["y".to_string()],
+            name: Rc::from("add"),
+            params: Rc::new(vec!["y".to_string()]),
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues2,
@@ -333,16 +333,16 @@ mod closure_tests {
         let upvalues2 = vec![Rc::new(RefCell::new(Value::Number(5.0)))];
 
         let closure1 = Value::Closure {
-            name: "add".to_string(),
-            params: vec!["y".to_string()],
+            name: Rc::from("add"),
+            params: Rc::new(vec!["y".to_string()]),
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues1,
         };
 
         let closure2 = Value::Closure {
-            name: "add".to_string(),
-            params: vec!["y".to_string()],
+            name: Rc::from("add"),
+            params: Rc::new(vec!["y".to_string()]),
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues2,
@@ -359,16 +359,16 @@ mod closure_tests {
         let upvalues2 = vec![Rc::new(RefCell::new(Value::Number(5.0)))];
 
         let closure1 = Value::Closure {
-            name: "add".to_string(),
-            params: vec!["y".to_string()],
+            name: Rc::from("add"),
+            params: Rc::new(vec!["y".to_string()]),
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues1,
         };
 
         let closure2 = Value::Closure {
-            name: "add".to_string(),
-            params: vec!["y".to_string()],
+            name: Rc::from("add"),
+            params: Rc::new(vec!["y".to_string()]),
             body_start: 0,
             bytecode_id: 2,
             upvalues: upvalues2,

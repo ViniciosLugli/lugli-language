@@ -10,7 +10,7 @@
 // Current optimizer status:
 // - Constant folding: ✅ ENABLED
 // - Jump optimization: ✅ ENABLED
-// - Dead code elimination: ❌ DISABLED (too aggressive with closures)
+// - Dead code elimination: ✅ ENABLED (with closure safeguards)
 
 use lugli_parser::Parser;
 use lugli_vm::{Instruction, Vm};
@@ -19,7 +19,8 @@ use lugli_vm::{Instruction, Vm};
 fn compile_and_get_instructions(source: &str) -> Vec<Instruction> {
     let mut parser = Parser::new(source).expect("Parse creation failed");
     let (program, span_map) = parser.parse().expect("Parse failed");
-    let bytecode = compile(&program, span_map).expect("Compilation failed");
+    let vm = Vm::new();
+    let bytecode = vm.compile(&program, span_map).expect("Compilation failed");
     bytecode.instructions.clone()
 }
 

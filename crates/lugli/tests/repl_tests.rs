@@ -13,7 +13,7 @@ fn test_repl_variable_persistence() {
     vm.run(&bytecode1).unwrap();
 
     // Verify variable exists
-    assert!(vm.machine().globals().contains_key("x"));
+    assert!(vm.machine().globals().borrow().contains_key("x"));
 
     vm.reset_for_repl();
 
@@ -38,8 +38,8 @@ fn test_repl_string_display() {
     vm.run(&bytecode).unwrap();
 
     // Get the value and format it
-    let value = vm.machine().globals().get("name").unwrap();
-    let formatted = vm.machine().format_value(value);
+    let value = vm.machine().globals().borrow().get("name").unwrap().clone();
+    let formatted = vm.machine().format_value(&value);
 
     // Should display actual string, not <string#N>
     assert_eq!(formatted, "\"Alice\"");
@@ -60,7 +60,7 @@ fn test_repl_bounded_bytecode_retention() {
 
     // All variables should still exist
     for i in 0..20 {
-        assert!(vm.machine().globals().contains_key(&format!("x{}", i)));
+        assert!(vm.machine().globals().borrow().contains_key(&format!("x{}", i)));
     }
 
     // But we shouldn't have 20 bytecodes in memory (should be max 10)
@@ -78,8 +78,8 @@ fn test_repl_list_display() {
     let bytecode = vm.compile(&program, span_map).unwrap();
     vm.run(&bytecode).unwrap();
 
-    let value = vm.machine().globals().get("items").unwrap();
-    let formatted = vm.machine().format_value(value);
+    let value = vm.machine().globals().borrow().get("items").unwrap().clone();
+    let formatted = vm.machine().format_value(&value);
 
     assert_eq!(formatted, "[1, 2, 3]");
 }
@@ -94,8 +94,8 @@ fn test_repl_dict_display() {
     let bytecode = vm.compile(&program, span_map).unwrap();
     vm.run(&bytecode).unwrap();
 
-    let value = vm.machine().globals().get("person").unwrap();
-    let formatted = vm.machine().format_value(value);
+    let value = vm.machine().globals().borrow().get("person").unwrap().clone();
+    let formatted = vm.machine().format_value(&value);
 
     // Dict order may vary, just check it contains the right parts
     assert!(formatted.contains("\"name\": \"Bob\"") || formatted.contains("\"age\": 30"));
@@ -122,7 +122,7 @@ fn test_repl_error_recovery() {
     assert!(result.is_err());
 
     // Previous variable should still exist
-    assert!(vm.machine().globals().contains_key("x"));
+    assert!(vm.machine().globals().borrow().contains_key("x"));
 
     vm.reset_for_repl();
 
@@ -132,7 +132,7 @@ fn test_repl_error_recovery() {
     let bytecode3 = vm.compile(&program3, span_map3).unwrap();
     vm.run(&bytecode3).unwrap();
 
-    assert!(vm.machine().globals().contains_key("z"));
+    assert!(vm.machine().globals().borrow().contains_key("z"));
 }
 
 #[test]
@@ -147,7 +147,7 @@ fn test_repl_function_definition() {
     let result = vm.run(&bytecode).unwrap();
 
     assert_eq!(result, Value::Number(12.0));
-    assert!(vm.machine().globals().contains_key("add"));
+    assert!(vm.machine().globals().borrow().contains_key("add"));
 }
 
 #[test]
@@ -161,7 +161,7 @@ fn test_repl_multiline_expression() {
     let bytecode = vm.compile(&program, span_map).unwrap();
     vm.run(&bytecode).unwrap();
 
-    assert!(vm.machine().globals().contains_key("items"));
+    assert!(vm.machine().globals().borrow().contains_key("items"));
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn test_repl_struct_definition() {
     let bytecode = vm.compile(&program, span_map).unwrap();
     vm.run(&bytecode).unwrap();
 
-    assert!(vm.machine().globals().contains_key("Point"));
+    assert!(vm.machine().globals().borrow().contains_key("Point"));
 
     vm.reset_for_repl();
 
@@ -184,7 +184,7 @@ fn test_repl_struct_definition() {
     let bytecode2 = vm.compile(&program2, span_map2).unwrap();
     vm.run(&bytecode2).unwrap();
 
-    assert!(vm.machine().globals().contains_key("p"));
+    assert!(vm.machine().globals().borrow().contains_key("p"));
 }
 
 #[test]
@@ -225,8 +225,8 @@ fn test_repl_nested_structures() {
     let bytecode = vm.compile(&program, span_map).unwrap();
     vm.run(&bytecode).unwrap();
 
-    let value = vm.machine().globals().get("data").unwrap();
-    let formatted = vm.machine().format_value(value);
+    let value = vm.machine().globals().borrow().get("data").unwrap().clone();
+    let formatted = vm.machine().format_value(&value);
 
     // Should format nested structures
     assert!(formatted.contains("Alice"));
@@ -260,9 +260,9 @@ fn test_repl_multiple_assignments() {
     let bytecode = vm.compile(&program, span_map).unwrap();
     vm.run(&bytecode).unwrap();
 
-    assert!(vm.machine().globals().contains_key("a"));
-    assert!(vm.machine().globals().contains_key("b"));
-    assert!(vm.machine().globals().contains_key("c"));
+    assert!(vm.machine().globals().borrow().contains_key("a"));
+    assert!(vm.machine().globals().borrow().contains_key("b"));
+    assert!(vm.machine().globals().borrow().contains_key("c"));
 }
 
 #[test]
@@ -282,8 +282,8 @@ fn test_repl_reassignment() {
     let bytecode2 = vm.compile(&program2, span_map2).unwrap();
     vm.run(&bytecode2).unwrap();
 
-    let value = vm.machine().globals().get("x").unwrap();
-    assert_eq!(value, &Value::Number(20.0));
+    let value = vm.machine().globals().borrow().get("x").unwrap().clone();
+    assert_eq!(value, Value::Number(20.0));
 }
 
 #[test]
@@ -296,8 +296,8 @@ fn test_repl_format_value_with_function() {
     let bytecode = vm.compile(&program, span_map).unwrap();
     vm.run(&bytecode).unwrap();
 
-    let value = vm.machine().globals().get("test").unwrap();
-    let formatted = vm.machine().format_value(value);
+    let value = vm.machine().globals().borrow().get("test").unwrap().clone();
+    let formatted = vm.machine().format_value(&value);
 
     assert!(formatted.contains("test"));
     assert!(formatted.contains("fn"));

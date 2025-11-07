@@ -46,6 +46,14 @@ impl Machine {
     }
 
     pub(super) fn exec_return(&mut self) -> Result<bool, LugliError> {
+        // Check if we're returning from the script frame (only one frame left)
+        // We check BEFORE popping so we know if this is the final return
+        if self.context.call_depth() == 1 {
+            let return_value = self.pop().unwrap_or(Value::Null);
+            self.push(return_value);
+            return Ok(false);
+        }
+
         let frame = self.context.pop_frame().ok_or_else(|| LugliError::runtime("Call stack underflow"))?;
         let return_value = self.pop().unwrap_or(Value::Null);
 
@@ -53,11 +61,6 @@ impl Machine {
         let frame_base = frame.stack_base;
         let frame_end = self.context.stack_len();
         self.context.close_upvalues(frame_base.min(frame_end));
-
-        if self.context.call_depth() == 0 {
-            self.push(return_value);
-            return Ok(false);
-        }
 
         self.context.jump_to(frame.return_ip);
         self.context.truncate_stack(frame.stack_base);

@@ -81,14 +81,20 @@ fn show_help() {
 }
 
 fn show_variables(vm: &Vm, _bytecodes: &[lugli_vm::Bytecode]) {
-    if vm.machine().globals().is_empty() {
+    if vm.machine().globals().borrow().is_empty() {
         println!("{}", "No variables defined yet.".yellow());
         return;
     }
 
     println!("\n{}", "Current Variables:".bright_cyan().bold());
-    let mut vars: Vec<_> = vm.machine().globals().iter().collect();
-    vars.sort_by_key(|(k, _)| *k);
+    let mut vars: Vec<(String, lugli_common::Value)> = vm
+        .machine()
+        .globals()
+        .borrow()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    vars.sort_by_key(|(k, _)| k.clone());
 
     for (name, value) in vars {
         // Skip native functions from display
@@ -96,7 +102,7 @@ fn show_variables(vm: &Vm, _bytecodes: &[lugli_vm::Bytecode]) {
             continue;
         }
 
-        println!("  {} = {}", name.bright_green(), vm.machine().format_value(value));
+        println!("  {} = {}", name.bright_green(), vm.machine().format_value(&value));
     }
     println!();
 }
@@ -107,14 +113,20 @@ fn clear_screen() {
 }
 
 fn reset_vm(vm: &mut Vm) {
-    let native_functions: Vec<_> =
-        vm.machine().globals().iter().filter(|(_, v)| matches!(v, lugli_common::Value::NativeFunction { .. })).map(|(k, v)| (k.clone(), v.clone())).collect();
+    let native_functions: Vec<(String, lugli_common::Value)> = vm
+        .machine()
+        .globals()
+        .borrow()
+        .iter()
+        .filter(|(_, v)| matches!(v, lugli_common::Value::NativeFunction { .. }))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
 
     vm.reset();
 
     // Restore native functions
     for (name, func) in native_functions {
-        vm.machine_mut().globals_mut().insert(name, func);
+        vm.machine_mut().globals_mut().borrow_mut().insert(name, func);
     }
 
     println!("{}", "VM state reset. All user variables cleared.".bright_green());
@@ -141,7 +153,7 @@ fn show_history(editor: &Editor<super::ReplHelper, FileHistory>) {
 }
 
 fn show_type(vm: &Vm, var_name: &str) -> Result<(), String> {
-    match vm.machine().globals().get(var_name) {
+    match vm.machine().globals().borrow().get(var_name) {
         Some(value) => {
             println!("{}: {}", var_name.bright_green(), value.type_name().bright_cyan());
             Ok(())

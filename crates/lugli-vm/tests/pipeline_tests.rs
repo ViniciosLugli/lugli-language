@@ -1,6 +1,6 @@
 use lugli_common::Value;
 use lugli_parser::parse;
-use lugli_vm::{Bytecode, Instruction, compile, run};
+use lugli_vm::{Bytecode, Instruction, Vm};
 use std::time::Instant;
 #[derive(Debug)]
 struct TestResult {
@@ -39,8 +39,10 @@ fn test_lugli_code_detailed(source: &str) -> TestResult {
 
     match parse_result {
         Ok((program, span_map)) => {
+            let mut vm = Vm::new();
+
             let compile_start = Instant::now();
-            let compile_result = compile(&program, span_map);
+            let compile_result = vm.compile(&program, span_map);
             result.compile_time = compile_start.elapsed();
 
             match compile_result {
@@ -52,7 +54,7 @@ fn test_lugli_code_detailed(source: &str) -> TestResult {
                     });
 
                     let execute_start = Instant::now();
-                    let vm_result = run(&bytecode);
+                    let vm_result = vm.run(&bytecode);
                     result.execution_time = execute_start.elapsed();
 
                     result.result = vm_result.map_err(|e| format!("VM error: {}", e));
@@ -112,7 +114,8 @@ fn calculate_complexity_score(bytecode: &Bytecode) -> usize {
             | Instruction::LoadUpvalue(_)
             | Instruction::StoreUpvalue(_) => 3,
             Instruction::MakeList(_) | Instruction::MakeDict(_) | Instruction::GetProperty(_) | Instruction::SetProperty(_) => 4,
-            Instruction::Jump(_) | Instruction::JumpIfFalse(_) | Instruction::Loop(_) | Instruction::Call(_) => 5,
+            Instruction::Jump(_) | Instruction::JumpIfFalse(_) | Instruction::JumpIfEqual(_) | Instruction::JumpIfNotEqual(_) | Instruction::Loop(_) | Instruction::Call(_) => 5,
+            Instruction::AddLocals(_, _) => 3,
             Instruction::DefineFunction(_) => 4,
             Instruction::MakeClosure {
                 ..
