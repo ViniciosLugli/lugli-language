@@ -14,7 +14,9 @@ pub fn list_push(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliE
     check_arity(args, 2, "list.push")?;
     match &args[0] {
         Value::List(l) => {
-            l.borrow_mut().push(args[1].clone());
+            l.try_borrow_mut()
+                .map_err(|_| LugliError::runtime("Cannot modify list while it's being accessed"))?
+                .push(args[1].clone());
             Ok(Value::Null)
         }
         _ => Err(LugliError::type_error("list", args[0].type_name())),
@@ -24,10 +26,14 @@ pub fn list_push(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliE
 pub fn list_pop(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity(args, 1, "list.pop")?;
     match &args[0] {
-        Value::List(l) => match l.borrow_mut().pop() {
-            Some(val) => Ok(val),
-            None => Ok(Value::Null),
-        },
+        Value::List(l) => {
+            let mut list = l.try_borrow_mut()
+                .map_err(|_| LugliError::runtime("Cannot modify list while it's being accessed"))?;
+            match list.pop() {
+                Some(val) => Ok(val),
+                None => Ok(Value::Null),
+            }
+        }
         _ => Err(LugliError::type_error("list", args[0].type_name())),
     }
 }
@@ -77,7 +83,9 @@ pub fn list_clear(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugli
     check_arity(args, 1, "list.clear")?;
     match &args[0] {
         Value::List(l) => {
-            l.borrow_mut().clear();
+            l.try_borrow_mut()
+                .map_err(|_| LugliError::runtime("Cannot modify list while it's being accessed"))?
+                .clear();
             Ok(Value::Null)
         }
         _ => Err(LugliError::type_error("list", args[0].type_name())),
@@ -88,7 +96,9 @@ pub fn list_reverse(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lug
     check_arity(args, 1, "list.reverse")?;
     match &args[0] {
         Value::List(l) => {
-            l.borrow_mut().reverse();
+            l.try_borrow_mut()
+                .map_err(|_| LugliError::runtime("Cannot modify list while it's being accessed"))?
+                .reverse();
             Ok(Value::Null)
         }
         _ => Err(LugliError::type_error("list", args[0].type_name())),
@@ -103,7 +113,9 @@ pub fn list_append(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugl
                 return Err(LugliError::runtime("Cannot append a list to itself (would create circular reference)"));
             }
             let items = l2.try_borrow().map_err(|_| LugliError::runtime("Cannot append list while it's being modified"))?.clone();
-            l1.borrow_mut().extend(items);
+            l1.try_borrow_mut()
+                .map_err(|_| LugliError::runtime("Cannot modify list while it's being accessed"))?
+                .extend(items);
             Ok(Value::Null)
         }
         (Value::List(_), _) => Err(LugliError::type_error("list", args[1].type_name())),
@@ -129,7 +141,8 @@ pub fn list_set(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliEr
     check_arity(args, 3, "list.set")?;
     match &args[0] {
         Value::List(l) => {
-            let mut list = l.borrow_mut();
+            let mut list = l.try_borrow_mut()
+                .map_err(|_| LugliError::runtime("Cannot modify list while it's being accessed"))?;
             let idx = validate_list_index_for_set(&args[1], list.len())?;
             list[idx] = args[2].clone();
             Ok(Value::Null)
