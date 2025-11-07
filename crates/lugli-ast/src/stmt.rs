@@ -31,7 +31,7 @@ pub enum Stmt {
 
     DestructuringAssignment { id: NodeId, pattern: Pattern, value: Expr },
 
-    FnDecl { id: NodeId, name: String, params: Vec<(String, Option<TypeHint>)>, return_type: Option<TypeHint>, body: Vec<Stmt> },
+    FnDecl { id: NodeId, name: String, params: Vec<(String, Option<TypeHint>)>, param_defaults: Vec<Option<Expr>>, return_type: Option<TypeHint>, body: Vec<Stmt> },
 
     StructDecl { id: NodeId, data: Box<StructDeclData> },
 

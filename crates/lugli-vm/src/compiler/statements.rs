@@ -126,6 +126,7 @@ impl Compiler {
                         id,
                         name: method_name,
                         params,
+                        param_defaults,
                         return_type,
                         body,
                     } = method
@@ -138,6 +139,7 @@ impl Compiler {
                             id: *id,
                             name: static_method_name,
                             params: params.clone(),
+                            param_defaults: param_defaults.clone(),
                             return_type: return_type.clone(),
                             body: body.clone(),
                         };
@@ -152,6 +154,7 @@ impl Compiler {
             Stmt::FnDecl {
                 name,
                 params,
+                param_defaults,
                 body,
                 ..
             } => {
@@ -166,6 +169,9 @@ impl Compiler {
 
                 // Extract param names (ignore type hints)
                 let param_names: Vec<String> = params.iter().map(|(name, _)| name.clone()).collect();
+
+                // Count required parameters (those without defaults)
+                let required_count = param_defaults.iter().filter(|d| d.is_none()).count();
 
                 // Detect which variables will be captured from outer scope
                 let captures = self.detect_captures(body, &saved_locals, &param_names);
@@ -245,12 +251,22 @@ impl Compiler {
                 self.upvalues = saved_upvalues;
                 self.upvalue_count = saved_upvalue_count;
 
+                // Evaluate default expressions and store as constants
+                let default_values: Vec<Value> = param_defaults
+                    .iter()
+                    .map(|default_expr| {
+                        default_expr.as_ref().and_then(|expr| self.try_evaluate_constant(expr)).unwrap_or(Value::Null)
+                    })
+                    .collect();
+
                 // Create the function value (use param_names instead of params)
                 let function_value = Value::Function {
                     name: Rc::from(name.as_str()),
                     params: Rc::new(param_names),
                     body_start,
-                    bytecode_id: 0, // Main bytecode
+                    bytecode_id: 0,
+                    required_count,
+                    defaults: Rc::new(default_values),
                 };
                 let function_index = self.add_constant(function_value);
 

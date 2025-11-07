@@ -40,13 +40,12 @@ pub enum Instruction {
     GreaterEqual,
     Less,
     LessEqual,
-    And,
-    Or,
     Print,
     Pop,
     Dup,
     Jump(usize),
     JumpIfFalse(usize),
+    JumpIfTrue(usize),
     Loop(usize),
 
     // Fused comparison + jump instructions for common patterns

@@ -141,17 +141,39 @@ pub fn list_set(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliEr
     }
 }
 
-pub fn list_map(_args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
+pub fn list_map(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
+    check_arity(args, 2, "list.map")?;
+
     Err(LugliError::runtime(
-        "map() is not yet implemented as a native function. Use list comprehensions instead:\n  \
-         result = [transform(x) for x in list]",
+        "map() cannot call user functions from native code.\n\
+         \n\
+         Use list comprehensions instead:\n\
+         \n\
+         Instead of:  result = list.map(transform)\n\
+         Write:       result = [transform(x) for x in list]\n\
+         \n\
+         Examples:\n\
+         - Double values:    [x * 2 for x in numbers]\n\
+         - Uppercase text:   [s.upper() for s in strings]\n\
+         - With function:    [double(x) for x in numbers]",
     ))
 }
 
-pub fn list_filter(_args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
+pub fn list_filter(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
+    check_arity(args, 2, "list.filter")?;
+
     Err(LugliError::runtime(
-        "filter() is not yet implemented as a native function. Use list comprehensions instead:\n  \
-         result = [x for x in list if condition(x)]",
+        "filter() cannot call user functions from native code.\n\
+         \n\
+         Use list comprehensions instead:\n\
+         \n\
+         Instead of:  result = list.filter(predicate)\n\
+         Write:       result = [x for x in list if predicate(x)]\n\
+         \n\
+         Examples:\n\
+         - Even numbers:     [x for x in numbers if x % 2 == 0]\n\
+         - Non-empty:        [s for s in strings if s != \"\"]\n\
+         - With function:    [x for x in items if is_valid(x)]",
     ))
 }
 

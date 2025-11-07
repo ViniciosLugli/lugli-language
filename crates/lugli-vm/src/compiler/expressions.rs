@@ -62,6 +62,45 @@ impl Compiler {
                 right,
                 ..
             } => {
+                // Handle short-circuit evaluation for logical operators
+                match operator {
+                    lugli_lexer::TokenKind::And => {
+                        // a && b - short-circuit evaluation
+                        // Returns first falsy value or last value
+                        // eval(a)
+                        // Dup
+                        // JumpIfFalse(end)  # Pops dup, leaves original on stack if false
+                        // Pop                 # Remove original a (it was truthy)
+                        // eval(b)
+                        // end:
+                        self.compile_expr(left)?;
+                        self.emit_unknown(Instruction::Dup);
+                        let jump_to_end = self.emit_jump(Instruction::JumpIfFalse(0));
+                        self.emit_unknown(Instruction::Pop);
+                        self.compile_expr(right)?;
+                        self.patch_jump(jump_to_end)?;
+                        return Ok(());
+                    }
+                    lugli_lexer::TokenKind::Or => {
+                        // a || b - short-circuit evaluation
+                        // Returns first truthy value or last value
+                        // eval(a)
+                        // Dup
+                        // JumpIfTrue(end)   # Pops dup, leaves original on stack if true
+                        // Pop                # Remove original a (it was falsy)
+                        // eval(b)
+                        // end:
+                        self.compile_expr(left)?;
+                        self.emit_unknown(Instruction::Dup);
+                        let jump_to_end = self.emit_jump(Instruction::JumpIfTrue(0));
+                        self.emit_unknown(Instruction::Pop);
+                        self.compile_expr(right)?;
+                        self.patch_jump(jump_to_end)?;
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+
                 // Try to optimize arithmetic with small constant on the right
                 let optimized = match operator {
                     lugli_lexer::TokenKind::Plus | lugli_lexer::TokenKind::Minus | lugli_lexer::TokenKind::Star => {
@@ -107,8 +146,6 @@ impl Compiler {
                         lugli_lexer::TokenKind::GreaterEqual => self.emit_unknown(Instruction::GreaterEqual),
                         lugli_lexer::TokenKind::Less => self.emit_unknown(Instruction::Less),
                         lugli_lexer::TokenKind::LessEqual => self.emit_unknown(Instruction::LessEqual),
-                        lugli_lexer::TokenKind::And => self.emit_unknown(Instruction::And),
-                        lugli_lexer::TokenKind::Or => self.emit_unknown(Instruction::Or),
                         _ => return Err(LugliError::runtime(format!("Unsupported binary operator: {:?}", operator))),
                     }
                 }
@@ -444,23 +481,26 @@ impl Compiler {
 
                 // Create closure or function based on captures
                 if captures.is_empty() {
-                    // No captures - regular function
+                    // No captures - regular function (lambda has no default params)
                     let function_value = Value::Function {
                         name: Rc::from("<lambda>"),
                         params: Rc::new(params.clone()),
                         body_start,
-                        bytecode_id: 0, // Main bytecode
+                        bytecode_id: 0,
+                        required_count: params.len(),
+                        defaults: Rc::new(vec![]),
                     };
                     let function_index = self.add_constant(function_value);
                     self.emit_unknown(Instruction::Constant(function_index));
                 } else {
-                    // Has captures - emit MakeClosure instruction
-                    // First create the base function template
+                    // Has captures - emit MakeClosure instruction (lambda has no default params)
                     let function_value = Value::Function {
                         name: Rc::from("<lambda>"),
                         params: Rc::new(params.clone()),
                         body_start,
-                        bytecode_id: 0, // Main bytecode
+                        bytecode_id: 0,
+                        required_count: params.len(),
+                        defaults: Rc::new(vec![]),
                     };
                     let function_index = self.add_constant(function_value);
 
@@ -780,6 +820,187 @@ impl Compiler {
 
                 Ok(())
             }
+            Expr::PreIncrement {
+                operand, ..
+            } => {
+                // ++x compiles to: x = x + 1, push x
+                // Only works with identifiers
+                if let Expr::Identifier {
+                    name, ..
+                } = operand.as_ref()
+                {
+                    // Load current value
+                    if let Some(&upvalue_index) = self.upvalues.get(name) {
+                        self.emit_unknown(Instruction::LoadUpvalue(upvalue_index));
+                    } else if let Some(&local_index) = self.locals.get(name) {
+                        self.emit_unknown(Instruction::Load(local_index));
+                    } else {
+                        let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                        let name_index = self.add_constant(Value::String(name_id));
+                        self.emit_unknown(Instruction::LoadGlobal(name_index));
+                    }
+
+                    // Add 1
+                    self.emit_unknown(Instruction::AddInt(1));
+
+                    // Store back
+                    if let Some(&upvalue_index) = self.upvalues.get(name) {
+                        self.emit_unknown(Instruction::StoreUpvalue(upvalue_index));
+                        self.emit_unknown(Instruction::LoadUpvalue(upvalue_index));
+                    } else if let Some(&local_index) = self.locals.get(name) {
+                        self.emit_unknown(Instruction::Store(local_index));
+                        self.emit_unknown(Instruction::Load(local_index));
+                    } else {
+                        let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                        let name_index = self.add_constant(Value::String(name_id));
+                        self.emit_unknown(Instruction::StoreGlobal(name_index));
+                        self.emit_unknown(Instruction::LoadGlobal(name_index));
+                    }
+
+                    Ok(())
+                } else {
+                    Err(LugliError::runtime("Pre-increment only works on variables"))
+                }
+            }
+            Expr::PreDecrement {
+                operand, ..
+            } => {
+                // --x compiles to: x = x - 1, push x
+                if let Expr::Identifier {
+                    name, ..
+                } = operand.as_ref()
+                {
+                    // Load current value
+                    if let Some(&upvalue_index) = self.upvalues.get(name) {
+                        self.emit_unknown(Instruction::LoadUpvalue(upvalue_index));
+                    } else if let Some(&local_index) = self.locals.get(name) {
+                        self.emit_unknown(Instruction::Load(local_index));
+                    } else {
+                        let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                        let name_index = self.add_constant(Value::String(name_id));
+                        self.emit_unknown(Instruction::LoadGlobal(name_index));
+                    }
+
+                    // Subtract 1
+                    self.emit_unknown(Instruction::SubInt(1));
+
+                    // Store back
+                    if let Some(&upvalue_index) = self.upvalues.get(name) {
+                        self.emit_unknown(Instruction::StoreUpvalue(upvalue_index));
+                        self.emit_unknown(Instruction::LoadUpvalue(upvalue_index));
+                    } else if let Some(&local_index) = self.locals.get(name) {
+                        self.emit_unknown(Instruction::Store(local_index));
+                        self.emit_unknown(Instruction::Load(local_index));
+                    } else {
+                        let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                        let name_index = self.add_constant(Value::String(name_id));
+                        self.emit_unknown(Instruction::StoreGlobal(name_index));
+                        self.emit_unknown(Instruction::LoadGlobal(name_index));
+                    }
+
+                    Ok(())
+                } else {
+                    Err(LugliError::runtime("Pre-decrement only works on variables"))
+                }
+            }
+            Expr::PostIncrement {
+                operand, ..
+            } => {
+                // x++ compiles to: tmp = x, x = x + 1, push tmp
+                if let Expr::Identifier {
+                    name, ..
+                } = operand.as_ref()
+                {
+                    // Check if it's a local/upvalue or global (different behavior)
+                    let is_global = !self.upvalues.contains_key(name) && !self.locals.contains_key(name);
+
+                    // Load current value (this will be returned)
+                    if let Some(&upvalue_index) = self.upvalues.get(name) {
+                        self.emit_unknown(Instruction::LoadUpvalue(upvalue_index));
+                    } else if let Some(&local_index) = self.locals.get(name) {
+                        self.emit_unknown(Instruction::Load(local_index));
+                    } else {
+                        let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                        let name_index = self.add_constant(Value::String(name_id));
+                        self.emit_unknown(Instruction::LoadGlobal(name_index));
+                    }
+
+                    // Duplicate the value (one for return, one for increment)
+                    self.emit_unknown(Instruction::Dup);
+
+                    // Add 1 to the top value
+                    self.emit_unknown(Instruction::AddInt(1));
+
+                    // Store incremented value back
+                    if let Some(&upvalue_index) = self.upvalues.get(name) {
+                        self.emit_unknown(Instruction::StoreUpvalue(upvalue_index));
+                    } else if let Some(&local_index) = self.locals.get(name) {
+                        self.emit_unknown(Instruction::Store(local_index));
+                    } else {
+                        let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                        let name_index = self.add_constant(Value::String(name_id));
+                        self.emit_unknown(Instruction::StoreGlobal(name_index));
+                        // StoreGlobal peeks, so we have [old, new] on stack
+                        // Pop the new value to leave only old value
+                        if is_global {
+                            self.emit_unknown(Instruction::Pop);
+                        }
+                    }
+
+                    Ok(())
+                } else {
+                    Err(LugliError::runtime("Post-increment only works on variables"))
+                }
+            }
+            Expr::PostDecrement {
+                operand, ..
+            } => {
+                // x-- compiles to: tmp = x, x = x - 1, push tmp
+                if let Expr::Identifier {
+                    name, ..
+                } = operand.as_ref()
+                {
+                    // Check if it's a local/upvalue or global (different behavior)
+                    let is_global = !self.upvalues.contains_key(name) && !self.locals.contains_key(name);
+
+                    // Load current value (this will be returned)
+                    if let Some(&upvalue_index) = self.upvalues.get(name) {
+                        self.emit_unknown(Instruction::LoadUpvalue(upvalue_index));
+                    } else if let Some(&local_index) = self.locals.get(name) {
+                        self.emit_unknown(Instruction::Load(local_index));
+                    } else {
+                        let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                        let name_index = self.add_constant(Value::String(name_id));
+                        self.emit_unknown(Instruction::LoadGlobal(name_index));
+                    }
+
+                    // Duplicate the value (one for return, one for decrement)
+                    self.emit_unknown(Instruction::Dup);
+
+                    // Subtract 1 from the top value
+                    self.emit_unknown(Instruction::SubInt(1));
+
+                    // Store decremented value back
+                    if let Some(&upvalue_index) = self.upvalues.get(name) {
+                        self.emit_unknown(Instruction::StoreUpvalue(upvalue_index));
+                    } else if let Some(&local_index) = self.locals.get(name) {
+                        self.emit_unknown(Instruction::Store(local_index));
+                    } else {
+                        let name_id = self.bytecode.string_pool.borrow_mut().intern(name);
+                        let name_index = self.add_constant(Value::String(name_id));
+                        self.emit_unknown(Instruction::StoreGlobal(name_index));
+                        // StoreGlobal peeks, so we have [old, new] on stack
+                        // Pop the new value to leave only old value
+                        if is_global {
+                            self.emit_unknown(Instruction::Pop);
+                        }
+                    }
+
+                    Ok(())
+                } else {
+                    Err(LugliError::runtime("Post-decrement only works on variables"))
+                }
+            }
         }
     }
 
@@ -1007,6 +1228,20 @@ impl Compiler {
                 if let Some(else_expr) = else_branch {
                     self.find_captured_identifiers_in_expr(else_expr, outer_locals, params, captures);
                 }
+            }
+            Expr::PreIncrement {
+                operand, ..
+            }
+            | Expr::PreDecrement {
+                operand, ..
+            }
+            | Expr::PostIncrement {
+                operand, ..
+            }
+            | Expr::PostDecrement {
+                operand, ..
+            } => {
+                self.find_captured_identifiers_in_expr(operand, outer_locals, params, captures);
             }
             _ => {}
         }

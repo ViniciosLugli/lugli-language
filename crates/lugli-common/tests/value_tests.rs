@@ -210,6 +210,8 @@ mod function_tests {
             params: Rc::new(vec!["a".to_string(), "b".to_string()]),
             body_start: 0,
             bytecode_id: 0,
+            required_count: 2,
+            defaults: Rc::new(vec![]),
         };
 
         assert_eq!(function.type_name(), "function");
@@ -312,6 +314,8 @@ mod closure_tests {
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues1,
+            required_count: 1,
+            defaults: Rc::new(vec![]),
         };
 
         let closure2 = Value::Closure {
@@ -320,6 +324,8 @@ mod closure_tests {
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues2,
+            required_count: 1,
+            defaults: Rc::new(vec![]),
         };
 
         // Different upvalues should make closures unequal
@@ -338,6 +344,8 @@ mod closure_tests {
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues1,
+            required_count: 1,
+            defaults: Rc::new(vec![]),
         };
 
         let closure2 = Value::Closure {
@@ -346,6 +354,8 @@ mod closure_tests {
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues2,
+            required_count: 1,
+            defaults: Rc::new(vec![]),
         };
 
         // Same upvalue values should make closures equal
@@ -364,6 +374,8 @@ mod closure_tests {
             body_start: 0,
             bytecode_id: 1,
             upvalues: upvalues1,
+            required_count: 1,
+            defaults: Rc::new(vec![]),
         };
 
         let closure2 = Value::Closure {
@@ -372,6 +384,8 @@ mod closure_tests {
             body_start: 0,
             bytecode_id: 2,
             upvalues: upvalues2,
+            required_count: 1,
+            defaults: Rc::new(vec![]),
         };
 
         // Different bytecode IDs should make closures unequal

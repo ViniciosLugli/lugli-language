@@ -382,47 +382,9 @@ fn pow_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     Ok(Value::Number(base.powf(exponent)))
 }
 
-fn map_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    check_arity(args, 2, "map")?;
-    let _func = match &args[0] {
-        Value::Function {
-            ..
-        }
-        | Value::NativeFunction {
-            ..
-        }
-        | Value::Closure {
-            ..
-        } => &args[0],
-        _ => return Err(LugliError::type_error("function", args[0].type_name())),
-    };
+fn map_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> { list::list_map(args, pool) }
 
-    match &args[1] {
-        Value::List(_list) => Err(LugliError::runtime("map is not yet fully implemented - requires VM integration for function calls")),
-        _ => Err(LugliError::type_error("list", args[1].type_name())),
-    }
-}
-
-fn filter_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
-    check_arity(args, 2, "filter")?;
-    let _func = match &args[0] {
-        Value::Function {
-            ..
-        }
-        | Value::NativeFunction {
-            ..
-        }
-        | Value::Closure {
-            ..
-        } => &args[0],
-        _ => return Err(LugliError::type_error("function", args[0].type_name())),
-    };
-
-    match &args[1] {
-        Value::List(_list) => Err(LugliError::runtime("filter is not yet fully implemented - requires VM integration for function calls")),
-        _ => Err(LugliError::type_error("list", args[1].type_name())),
-    }
-}
+fn filter_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> { list::list_filter(args, pool) }
 
 fn reduce_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity_range(args, 2, 3, "reduce")?;

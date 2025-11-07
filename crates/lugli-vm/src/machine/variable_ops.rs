@@ -81,7 +81,7 @@ impl Machine {
             } else {
                 // Generate helpful error with suggestions
                 if let Some(context) = self.get_source_context(bytecode) {
-                    let available_names: Vec<String> = self.context.globals().borrow().keys().map(|s| s.clone()).collect();
+                    let available_names: Vec<String> = self.context.globals().borrow().keys().cloned().collect();
                     let available_refs: Vec<&str> = available_names.iter().map(|s| s.as_str()).collect();
                     let suggestion = crate::error_formatter::suggest_similar_name(&name, &available_refs);
                     Err(LugliError::undefined_variable_with_context(name, context, suggestion))

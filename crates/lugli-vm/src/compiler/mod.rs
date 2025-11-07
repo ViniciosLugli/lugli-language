@@ -6,10 +6,7 @@ use std::{cell::RefCell, rc::Rc};
 
 mod control_flow;
 mod expressions;
-mod optimizer;
 mod statements;
-
-use optimizer::PeepholeOptimizer;
 
 pub struct CompilerDebug {
     pub trace_emit: bool,
@@ -116,12 +113,6 @@ impl Compiler {
             self.emit_unknown(Instruction::Return);
         }
 
-        // Apply peephole optimizations if enabled
-        if std::env::var("LUGLI_NO_OPTIMIZE").is_err() {
-            let optimizer = PeepholeOptimizer::new();
-            self.bytecode.instructions = optimizer.optimize(std::mem::take(&mut self.bytecode.instructions));
-        }
-
         Ok(std::mem::take(&mut self.bytecode))
     }
 
@@ -178,6 +169,10 @@ impl Compiler {
                 Ok(())
             }
             Some(Instruction::JumpIfFalse(addr)) => {
+                *addr = current_address;
+                Ok(())
+            }
+            Some(Instruction::JumpIfTrue(addr)) => {
                 *addr = current_address;
                 Ok(())
             }

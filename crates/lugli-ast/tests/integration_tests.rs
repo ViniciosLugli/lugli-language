@@ -33,6 +33,7 @@ mod ast_construction_tests {
                     id: next_id(),
                     name: "fibonacci".to_string(),
                     params: vec![("n".to_string(), None)],
+                    param_defaults: vec![None],
                     return_type: None,
                     body: vec![Stmt::If {
                         id: next_id(),
@@ -544,6 +545,7 @@ mod visitor_pattern_tests {
                 id: next_id(),
                 name: "calculate".to_string(),
                 params: vec![("x".to_string(), None), ("y".to_string(), None)],
+                param_defaults: vec![None, None],
                 return_type: None,
                 body: vec![Stmt::Return {
                     id: next_id(),

@@ -75,6 +75,8 @@ fn test_closure_equality_with_upvalues() {
         body_start: 100,
         bytecode_id: 0,
         upvalues: vec![upval1.clone()],
+        required_count: 1,
+        defaults: Rc::new(vec![]),
     };
 
     let closure2 = Value::Closure {
@@ -83,6 +85,8 @@ fn test_closure_equality_with_upvalues() {
         body_start: 100,
         bytecode_id: 0,
         upvalues: vec![upval1.clone()],
+        required_count: 1,
+        defaults: Rc::new(vec![]),
     };
 
     let closure3 = Value::Closure {
@@ -91,6 +95,8 @@ fn test_closure_equality_with_upvalues() {
         body_start: 100,
         bytecode_id: 0,
         upvalues: vec![upval2],
+        required_count: 1,
+        defaults: Rc::new(vec![]),
     };
 
     // Same upvalue Rc = equal

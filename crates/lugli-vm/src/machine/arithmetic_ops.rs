@@ -89,20 +89,6 @@ impl Machine {
         Ok(())
     }
 
-    pub(super) fn exec_and(&mut self) -> Result<(), LugliError> {
-        let b = self.pop()?;
-        let a = self.pop()?;
-        self.push(Value::Bool(a.is_truthy() && b.is_truthy()));
-        Ok(())
-    }
-
-    pub(super) fn exec_or(&mut self) -> Result<(), LugliError> {
-        let b = self.pop()?;
-        let a = self.pop()?;
-        self.push(Value::Bool(a.is_truthy() || b.is_truthy()));
-        Ok(())
-    }
-
     pub(super) fn exec_equal(&mut self) -> Result<(), LugliError> {
         let b = self.pop()?;
         let a = self.pop()?;

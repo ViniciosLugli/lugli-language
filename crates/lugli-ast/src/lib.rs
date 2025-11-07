@@ -278,7 +278,8 @@ mod tests {
         let fn_decl = Stmt::FnDecl {
             id: make_id(2),
             name: "add".to_string(),
-            params,
+            params: params.clone(),
+            param_defaults: vec![None; params.len()],
             return_type: None,
             body,
         };

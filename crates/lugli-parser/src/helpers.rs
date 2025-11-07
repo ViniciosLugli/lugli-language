@@ -1,5 +1,5 @@
 use crate::{Parser, error::ParseError, literals::unescape_string};
-use lugli_ast::{FStringPart, Pattern, TypeHint};
+use lugli_ast::{Expr, FStringPart, Pattern, TypeHint};
 use lugli_common::Span;
 use lugli_lexer::{Token, TokenKind};
 use std::sync::OnceLock;
@@ -9,6 +9,7 @@ static ERROR_TOKEN: OnceLock<Token> = OnceLock::new();
 pub struct Param {
     pub name: String,
     pub type_hint: Option<TypeHint>,
+    pub default: Option<Expr>,
 }
 
 impl<'a> Parser<'a> {
@@ -420,6 +421,7 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {
         let mut params = Vec::new();
+        let mut seen_default = false;
 
         if self.check(&TokenKind::RightParen) {
             return Ok(params);
@@ -428,16 +430,30 @@ impl<'a> Parser<'a> {
         loop {
             if self.check(&TokenKind::SelfKeyword) {
                 self.advance();
+                if seen_default {
+                    return Err(ParseError::Custom {
+                        message: "Required parameters cannot follow parameters with defaults".to_string(),
+                        span: self.previous_span(),
+                    });
+                }
                 params.push(Param {
                     name: "self".to_string(),
                     type_hint: None,
+                    default: None,
                 });
             } else if self.check(&TokenKind::Mut) && self.peek_next_kind() == Some(TokenKind::SelfKeyword) {
                 self.advance(); // consume mut
                 self.advance(); // consume self
+                if seen_default {
+                    return Err(ParseError::Custom {
+                        message: "Required parameters cannot follow parameters with defaults".to_string(),
+                        span: self.previous_span(),
+                    });
+                }
                 params.push(Param {
                     name: "self".to_string(),
                     type_hint: None,
+                    default: None,
                 });
             } else {
                 // Allow keywords as parameter names
@@ -446,9 +462,24 @@ impl<'a> Parser<'a> {
                 // Parse optional type hint
                 let type_hint = if self.match_any(&[TokenKind::Colon]) { Some(self.parse_type_hint()?) } else { None };
 
+                // Parse optional default value
+                let default = if self.match_any(&[TokenKind::Equal]) {
+                    seen_default = true;
+                    Some(self.expression()?)
+                } else {
+                    if seen_default {
+                        return Err(ParseError::Custom {
+                            message: "Required parameters cannot follow parameters with defaults".to_string(),
+                            span: self.previous_span(),
+                        });
+                    }
+                    None
+                };
+
                 params.push(Param {
                     name: param_name,
                     type_hint,
+                    default,
                 });
             }
 

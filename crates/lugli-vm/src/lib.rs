@@ -1,24 +1,4 @@
 //! Bytecode virtual machine for the Lugli programming language.
-//!
-//! # Recommended Usage
-//!
-//! Use the new unified `Vm` API:
-//!
-//! ```ignore
-//! use lugli_vm::Vm;
-//!
-//! let mut vm = Vm::new();
-//! let result = vm.compile_and_run(&program, span_map)?;
-//! ```
-//!
-//! Or with custom configuration:
-//!
-//! ```ignore
-//! let mut vm = Vm::builder()
-//!     .with_source("file.lg".to_string(), source.clone())
-//!     .debug(true)
-//!     .build();
-//! ```
 
 use thiserror::Error;
 

@@ -134,7 +134,7 @@ mod tests {
 
         // Test echo with value
         let arg = Value::String(pool.intern("hello"));
-        let result = functions[1].1(&[arg.clone()], &mut pool);
+        let result = functions[1].1(std::slice::from_ref(&arg), &mut pool);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), arg);
 

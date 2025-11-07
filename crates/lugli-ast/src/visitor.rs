@@ -241,6 +241,20 @@ where T: Default {
                     self.visit_expr(else_expr);
                 }
             }
+            Expr::PreIncrement {
+                operand, ..
+            }
+            | Expr::PreDecrement {
+                operand, ..
+            }
+            | Expr::PostIncrement {
+                operand, ..
+            }
+            | Expr::PostDecrement {
+                operand, ..
+            } => {
+                self.visit_expr(operand);
+            }
             Expr::Literal {
                 ..
             }
@@ -492,6 +506,20 @@ where T: Default {
                 if let Some(else_expr) = else_branch {
                     self.visit_expr_mut(else_expr);
                 }
+            }
+            Expr::PreIncrement {
+                operand, ..
+            }
+            | Expr::PreDecrement {
+                operand, ..
+            }
+            | Expr::PostIncrement {
+                operand, ..
+            }
+            | Expr::PostDecrement {
+                operand, ..
+            } => {
+                self.visit_expr_mut(operand);
             }
             Expr::Literal {
                 ..

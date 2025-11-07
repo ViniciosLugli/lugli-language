@@ -102,8 +102,6 @@ fn calculate_complexity_score(bytecode: &Bytecode) -> usize {
             | Instruction::LessEqual
             | Instruction::Greater
             | Instruction::GreaterEqual
-            | Instruction::And
-            | Instruction::Or
             | Instruction::Not
             | Instruction::Negate => 2,
             Instruction::Load(_)
@@ -116,6 +114,7 @@ fn calculate_complexity_score(bytecode: &Bytecode) -> usize {
             Instruction::MakeList(_) | Instruction::MakeDict(_) | Instruction::GetProperty(_) | Instruction::SetProperty(_) => 4,
             Instruction::Jump(_)
             | Instruction::JumpIfFalse(_)
+            | Instruction::JumpIfTrue(_)
             | Instruction::JumpIfEqual(_)
             | Instruction::JumpIfNotEqual(_)
             | Instruction::Loop(_)

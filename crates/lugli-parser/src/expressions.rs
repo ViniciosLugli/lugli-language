@@ -98,6 +98,38 @@ impl<'a> Parser<'a> {
             });
         }
 
+        // Pre-increment: ++x
+        if self.match_any(&[TokenKind::Increment]) {
+            let operator_span = self.previous().span;
+            let operand = self.unary()?;
+
+            let operand_span = self.get_expr_span(operand.id());
+            let span = self.merge_spans(operator_span, operand_span);
+            let id = self.span_map.alloc_id();
+            self.span_map.insert(id, span);
+
+            return Ok(Expr::PreIncrement {
+                id,
+                operand: Box::new(operand),
+            });
+        }
+
+        // Pre-decrement: --x
+        if self.match_any(&[TokenKind::Decrement]) {
+            let operator_span = self.previous().span;
+            let operand = self.unary()?;
+
+            let operand_span = self.get_expr_span(operand.id());
+            let span = self.merge_spans(operator_span, operand_span);
+            let id = self.span_map.alloc_id();
+            self.span_map.insert(id, span);
+
+            return Ok(Expr::PreDecrement {
+                id,
+                operand: Box::new(operand),
+            });
+        }
+
         self.call()
     }
 
@@ -148,6 +180,30 @@ impl<'a> Parser<'a> {
                     id,
                     object: Box::new(expr),
                     name,
+                };
+            } else if self.match_any(&[TokenKind::Increment]) {
+                // Post-increment: x++
+                let expr_span = self.get_expr_span(expr.id());
+                let operator_span = self.previous().span;
+                let span = self.merge_spans(expr_span, operator_span);
+                let id = self.span_map.alloc_id();
+                self.span_map.insert(id, span);
+
+                expr = Expr::PostIncrement {
+                    id,
+                    operand: Box::new(expr),
+                };
+            } else if self.match_any(&[TokenKind::Decrement]) {
+                // Post-decrement: x--
+                let expr_span = self.get_expr_span(expr.id());
+                let operator_span = self.previous().span;
+                let span = self.merge_spans(expr_span, operator_span);
+                let id = self.span_map.alloc_id();
+                self.span_map.insert(id, span);
+
+                expr = Expr::PostDecrement {
+                    id,
+                    operand: Box::new(expr),
                 };
             } else {
                 break;

@@ -54,6 +54,14 @@ pub enum Expr {
     Block { id: NodeId, statements: Vec<Stmt> },
 
     If { id: NodeId, condition: Box<Expr>, then_branch: Box<Expr>, else_branch: Option<Box<Expr>> },
+
+    PreIncrement { id: NodeId, operand: Box<Expr> },
+
+    PreDecrement { id: NodeId, operand: Box<Expr> },
+
+    PostIncrement { id: NodeId, operand: Box<Expr> },
+
+    PostDecrement { id: NodeId, operand: Box<Expr> },
 }
 
 impl Expr {
@@ -105,6 +113,18 @@ impl Expr {
                 id, ..
             } => *id,
             Expr::If {
+                id, ..
+            } => *id,
+            Expr::PreIncrement {
+                id, ..
+            } => *id,
+            Expr::PreDecrement {
+                id, ..
+            } => *id,
+            Expr::PostIncrement {
+                id, ..
+            } => *id,
+            Expr::PostDecrement {
                 id, ..
             } => *id,
         }

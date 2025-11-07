@@ -144,6 +144,8 @@ impl Machine {
             params,
             body_start,
             bytecode_id,
+            required_count,
+            defaults,
         } = function_value
         {
             // Get current stack frame to calculate absolute positions
@@ -168,6 +170,8 @@ impl Machine {
                 body_start: *body_start,
                 bytecode_id: *bytecode_id,
                 upvalues,
+                required_count: *required_count,
+                defaults: defaults.clone(),
             };
 
             self.push(closure);

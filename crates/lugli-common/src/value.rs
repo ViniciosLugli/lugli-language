@@ -56,6 +56,8 @@ pub enum Value {
         params: Rc<Vec<String>>,
         body_start: usize,
         bytecode_id: usize,
+        required_count: usize,
+        defaults: Rc<Vec<Value>>,
     },
     Closure {
         name: Rc<str>,
@@ -63,6 +65,8 @@ pub enum Value {
         body_start: usize,
         bytecode_id: usize,
         upvalues: Vec<Rc<RefCell<Value>>>,
+        required_count: usize,
+        defaults: Rc<Vec<Value>>,
     },
     NativeFunction {
         name: String,
@@ -230,12 +234,16 @@ impl Value {
                 body_start,
                 bytecode_id,
                 upvalues,
+                required_count,
+                defaults,
             } => Value::Closure {
                 name: name.clone(),
                 params: params.clone(),
                 body_start: *body_start,
                 bytecode_id: *bytecode_id,
                 upvalues: upvalues.iter().map(Rc::clone).collect(),
+                required_count: *required_count,
+                defaults: defaults.clone(),
             },
             // Other types need full clone (String allocates)
             _ => self.clone(),
@@ -469,12 +477,14 @@ impl Value {
                     params: p1,
                     body_start: b1,
                     bytecode_id: id1,
+                    ..
                 },
                 Value::Function {
                     name: n2,
                     params: p2,
                     body_start: b2,
                     bytecode_id: id2,
+                    ..
                 },
             ) => n1 == n2 && p1 == p2 && b1 == b2 && id1 == id2,
             (
@@ -484,6 +494,7 @@ impl Value {
                     body_start: b1,
                     bytecode_id: id1,
                     upvalues: u1,
+                    ..
                 },
                 Value::Closure {
                     name: n2,
@@ -491,6 +502,7 @@ impl Value {
                     body_start: b2,
                     bytecode_id: id2,
                     upvalues: u2,
+                    ..
                 },
             ) => {
                 if n1 != n2 || p1 != p2 || b1 != b2 || id1 != id2 || u1.len() != u2.len() {

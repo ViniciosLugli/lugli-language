@@ -271,6 +271,7 @@ fn test_struct_declaration_ast() {
                 id: next_id(),
                 name: "distance".to_string(),
                 params: vec![("self".to_string(), None)],
+                param_defaults: vec![None],
                 return_type: None,
                 body: vec![Stmt::Return {
                     id: next_id(),

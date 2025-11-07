@@ -120,6 +120,7 @@ impl<'a> Parser<'a> {
 
         let parsed_params = self.parse_params()?;
         let params: Vec<(String, Option<lugli_ast::TypeHint>)> = parsed_params.iter().map(|p| (p.name.clone(), p.type_hint.clone())).collect();
+        let param_defaults: Vec<Option<lugli_ast::Expr>> = parsed_params.iter().map(|p| p.default.clone()).collect();
 
         self.skip_newlines();
         self.consume(&TokenKind::RightParen, "Expected ')' after parameters")?;
@@ -138,6 +139,7 @@ impl<'a> Parser<'a> {
             id,
             name,
             params,
+            param_defaults,
             return_type,
             body,
         })

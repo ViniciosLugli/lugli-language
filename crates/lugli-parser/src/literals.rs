@@ -201,7 +201,7 @@ impl<'a> Parser<'a> {
                 });
             }
 
-            // Check for struct literal (Type { field: value, ... })
+            // Check for struct literal (Type { field: value, ... } or Type { field, ... })
             if self.check(&TokenKind::LeftBrace) && is_pascal_case(&name) {
                 let struct_start_span = span;
                 self.advance(); // consume '{'
@@ -211,11 +211,22 @@ impl<'a> Parser<'a> {
 
                 if !self.check(&TokenKind::RightBrace) {
                     loop {
-                        let field_name = self.consume_identifier("Expected field name")?;
-                        self.consume(&TokenKind::Colon, "Expected ':' after field name")?;
-                        let value_expr = self.expression()?;
-
                         let field_span = self.current_span();
+                        let field_name = self.consume_identifier("Expected field name")?;
+
+                        let value_expr = if self.match_any(&[TokenKind::Colon]) {
+                            // Longhand: field: value
+                            self.expression()?
+                        } else {
+                            // Shorthand: field (desugar to field: field)
+                            let value_id = self.span_map.alloc_id();
+                            self.span_map.insert(value_id, field_span);
+                            Expr::Identifier {
+                                id: value_id,
+                                name: field_name.clone(),
+                            }
+                        };
+
                         let key_id = self.span_map.alloc_id();
                         self.span_map.insert(key_id, field_span);
 

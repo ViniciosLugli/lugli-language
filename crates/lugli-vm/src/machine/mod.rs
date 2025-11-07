@@ -65,7 +65,6 @@ pub struct Machine {
     // Remaining infrastructure
     pub debug: DebugContext,
     string_pool: Rc<RefCell<StringPool>>,
-    gc: lugli_common::GarbageCollector,
 }
 
 impl Machine {
@@ -123,7 +122,6 @@ impl Machine {
             dispatcher: InstructionDispatcher::new(),
             debug,
             string_pool,
-            gc: lugli_common::GarbageCollector::new(),
         }
     }
 
@@ -157,9 +155,6 @@ impl Machine {
         // Sweep phase: remove unreferenced bytecodes
         self.modules.retain_bytecodes(|&id, _| live_bytecodes.contains(&id));
     }
-
-    /// Get current GC statistics
-    pub fn gc_stats(&self) -> lugli_common::GCStats { self.gc.stats() }
 
     /// Recursively mark bytecode IDs referenced by a value
     fn mark_bytecode_ids(&self, value: &Value, live_set: &mut std::collections::HashSet<usize>) {
@@ -400,6 +395,7 @@ impl Machine {
                 params,
                 body_start,
                 bytecode_id,
+                ..
             }
             | Value::Closure {
                 name,
@@ -671,25 +667,13 @@ impl Machine {
             return Err(LugliError::runtime(format!("Maximum recursion depth exceeded: {} nested calls", MAX_CALL_DEPTH)));
         }
 
-        // Increment instruction counter for GC and debugging
+        // Increment instruction counter for debugging
         self.debug.instruction_count += 1;
 
         // Debug tracing
         if self.debug.trace_execution {
             eprintln!("[TRACE] IP:{:04} | {:?}", self.context.current_ip(), instruction);
         }
-
-        // TODO: GC is currently disabled because:
-        // 1. It clones entire VM state (expensive)
-        // 2. sweep() is a no-op - doesn't actually free memory
-        // 3. Rust's Rc<RefCell<>> handles reference counting automatically
-        // Need to implement proper tri-color marking GC or remove GC tracking entirely
-        // if self.debug.instruction_count % 10_000 == 0 {
-        //     let mut roots = Vec::with_capacity(self.globals.len() + self.stack.len());
-        //     roots.extend(self.globals.values().cloned());
-        //     roots.extend(self.stack.iter().cloned());
-        //     self.gc.collect(&roots);
-        // }
 
         if self.debug.trace_stack && self.context.stack_len() > 0 {
             eprintln!("[STACK] depth:{} top:{:?}", self.context.stack_len(), self.context.peek(0));
@@ -724,8 +708,6 @@ impl Machine {
             Instruction::AddLocals(a, b) => self.exec_add_locals(*a, *b, bytecode)?,
             Instruction::Negate => self.exec_negate()?,
             Instruction::Not => self.exec_not()?,
-            Instruction::And => self.exec_and()?,
-            Instruction::Or => self.exec_or()?,
             Instruction::Equal => self.exec_equal()?,
             Instruction::NotEqual => self.exec_not_equal()?,
             Instruction::Greater => self.exec_greater()?,
@@ -736,6 +718,11 @@ impl Machine {
             Instruction::Jump(addr) => return self.exec_jump(*addr),
             Instruction::JumpIfFalse(addr) => {
                 if self.exec_jump_if_false(*addr)? {
+                    return Ok(true);
+                }
+            }
+            Instruction::JumpIfTrue(addr) => {
+                if self.exec_jump_if_true(*addr)? {
                     return Ok(true);
                 }
             }
@@ -805,10 +792,39 @@ impl Machine {
                         params,
                         body_start,
                         bytecode_id,
+                        required_count,
+                        defaults,
                     } => {
                         let arity = params.len();
-                        if arg_count != arity {
-                            return Err(LugliError::runtime(format!("Function expects {} arguments, got {}", arity, arg_count)));
+
+                        // Validate arg_count against required_count
+                        if arg_count < required_count {
+                            return Err(LugliError::runtime(format!("Function expects at least {} arguments, got {}", required_count, arg_count)));
+                        }
+                        if arg_count > arity {
+                            return Err(LugliError::runtime(format!("Function expects at most {} arguments, got {}", arity, arg_count)));
+                        }
+
+                        // Calculate stack_base using ORIGINAL arg_count before pushing defaults
+                        // Stack: [..., function, arg0, ..., argN-1]
+                        // stack_base points to function slot
+                        let stack_base = self.context.stack_len() - arg_count - 1;
+
+                        // Push default values for missing optional args
+                        // After pushing: [..., function, arg0, ..., argN-1, default_argN, ...]
+                        if self.debug.trace_calls {
+                            eprintln!("[DEBUG] Function {}: arg_count={}, arity={}, required={}, defaults.len()={}", name, arg_count, arity, required_count, defaults.len());
+                        }
+                        for i in arg_count..arity {
+                            let default_idx = i;
+                            if default_idx < defaults.len() {
+                                if self.debug.trace_calls {
+                                    eprintln!("[DEBUG] Pushing default[{}] = {:?}", default_idx, defaults[default_idx]);
+                                }
+                                self.push(defaults[default_idx].clone());
+                            } else {
+                                self.push(Value::Null);
+                            }
                         }
 
                         // Check if this is a cross-bytecode call (module function)
@@ -821,7 +837,6 @@ impl Machine {
                                 .clone();
 
                             let saved_call_stack_len = self.context.call_depth();
-                            let stack_base = self.context.stack_len() - arg_count - 1;
                             let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, None);
                             self.context.push_frame(frame);
 
@@ -841,8 +856,7 @@ impl Machine {
 
                             // Return value is now on stack
                         } else {
-                            // Same-bytecode call - normal path
-                            let stack_base = self.context.stack_len() - arg_count - 1;
+                            // Same-bytecode call - normal path (stack_base already calculated before pushing defaults)
                             let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, None);
                             self.context.push_frame(frame);
                             self.context.jump_to(body_start);
@@ -855,10 +869,30 @@ impl Machine {
                         body_start,
                         bytecode_id,
                         upvalues,
+                        required_count,
+                        defaults,
                     } => {
                         let arity = params.len();
-                        if arg_count != arity {
-                            return Err(LugliError::runtime(format!("Closure expects {} arguments, got {}", arity, arg_count)));
+
+                        // Validate arg_count against required_count
+                        if arg_count < required_count {
+                            return Err(LugliError::runtime(format!("Closure expects at least {} arguments, got {}", required_count, arg_count)));
+                        }
+                        if arg_count > arity {
+                            return Err(LugliError::runtime(format!("Closure expects at most {} arguments, got {}", arity, arg_count)));
+                        }
+
+                        // Calculate stack_base using ORIGINAL arg_count before pushing defaults
+                        let stack_base = self.context.stack_len() - arg_count - 1;
+
+                        // Push default values for missing optional args
+                        for i in arg_count..arity {
+                            let default_idx = i;
+                            if default_idx < defaults.len() {
+                                self.push(defaults[default_idx].clone());
+                            } else {
+                                self.push(Value::Null);
+                            }
                         }
 
                         // Check if this is a cross-bytecode call (module closure)
@@ -871,7 +905,6 @@ impl Machine {
                                 .clone();
 
                             let saved_call_stack_len = self.context.call_depth();
-                            let stack_base = self.context.stack_len() - arg_count - 1;
                             let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, Some(upvalues.clone()));
                             self.context.push_frame(frame);
 
@@ -891,8 +924,7 @@ impl Machine {
 
                             // Return value is now on stack
                         } else {
-                            // Same-bytecode call - normal path
-                            let stack_base = self.context.stack_len() - arg_count - 1;
+                            // Same-bytecode call - normal path (stack_base already calculated before pushing defaults)
                             let frame = CallFrame::new(name.clone(), self.context.current_ip() + 1, stack_base, Some(upvalues.clone()));
                             self.context.push_frame(frame);
                             self.context.jump_to(body_start);
@@ -1050,6 +1082,7 @@ impl Machine {
                                     params,
                                     body_start,
                                     bytecode_id,
+                                    ..
                                 }
                                 | Value::Closure {
                                     name,

@@ -18,6 +18,16 @@ impl Machine {
         }
     }
 
+    pub(super) fn exec_jump_if_true(&mut self, addr: usize) -> Result<bool, LugliError> {
+        let condition = self.pop()?;
+        if condition.is_truthy() {
+            self.context.jump_to(addr);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     pub(super) fn exec_jump_if_equal(&mut self, addr: usize) -> Result<bool, LugliError> {
         let b = self.pop()?;
         let a = self.pop()?;

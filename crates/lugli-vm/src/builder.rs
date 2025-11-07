@@ -148,9 +148,9 @@ mod tests {
 
     #[test]
     fn test_vm_builder_debug() {
-        let vm = Vm::builder().debug(true).build();
-        // Debug mode would be checked in Machine if we pass it through
-        assert!(vm.machine.debug.trace_execution || !vm.machine.debug.trace_execution);
+        let _vm = Vm::builder().debug(true).build();
+        // Debug mode configuration is stored in builder but not yet passed to Machine
+        // This test verifies the builder accepts the debug parameter without panicking
     }
 
     #[test]
