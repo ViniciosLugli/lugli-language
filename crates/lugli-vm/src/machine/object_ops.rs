@@ -46,10 +46,11 @@ impl Machine {
 
         if let Value::String(name_id) = prop_name {
             if let Value::Dict(dict_ref) = &object {
-                // Detect potential circular reference
+                // Detect potential circular reference (direct)
                 if let Value::Dict(value_dict_ref) = &value {
                     if Rc::ptr_eq(dict_ref, value_dict_ref) {
                         eprintln!("⚠️  WARNING: Assigning dictionary to itself creates a circular reference");
+                        eprintln!("    This will cause memory leaks. Consider restructuring your data.");
                     }
                 }
 
@@ -57,6 +58,16 @@ impl Machine {
                     .try_borrow_mut()
                     .map_err(|_| LugliError::runtime("Cannot modify struct while it's being used"))?
                     .insert(*name_id, value.clone());
+
+                // Check for indirect cycles after assignment
+                if object.contains_cycle() {
+                    let prop_name_str = bytecode.string_pool.borrow().resolve(*name_id).to_string();
+                    eprintln!("⚠️  WARNING: Circular reference detected in dictionary after setting property '{}'", prop_name_str);
+                    eprintln!("    Pattern: a → b → ... → a");
+                    eprintln!("    This will cause memory leaks in long-running programs.");
+                    eprintln!("    Tip: Break cycles by setting references to null before dropping objects.");
+                }
+
                 self.stack.push(value);
                 Ok(())
             } else {

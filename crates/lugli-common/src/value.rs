@@ -316,6 +316,93 @@ impl Value {
         }
     }
 
+    /// Check if this value contains circular references
+    ///
+    /// Detects both direct (x.self = x) and indirect (a→b→a) cycles
+    /// Uses depth-first search with visited set tracking
+    pub fn contains_cycle(&self) -> bool {
+        use std::collections::HashSet;
+        let mut visited = HashSet::new();
+        self.contains_cycle_impl(&mut visited)
+    }
+
+    fn contains_cycle_impl(&self, visited: &mut std::collections::HashSet<usize>) -> bool {
+        match self {
+            Value::Dict(d) => {
+                let ptr = Rc::as_ptr(d) as usize;
+                if visited.contains(&ptr) {
+                    return true; // Cycle detected
+                }
+
+                visited.insert(ptr);
+
+                if let Ok(dict_ref) = d.try_borrow() {
+                    for v in dict_ref.values() {
+                        if v.contains_cycle_impl(visited) {
+                            visited.remove(&ptr);
+                            return true;
+                        }
+                    }
+                }
+
+                visited.remove(&ptr);
+                false
+            }
+            Value::List(l) => {
+                let ptr = Rc::as_ptr(l) as usize;
+                if visited.contains(&ptr) {
+                    return true; // Cycle detected
+                }
+
+                visited.insert(ptr);
+
+                if let Ok(list_ref) = l.try_borrow() {
+                    for v in list_ref.iter() {
+                        if v.contains_cycle_impl(visited) {
+                            visited.remove(&ptr);
+                            return true;
+                        }
+                    }
+                }
+
+                visited.remove(&ptr);
+                false
+            }
+            Value::Closure { upvalues, .. } => {
+                // Check upvalues for cycles
+                for upvalue in upvalues {
+                    if let Ok(uv_ref) = upvalue.try_borrow() {
+                        if uv_ref.contains_cycle_impl(visited) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            Value::StructInstance { fields, .. } => {
+                // Use stable hash of fields HashMap pointer
+                let ptr = (fields as *const HashMap<StringId, Value>) as usize;
+                if visited.contains(&ptr) {
+                    return true;
+                }
+
+                visited.insert(ptr);
+
+                for v in fields.values() {
+                    if v.contains_cycle_impl(visited) {
+                        visited.remove(&ptr);
+                        return true;
+                    }
+                }
+
+                visited.remove(&ptr);
+                false
+            }
+            // Primitives and functions cannot form cycles
+            _ => false,
+        }
+    }
+
     pub fn display_with_pool(&self, pool: &StringPool) -> String {
         match self {
             Value::Number(n) => n.to_string(),
