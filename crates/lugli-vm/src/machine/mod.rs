@@ -12,6 +12,10 @@ pub use context::{CallFrame, ExecutionContext};
 mod module_runtime;
 pub use module_runtime::ModuleRuntime;
 
+// Instruction dispatcher
+mod dispatcher;
+pub use dispatcher::{CacheStats, InstructionDispatcher};
+
 // Instruction handler modules
 mod arithmetic_ops;
 mod control_flow;
@@ -55,11 +59,12 @@ pub struct Machine {
     // Module runtime encapsulates module system
     modules: ModuleRuntime,
 
+    // Instruction dispatcher encapsulates method dispatch
+    dispatcher: InstructionDispatcher,
+
     // Remaining infrastructure
     pub debug: DebugContext,
     string_pool: Rc<RefCell<StringPool>>,
-    method_registry: lugli_stdlib::MethodRegistry,
-    method_cache: HashMap<(usize, usize), u32>,
     gc: lugli_common::GarbageCollector,
 }
 
@@ -128,10 +133,9 @@ impl Machine {
         Self {
             context: ExecutionContext::with_globals(globals),
             modules: ModuleRuntime::new(),
+            dispatcher: InstructionDispatcher::new(),
             debug,
             string_pool,
-            method_registry: lugli_stdlib::MethodRegistry::new(),
-            method_cache: HashMap::with_capacity(256),
             gc: lugli_common::GarbageCollector::new(),
         }
     }
@@ -1169,20 +1173,16 @@ impl Machine {
                         let args_end = self.context.stack_len();
                         let args: Vec<Value> = self.context.stack()[args_start..args_end].to_vec();
 
-                        // Hash-based method lookup with cache
-                        let type_id = object.type_id();
-                        let cache_key = (type_id, *method_name_index);
-
-                        let hash = if let Some(&h) = self.method_cache.get(&cache_key) {
-                            h
-                        } else {
-                            let h = lugli_stdlib::methods::hash_method(object.type_name(), &method_name);
-                            self.method_cache.insert(cache_key, h);
-                            h
-                        };
-
+                        // Hash-based method lookup with cache via dispatcher
                         let mut pool = bytecode.string_pool.borrow_mut();
-                        self.method_registry.call_by_hash(hash, &args, &mut pool)?
+                        self.dispatcher.dispatch_cached(
+                            object.type_id(),
+                            object.type_name(),
+                            *method_name_index,
+                            &method_name,
+                            &args,
+                            &mut pool,
+                        )?
                     }
                     Value::Module {
                         exports, ..
