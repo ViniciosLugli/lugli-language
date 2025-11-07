@@ -114,8 +114,13 @@ fn calculate_complexity_score(bytecode: &Bytecode) -> usize {
             | Instruction::LoadUpvalue(_)
             | Instruction::StoreUpvalue(_) => 3,
             Instruction::MakeList(_) | Instruction::MakeDict(_) | Instruction::GetProperty(_) | Instruction::SetProperty(_) => 4,
-            Instruction::Jump(_) | Instruction::JumpIfFalse(_) | Instruction::JumpIfEqual(_) | Instruction::JumpIfNotEqual(_) | Instruction::Loop(_) | Instruction::Call(_) => 5,
-            Instruction::AddLocals(_, _) => 3,
+            Instruction::Jump(_)
+            | Instruction::JumpIfFalse(_)
+            | Instruction::JumpIfEqual(_)
+            | Instruction::JumpIfNotEqual(_)
+            | Instruction::Loop(_)
+            | Instruction::Call(_) => 5,
+            Instruction::AddLocals(..) => 3,
             Instruction::DefineFunction(_) => 4,
             Instruction::MakeClosure {
                 ..

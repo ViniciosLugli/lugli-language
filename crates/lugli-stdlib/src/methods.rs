@@ -103,32 +103,15 @@ impl Default for MethodRegistry {
 }
 
 impl lugli_common::stdlib::MethodRegistry for MethodRegistry {
-    fn call(
-        &self,
-        type_name: &str,
-        method_name: &str,
-        args: &[Value],
-        pool: &mut StringPool,
-    ) -> Result<Value, LugliError> {
+    fn call(&self, type_name: &str, method_name: &str, args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
         self.call(type_name, method_name, args, pool)
     }
 
-    fn call_by_hash(
-        &self,
-        hash: u32,
-        args: &[Value],
-        pool: &mut StringPool,
-    ) -> Result<Value, LugliError> {
-        self.call_by_hash(hash, args, pool)
-    }
+    fn call_by_hash(&self, hash: u32, args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> { self.call_by_hash(hash, args, pool) }
 
-    fn has_method(&self, type_name: &str, method_name: &str) -> bool {
-        self.has_method(type_name, method_name)
-    }
+    fn has_method(&self, type_name: &str, method_name: &str) -> bool { self.has_method(type_name, method_name) }
 
-    fn get_method_id(&self, type_name: &str, method_name: &str) -> Option<u32> {
-        Some(hash_method(type_name, method_name))
-    }
+    fn get_method_id(&self, type_name: &str, method_name: &str) -> Option<u32> { Some(hash_method(type_name, method_name)) }
 }
 
 #[cfg(test)]

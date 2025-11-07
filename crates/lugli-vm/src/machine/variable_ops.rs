@@ -8,7 +8,8 @@ impl Machine {
         let frame = self.context.current_frame().ok_or_else(|| LugliError::runtime("Call stack is empty"))?;
         let target_index = frame.stack_base + index;
         let value = self
-            .context.stack()
+            .context
+            .stack()
             .get(target_index)
             .ok_or_else(|| {
                 LugliError::runtime(format!(

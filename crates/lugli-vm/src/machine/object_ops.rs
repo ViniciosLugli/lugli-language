@@ -147,9 +147,8 @@ impl Machine {
         } = function_value
         {
             // Get current stack frame to calculate absolute positions
-            let stack_base = self.context.current_frame()
-                .ok_or_else(|| LugliError::runtime("Call stack is empty during closure creation"))?
-                .stack_base;
+            let stack_base =
+                self.context.current_frame().ok_or_else(|| LugliError::runtime("Call stack is empty during closure creation"))?.stack_base;
 
             // Capture values from the stack using open upvalues pattern
             let mut upvalues: Vec<Rc<RefCell<Value>>> = Vec::new();
@@ -203,7 +202,11 @@ impl Machine {
                 let actual_idx_opt = if idx_i64 < 0 {
                     let positive_offset = len + idx_i64;
                     if positive_offset < 0 { None } else { Some(positive_offset as usize) }
-                } else if idx_i64 >= len { None } else { Some(idx_i64 as usize) };
+                } else if idx_i64 >= len {
+                    None
+                } else {
+                    Some(idx_i64 as usize)
+                };
 
                 if let Some(actual_idx) = actual_idx_opt {
                     self.push(list_ref[actual_idx].clone());

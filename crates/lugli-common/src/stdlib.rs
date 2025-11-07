@@ -2,11 +2,7 @@
 //!
 //! Provides traits for pluggable standard library implementations.
 
-use crate::{LugliError, StringPool, Value};
-use std::collections::HashMap;
-
-/// Function signature for native functions callable from Lugli code
-pub type NativeFunction = fn(&[Value], &mut StringPool) -> Result<Value, LugliError>;
+use crate::{LugliError, NativeFunction, StringPool, Value};
 
 /// Trait for standard library implementations.
 ///
@@ -40,23 +36,12 @@ pub trait MethodRegistry: Send + Sync {
     /// * `method_name` - The method name (e.g., "upper", "push")
     /// * `args` - Arguments including self as first argument
     /// * `pool` - String pool for string operations
-    fn call(
-        &self,
-        type_name: &str,
-        method_name: &str,
-        args: &[Value],
-        pool: &mut StringPool,
-    ) -> Result<Value, LugliError>;
+    fn call(&self, type_name: &str, method_name: &str, args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError>;
 
     /// Call a method by precomputed hash (for performance)
     ///
     /// This is used by the VM's method cache to avoid repeated hash computations.
-    fn call_by_hash(
-        &self,
-        hash: u32,
-        args: &[Value],
-        pool: &mut StringPool,
-    ) -> Result<Value, LugliError>;
+    fn call_by_hash(&self, hash: u32, args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError>;
 
     /// Check if a method exists for a type
     fn has_method(&self, type_name: &str, method_name: &str) -> bool;
@@ -69,8 +54,7 @@ pub trait MethodRegistry: Send + Sync {
 pub trait StandardLibraryFactory {
     /// Create a new instance of the standard library
     fn create() -> Box<dyn StandardLibrary>
-    where
-        Self: Sized;
+    where Self: Sized;
 }
 
 /// Minimal test implementation for testing
@@ -82,23 +66,13 @@ impl StandardLibrary for TestStdlib {
     fn get_global_functions(&self) -> Vec<(&'static str, NativeFunction)> {
         vec![
             ("test_fn", |_args, _pool| Ok(Value::Number(42.0))),
-            ("echo", |args, _pool| {
-                if args.is_empty() {
-                    Ok(Value::Null)
-                } else {
-                    Ok(args[0].clone())
-                }
-            }),
+            ("echo", |args, _pool| if args.is_empty() { Ok(Value::Null) } else { Ok(args[0].clone()) }),
         ]
     }
 
-    fn get_method_registry(&self) -> Box<dyn MethodRegistry> {
-        Box::new(EmptyMethodRegistry)
-    }
+    fn get_method_registry(&self) -> Box<dyn MethodRegistry> { Box::new(EmptyMethodRegistry) }
 
-    fn info(&self) -> (&'static str, &'static str) {
-        ("test-stdlib", "0.0.1")
-    }
+    fn info(&self) -> (&'static str, &'static str) { ("test-stdlib", "0.0.1") }
 }
 
 #[cfg(test)]
@@ -106,13 +80,7 @@ struct EmptyMethodRegistry;
 
 #[cfg(test)]
 impl MethodRegistry for EmptyMethodRegistry {
-    fn call(
-        &self,
-        _type_name: &str,
-        _method_name: &str,
-        _args: &[Value],
-        _pool: &mut StringPool,
-    ) -> Result<Value, LugliError> {
+    fn call(&self, _type_name: &str, _method_name: &str, _args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
         Err(LugliError::runtime("No methods available in test registry"))
     }
 
@@ -120,13 +88,9 @@ impl MethodRegistry for EmptyMethodRegistry {
         Err(LugliError::runtime("No methods available in test registry"))
     }
 
-    fn has_method(&self, _type_name: &str, _method_name: &str) -> bool {
-        false
-    }
+    fn has_method(&self, _type_name: &str, _method_name: &str) -> bool { false }
 
-    fn get_method_id(&self, _type_name: &str, _method_name: &str) -> Option<u32> {
-        None
-    }
+    fn get_method_id(&self, _type_name: &str, _method_name: &str) -> Option<u32> { None }
 }
 
 #[cfg(test)]

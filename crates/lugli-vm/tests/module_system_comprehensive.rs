@@ -29,7 +29,11 @@ fn cleanup_module(test_name: &str) {
 fn run_code(code: &str) -> Result<Value, String> {
     let mut parser = Parser::new(code).map_err(|e| e.to_string())?;
     let (ast, span_map) = parser.parse().map_err(|e| e.to_string())?;
-    { let mut vm = Vm::new(); vm.compile_and_run(&ast, span_map) }.map_err(|e| e.to_string())
+    {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&ast, span_map)
+    }
+    .map_err(|e| e.to_string())
 }
 
 #[test]

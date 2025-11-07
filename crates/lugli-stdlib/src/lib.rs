@@ -4,8 +4,8 @@
 //! Functions are registered with the VM and callable from Lugli code.
 
 use lugli_common::{
-    stdlib::{MethodRegistry as MethodRegistryTrait, StandardLibrary, StandardLibraryFactory},
     LugliError, StringPool, Value,
+    stdlib::{MethodRegistry as MethodRegistryTrait, StandardLibrary, StandardLibraryFactory},
 };
 
 pub mod core;
@@ -33,21 +33,13 @@ pub fn get_global_functions() -> Vec<(&'static str, NativeFunction)> {
 pub struct LugliStdlib;
 
 impl StandardLibrary for LugliStdlib {
-    fn get_global_functions(&self) -> Vec<(&'static str, NativeFunction)> {
-        get_global_functions()
-    }
+    fn get_global_functions(&self) -> Vec<(&'static str, NativeFunction)> { get_global_functions() }
 
-    fn get_method_registry(&self) -> Box<dyn MethodRegistryTrait> {
-        Box::new(MethodRegistry::new())
-    }
+    fn get_method_registry(&self) -> Box<dyn MethodRegistryTrait> { Box::new(MethodRegistry::new()) }
 
-    fn info(&self) -> (&'static str, &'static str) {
-        ("lugli-stdlib", env!("CARGO_PKG_VERSION"))
-    }
+    fn info(&self) -> (&'static str, &'static str) { ("lugli-stdlib", env!("CARGO_PKG_VERSION")) }
 }
 
 impl StandardLibraryFactory for LugliStdlib {
-    fn create() -> Box<dyn StandardLibrary> {
-        Box::new(LugliStdlib)
-    }
+    fn create() -> Box<dyn StandardLibrary> { Box::new(LugliStdlib) }
 }

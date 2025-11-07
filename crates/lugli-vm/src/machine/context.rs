@@ -11,12 +11,7 @@ pub struct CallFrame {
 }
 
 impl CallFrame {
-    pub fn new(
-        function_name: impl Into<Rc<str>>,
-        return_ip: usize,
-        stack_base: usize,
-        upvalues: Option<Vec<Rc<RefCell<Value>>>>,
-    ) -> Self {
+    pub fn new(function_name: impl Into<Rc<str>>, return_ip: usize, stack_base: usize, upvalues: Option<Vec<Rc<RefCell<Value>>>>) -> Self {
         Self {
             function_name: function_name.into(),
             return_ip,
@@ -73,13 +68,9 @@ impl ExecutionContext {
     }
 
     // Stack operations
-    pub fn push(&mut self, value: Value) {
-        self.stack.push(value);
-    }
+    pub fn push(&mut self, value: Value) { self.stack.push(value); }
 
-    pub fn pop(&mut self) -> Option<Value> {
-        self.stack.pop()
-    }
+    pub fn pop(&mut self) -> Option<Value> { self.stack.pop() }
 
     pub fn peek(&self, distance: usize) -> Option<&Value> {
         if distance >= self.stack.len() {
@@ -96,25 +87,15 @@ impl ExecutionContext {
         self.stack.get_mut(index)
     }
 
-    pub fn stack_len(&self) -> usize {
-        self.stack.len()
-    }
+    pub fn stack_len(&self) -> usize { self.stack.len() }
 
-    pub fn truncate_stack(&mut self, len: usize) {
-        self.stack.truncate(len);
-    }
+    pub fn truncate_stack(&mut self, len: usize) { self.stack.truncate(len); }
 
-    pub fn clear_stack(&mut self) {
-        self.stack.clear();
-    }
+    pub fn clear_stack(&mut self) { self.stack.clear(); }
 
-    pub fn stack(&self) -> &[Value] {
-        &self.stack
-    }
+    pub fn stack(&self) -> &[Value] { &self.stack }
 
-    pub fn stack_mut(&mut self) -> &mut Vec<Value> {
-        &mut self.stack
-    }
+    pub fn stack_mut(&mut self) -> &mut Vec<Value> { &mut self.stack }
 
     // Global variable operations
 
@@ -130,9 +111,7 @@ impl ExecutionContext {
     }
 
     /// Get a global variable (clones the value)
-    pub fn get_global(&self, name: &str) -> Option<Value> {
-        self.globals.borrow().get(name).cloned()
-    }
+    pub fn get_global(&self, name: &str) -> Option<Value> { self.globals.borrow().get(name).cloned() }
 
     /// Set an existing global variable (copy-on-write)
     pub fn set_global(&mut self, name: &str, value: Value) -> Result<(), LugliError> {
@@ -151,9 +130,7 @@ impl ExecutionContext {
     }
 
     /// Get immutable reference to globals HashMap (requires manual borrow)
-    pub fn globals(&self) -> Rc<RefCell<HashMap<String, Value>>> {
-        Rc::clone(&self.globals)
-    }
+    pub fn globals(&self) -> Rc<RefCell<HashMap<String, Value>>> { Rc::clone(&self.globals) }
 
     /// Get mutable access to globals (triggers COW if shared)
     pub fn globals_mut(&mut self) -> Rc<RefCell<HashMap<String, Value>>> {
@@ -177,44 +154,26 @@ impl ExecutionContext {
     }
 
     /// Replace globals with a new HashMap
-    pub fn set_globals(&mut self, globals: HashMap<String, Value>) {
-        self.globals = Rc::new(RefCell::new(globals));
-    }
+    pub fn set_globals(&mut self, globals: HashMap<String, Value>) { self.globals = Rc::new(RefCell::new(globals)); }
 
     /// Snapshot globals for module isolation (O(1) operation)
-    pub fn snapshot_globals(&self) -> Rc<RefCell<HashMap<String, Value>>> {
-        Rc::clone(&self.globals)
-    }
+    pub fn snapshot_globals(&self) -> Rc<RefCell<HashMap<String, Value>>> { Rc::clone(&self.globals) }
 
     /// Restore globals from a snapshot (O(1) operation)
-    pub fn restore_globals(&mut self, snapshot: Rc<RefCell<HashMap<String, Value>>>) {
-        self.globals = snapshot;
-    }
+    pub fn restore_globals(&mut self, snapshot: Rc<RefCell<HashMap<String, Value>>>) { self.globals = snapshot; }
 
     // Call stack operations
-    pub fn push_frame(&mut self, frame: CallFrame) {
-        self.call_stack.push(frame);
-    }
+    pub fn push_frame(&mut self, frame: CallFrame) { self.call_stack.push(frame); }
 
-    pub fn pop_frame(&mut self) -> Option<CallFrame> {
-        self.call_stack.pop()
-    }
+    pub fn pop_frame(&mut self) -> Option<CallFrame> { self.call_stack.pop() }
 
-    pub fn current_frame(&self) -> Option<&CallFrame> {
-        self.call_stack.last()
-    }
+    pub fn current_frame(&self) -> Option<&CallFrame> { self.call_stack.last() }
 
-    pub fn current_frame_mut(&mut self) -> Option<&mut CallFrame> {
-        self.call_stack.last_mut()
-    }
+    pub fn current_frame_mut(&mut self) -> Option<&mut CallFrame> { self.call_stack.last_mut() }
 
-    pub fn call_depth(&self) -> usize {
-        self.call_stack.len()
-    }
+    pub fn call_depth(&self) -> usize { self.call_stack.len() }
 
-    pub fn call_stack(&self) -> &[CallFrame] {
-        &self.call_stack
-    }
+    pub fn call_stack(&self) -> &[CallFrame] { &self.call_stack }
 
     pub fn clear_call_stack(&mut self) {
         self.call_stack.clear();
@@ -227,40 +186,24 @@ impl ExecutionContext {
             return Ok(Rc::clone(existing));
         }
 
-        let value = self
-            .stack
-            .get(stack_index)
-            .ok_or_else(|| LugliError::runtime("Stack index out of bounds"))?
-            .clone();
+        let value = self.stack.get(stack_index).ok_or_else(|| LugliError::runtime("Stack index out of bounds"))?.clone();
         let upvalue = Rc::new(RefCell::new(value));
         self.open_upvalues.insert(stack_index, Rc::clone(&upvalue));
         Ok(upvalue)
     }
 
-    pub fn close_upvalues(&mut self, from_index: usize) {
-        self.open_upvalues.retain(|&idx, _| idx < from_index);
-    }
+    pub fn close_upvalues(&mut self, from_index: usize) { self.open_upvalues.retain(|&idx, _| idx < from_index); }
 
-    pub fn clear_upvalues(&mut self) {
-        self.open_upvalues.clear();
-    }
+    pub fn clear_upvalues(&mut self) { self.open_upvalues.clear(); }
 
     // Instruction pointer operations
-    pub fn advance_ip(&mut self, offset: usize) {
-        self.ip += offset;
-    }
+    pub fn advance_ip(&mut self, offset: usize) { self.ip += offset; }
 
-    pub fn jump_to(&mut self, target: usize) {
-        self.ip = target;
-    }
+    pub fn jump_to(&mut self, target: usize) { self.ip = target; }
 
-    pub fn current_ip(&self) -> usize {
-        self.ip
-    }
+    pub fn current_ip(&self) -> usize { self.ip }
 
-    pub fn reset_ip(&mut self) {
-        self.ip = 0;
-    }
+    pub fn reset_ip(&mut self) { self.ip = 0; }
 
     // Full reset operations
     pub fn reset(&mut self) {
@@ -282,9 +225,7 @@ impl ExecutionContext {
 }
 
 impl Default for ExecutionContext {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]
