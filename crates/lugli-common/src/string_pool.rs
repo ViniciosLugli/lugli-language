@@ -5,9 +5,9 @@ use std::sync::Arc;
 pub struct StringId(u32);
 
 impl StringId {
-    pub fn as_u32(self) -> u32 { self.0 }
+    pub const fn as_u32(self) -> u32 { self.0 }
 
-    pub fn from_u32(id: u32) -> Self { StringId(id) }
+    pub const fn from_u32(id: u32) -> Self { StringId(id) }
 }
 
 #[derive(Debug, Clone)]

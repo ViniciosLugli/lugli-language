@@ -3,7 +3,7 @@ use lugli_common::{Span, StringId};
 use std::fmt;
 
 // Placeholder StringId used by logos (will be replaced during lexing)
-const PLACEHOLDER_STRING_ID: StringId = unsafe { std::mem::transmute(0u32) };
+const PLACEHOLDER_STRING_ID: StringId = StringId::from_u32(0);
 
 // Custom f-string lexer using Python-inspired state machine approach
 // Note: logos has already consumed "f\"" or "f'", so we need to determine the quote type
