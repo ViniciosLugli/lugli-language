@@ -227,13 +227,9 @@ impl PeepholeOptimizer {
                         i += 2;
                         continue;
                     }
-                    // MulInt(0) → Pop, then load 0
-                    (_, Instruction::MulInt(0)) => {
-                        result.push(Instruction::Pop);
-                        result.push(Instruction::LoadSmallInt(0));
-                        i += 2;
-                        continue;
-                    }
+                    // Note: MulInt(0) optimization is complex due to stack management
+                    // and needs careful handling of Dup instructions for assignments.
+                    // Left unoptimized for safety.
                     _ => {}
                 }
             }
