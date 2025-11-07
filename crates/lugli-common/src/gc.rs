@@ -196,6 +196,21 @@ impl GarbageCollector {
         }
     }
 
+    /// Detect cycles in value graph
+    ///
+    /// Returns descriptions of any cycles found
+    pub fn detect_cycles(&self, roots: &[Value]) -> Vec<String> {
+        let mut cycles = Vec::new();
+
+        for (i, root) in roots.iter().enumerate() {
+            if root.contains_cycle() {
+                cycles.push(format!("Cycle detected in root value #{}: type={}", i, root.type_name()));
+            }
+        }
+
+        cycles
+    }
+
     /// Get current GC statistics (for debugging and tuning)
     pub fn stats(&self) -> GCStats {
         GCStats {

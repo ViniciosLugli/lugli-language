@@ -10,7 +10,7 @@
 
 use lugli_common::Value;
 use lugli_parser::Parser;
-use lugli_vm::compile_and_run;
+use lugli_vm::Vm;
 use std::{fs, path::PathBuf};
 
 fn setup_module(test_name: &str, module_name: &str, content: &str) -> PathBuf {
@@ -29,7 +29,11 @@ fn cleanup_module(test_name: &str) {
 fn run_code(code: &str) -> Result<Value, String> {
     let mut parser = Parser::new(code).map_err(|e| e.to_string())?;
     let (ast, span_map) = parser.parse().map_err(|e| e.to_string())?;
-    compile_and_run(&ast, span_map).map_err(|e| e.to_string())
+    {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&ast, span_map)
+    }
+    .map_err(|e| e.to_string())
 }
 
 #[test]
@@ -351,8 +355,11 @@ fn test_import_nonexistent_module() {
 
     match result {
         Err(e) => {
-            assert!(e.contains("not found") || e.contains("No such file") || e.contains("Failed to read"),
-                "Should error on missing module, got: {}", e);
+            assert!(
+                e.contains("not found") || e.contains("No such file") || e.contains("Failed to read"),
+                "Should error on missing module, got: {}",
+                e
+            );
         }
         Ok(_) => panic!("Should have failed to import nonexistent module!"),
     }
@@ -381,8 +388,7 @@ fn add(a, b) {
 
     match result {
         Err(e) => {
-            assert!(e.contains("Undefined variable") || e.contains("subtract"),
-                "Should error on missing export, got: {}", e);
+            assert!(e.contains("Undefined variable") || e.contains("subtract"), "Should error on missing export, got: {}", e);
         }
         Ok(_) => panic!("Should have failed to import nonexistent functions!"),
     }

@@ -5,9 +5,9 @@ use std::sync::Arc;
 pub struct StringId(u32);
 
 impl StringId {
-    pub fn as_u32(self) -> u32 { self.0 }
+    pub const fn as_u32(self) -> u32 { self.0 }
 
-    pub fn from_u32(id: u32) -> Self { StringId(id) }
+    pub const fn from_u32(id: u32) -> Self { StringId(id) }
 }
 
 #[derive(Debug, Clone)]
@@ -32,13 +32,10 @@ impl StringPool {
 
         // Pre-intern most common identifiers and keywords
         let common = [
-            "self", "true", "false", "null", "len", "push", "pop", "get", "set",
-            "name", "value", "result", "data", "error", "message", "type", "item",
-            "index", "key", "size", "count", "list", "dict", "string", "number",
-            "add", "remove", "contains", "clear", "empty", "start", "end", "text",
-            "i", "j", "k", "x", "y", "z", "a", "b", "c", "n", "m", "tmp", "temp",
-            "main", "fn", "struct", "if", "else", "for", "while", "return", "match",
-            "print", "input", "str", "int", "float", "bool", "upper", "lower", "split",
+            "self", "true", "false", "null", "len", "push", "pop", "get", "set", "name", "value", "result", "data", "error", "message", "type",
+            "item", "index", "key", "size", "count", "list", "dict", "string", "number", "add", "remove", "contains", "clear", "empty", "start",
+            "end", "text", "i", "j", "k", "x", "y", "z", "a", "b", "c", "n", "m", "tmp", "temp", "main", "fn", "struct", "if", "else", "for",
+            "while", "return", "match", "print", "input", "str", "int", "float", "bool", "upper", "lower", "split",
         ];
 
         for s in &common {

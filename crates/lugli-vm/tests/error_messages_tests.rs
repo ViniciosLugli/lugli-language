@@ -1,5 +1,5 @@
 use lugli_parser::parse;
-use lugli_vm::{ErrorFormatter, Machine, compile_with_source};
+use lugli_vm::{ErrorFormatter, Vm, VmError};
 
 #[test]
 fn test_undefined_variable_with_suggestion() {
@@ -9,13 +9,16 @@ let bar = foe + 5
 "#;
 
     let (program, span_map) = parse(source).unwrap();
-    let bytecode = compile_with_source(&program, span_map, "test.lg", source).unwrap();
-    let mut vm = Machine::new();
+    let mut vm = Vm::builder().with_source("test.lg".to_string(), source.to_string()).build();
+    let bytecode = vm.compile(&program, span_map).unwrap();
 
     let result = vm.run(&bytecode);
     assert!(result.is_err());
 
-    let error = result.unwrap_err();
+    let error = match result.unwrap_err() {
+        VmError::RuntimeError(e) => e,
+        _ => panic!("Expected RuntimeError"),
+    };
     let formatter = ErrorFormatter::without_colors();
     let formatted = formatter.format(&error);
 
@@ -41,13 +44,16 @@ let y = unknown_var
 "#;
 
     let (program, span_map) = parse(source).unwrap();
-    let bytecode = compile_with_source(&program, span_map, "test.lg", source).unwrap();
-    let mut vm = Machine::new();
+    let mut vm = Vm::builder().with_source("test.lg".to_string(), source.to_string()).build();
+    let bytecode = vm.compile(&program, span_map).unwrap();
 
     let result = vm.run(&bytecode);
     assert!(result.is_err());
 
-    let error = result.unwrap_err();
+    let error = match result.unwrap_err() {
+        VmError::RuntimeError(e) => e,
+        _ => panic!("Expected RuntimeError"),
+    };
     let formatter = ErrorFormatter::without_colors();
     let formatted = formatter.format(&error);
 
@@ -68,8 +74,8 @@ let y = x / 0
 "#;
 
     let (program, span_map) = parse(source).unwrap();
-    let bytecode = compile_with_source(&program, span_map, "test.lg", source).unwrap();
-    let mut vm = Machine::new();
+    let mut vm = Vm::builder().with_source("test.lg".to_string(), source.to_string()).build();
+    let bytecode = vm.compile(&program, span_map).unwrap();
 
     let result = vm.run(&bytecode);
     assert!(result.is_err());

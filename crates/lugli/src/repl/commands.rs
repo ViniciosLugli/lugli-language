@@ -1,5 +1,5 @@
 use colored::Colorize;
-use lugli_vm::Machine;
+use lugli_vm::Vm;
 use rustyline::{
     Editor,
     history::{FileHistory, History},
@@ -7,7 +7,7 @@ use rustyline::{
 
 pub fn handle_command(
     input: &str,
-    vm: &mut Machine,
+    vm: &mut Vm,
     editor: &mut Editor<super::ReplHelper, FileHistory>,
     bytecodes: &[lugli_vm::Bytecode],
 ) -> Result<(), String> {
@@ -80,15 +80,15 @@ fn show_help() {
     println!();
 }
 
-fn show_variables(vm: &Machine, _bytecodes: &[lugli_vm::Bytecode]) {
-    if vm.globals.is_empty() {
+fn show_variables(vm: &Vm, _bytecodes: &[lugli_vm::Bytecode]) {
+    if vm.machine().globals().borrow().is_empty() {
         println!("{}", "No variables defined yet.".yellow());
         return;
     }
 
     println!("\n{}", "Current Variables:".bright_cyan().bold());
-    let mut vars: Vec<_> = vm.globals.iter().collect();
-    vars.sort_by_key(|(k, _)| *k);
+    let mut vars: Vec<(String, lugli_common::Value)> = vm.machine().globals().borrow().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    vars.sort_by_key(|(k, _)| k.clone());
 
     for (name, value) in vars {
         // Skip native functions from display
@@ -96,7 +96,7 @@ fn show_variables(vm: &Machine, _bytecodes: &[lugli_vm::Bytecode]) {
             continue;
         }
 
-        println!("  {} = {}", name.bright_green(), vm.format_value(value));
+        println!("  {} = {}", name.bright_green(), vm.machine().format_value(&value));
     }
     println!();
 }
@@ -106,15 +106,21 @@ fn clear_screen() {
     print!("\x1B[2J\x1B[1;1H");
 }
 
-fn reset_vm(vm: &mut Machine) {
-    let native_functions: Vec<_> =
-        vm.globals.iter().filter(|(_, v)| matches!(v, lugli_common::Value::NativeFunction { .. })).map(|(k, v)| (k.clone(), v.clone())).collect();
+fn reset_vm(vm: &mut Vm) {
+    let native_functions: Vec<(String, lugli_common::Value)> = vm
+        .machine()
+        .globals()
+        .borrow()
+        .iter()
+        .filter(|(_, v)| matches!(v, lugli_common::Value::NativeFunction { .. }))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
 
     vm.reset();
 
     // Restore native functions
     for (name, func) in native_functions {
-        vm.globals.insert(name, func);
+        vm.machine_mut().globals_mut().borrow_mut().insert(name, func);
     }
 
     println!("{}", "VM state reset. All user variables cleared.".bright_green());
@@ -140,8 +146,8 @@ fn show_history(editor: &Editor<super::ReplHelper, FileHistory>) {
     println!();
 }
 
-fn show_type(vm: &Machine, var_name: &str) -> Result<(), String> {
-    match vm.globals.get(var_name) {
+fn show_type(vm: &Vm, var_name: &str) -> Result<(), String> {
+    match vm.machine().globals().borrow().get(var_name) {
         Some(value) => {
             println!("{}: {}", var_name.bright_green(), value.type_name().bright_cyan());
             Ok(())
@@ -150,14 +156,14 @@ fn show_type(vm: &Machine, var_name: &str) -> Result<(), String> {
     }
 }
 
-fn load_file(vm: &mut Machine, file_path: &str) -> Result<(), String> {
+fn load_file(vm: &mut Vm, file_path: &str) -> Result<(), String> {
     use std::fs;
 
     let source = fs::read_to_string(file_path).map_err(|e| format!("Failed to read file '{}': {}", file_path, e))?;
 
     match lugli_parser::parse(&source) {
-        Ok((program, span_map)) => match lugli_vm::compile(&program, span_map) {
-            Ok(bytecode) => match lugli_vm::run_with_vm(vm, &bytecode) {
+        Ok((program, span_map)) => match vm.compile(&program, span_map) {
+            Ok(bytecode) => match vm.run(&bytecode) {
                 Ok(_) => {
                     println!("{}", format!("Loaded '{}'", file_path).bright_green());
                     Ok(())

@@ -1,6 +1,6 @@
+use super::Machine;
 use crate::Bytecode;
 use lugli_common::{LugliError, Value};
-use super::Machine;
 
 // Utility and module operation instruction handlers
 impl Machine {
@@ -44,15 +44,26 @@ impl Machine {
                     .collect();
                 format!("{{{}}}", pairs.join(", "))
             }
-            Value::Function { name, .. } | Value::Closure { name, .. } => format!("<function {}>", name),
-            Value::NativeFunction { name, .. } => format!("<native function {}>", name),
-            Value::StructInstance { name, .. } => format!("<{} instance>", name),
+            Value::Function {
+                name, ..
+            }
+            | Value::Closure {
+                name, ..
+            } => format!("<function {}>", name),
+            Value::NativeFunction {
+                name, ..
+            } => format!("<native function {}>", name),
+            Value::StructInstance {
+                name, ..
+            } => format!("<{} instance>", name),
             Value::DateTime(dt) => dt.to_string(),
-            Value::Module { path, .. } => format!("<module {}>", path),
+            Value::Module {
+                path, ..
+            } => format!("<module {}>", path),
         };
         drop(pool);
         let id = bytecode.string_pool.borrow_mut().intern(&string_value);
-        self.stack.push(Value::String(id));
+        self.push(Value::String(id));
         Ok(())
     }
 
@@ -70,7 +81,7 @@ impl Machine {
         };
 
         // Store directly in globals - no stack effect
-        self.globals.insert(bind_name.to_string(), module_value);
+        self.context.define_global(bind_name.to_string(), module_value);
         Ok(())
     }
 
@@ -84,7 +95,7 @@ impl Machine {
 
         for name in names {
             if let Some(value) = exports.get(name) {
-                self.globals.insert(name.clone(), value.clone());
+                self.context.define_global(name.clone(), value.clone());
             } else {
                 return Err(LugliError::runtime(format!("Module '{}' has no export '{}'", module_path, name)));
             }

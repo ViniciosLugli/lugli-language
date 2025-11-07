@@ -22,8 +22,8 @@ impl PeepholeOptimizer {
     pub fn new() -> Self {
         Self {
             optimize_constants: true,
-            optimize_jumps: true,      // Re-enabled with offset tracking
-            optimize_dead_code: false, // Keep disabled - still too aggressive
+            optimize_jumps: false,     // Disabled - has bugs with jump target calculation
+            optimize_dead_code: false, // Disabled - too aggressive, removes function definitions
         }
     }
 
@@ -51,6 +51,11 @@ impl PeepholeOptimizer {
             if self.optimize_jumps {
                 optimized = self.jump_threading(optimized);
             }
+
+            // Instruction fusion - disabled due to jump target bugs
+            // FIXME: instruction_fusion changes instruction count but doesn't update jump targets
+            // This causes Jump instructions to skip DefineFunction/StoreGlobal incorrectly
+            // optimized = self.instruction_fusion(optimized);
 
             changed = optimized.len() != before_len;
             pass_count += 1;
@@ -206,6 +211,39 @@ impl PeepholeOptimizer {
         let mut i = 0;
 
         while i < instructions.len() {
+            // Try 2-instruction patterns first (immediate operand optimizations)
+            if i + 1 < instructions.len() {
+                match (&instructions[i], &instructions[i + 1]) {
+                    // AddInt(0) → noop (keep previous value)
+                    (_, Instruction::AddInt(0)) => {
+                        result.push(instructions[i].clone());
+                        i += 2;
+                        continue;
+                    }
+                    // SubInt(0) → noop
+                    (_, Instruction::SubInt(0)) => {
+                        result.push(instructions[i].clone());
+                        i += 2;
+                        continue;
+                    }
+                    // MulInt(1) → noop
+                    (_, Instruction::MulInt(1)) => {
+                        result.push(instructions[i].clone());
+                        i += 2;
+                        continue;
+                    }
+                    // MulInt(0) → Pop the value, push 0 instead
+                    (_, Instruction::MulInt(0)) => {
+                        result.push(instructions[i].clone()); // Keep the instruction that pushes the value
+                        result.push(Instruction::Pop); // Pop that value
+                        result.push(Instruction::LoadSmallInt(0)); // Push 0
+                        i += 2;
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+
             if i + 2 < instructions.len() {
                 match (&instructions[i], &instructions[i + 1], &instructions[i + 2]) {
                     // Addition: x + 0 → x
@@ -468,7 +506,11 @@ impl PeepholeOptimizer {
     fn is_potential_jump_target(&self, pos: usize, instructions: &[Instruction]) -> bool {
         for inst in instructions {
             match inst {
-                Instruction::Jump(target) | Instruction::JumpIfFalse(target) | Instruction::Loop(target) => {
+                Instruction::Jump(target)
+                | Instruction::JumpIfFalse(target)
+                | Instruction::JumpIfEqual(target)
+                | Instruction::JumpIfNotEqual(target)
+                | Instruction::Loop(target) => {
                     if *target == pos {
                         return true;
                     }
@@ -477,6 +519,65 @@ impl PeepholeOptimizer {
             }
         }
         false
+    }
+
+    /// Fuse common instruction patterns into specialized instructions
+    ///
+    /// Patterns:
+    /// - Equal + JumpIfTrue → JumpIfEqual
+    /// - Equal + JumpIfFalse → JumpIfNotEqual
+    /// - Load(a) + Load(b) + Add → AddLocals(a, b)
+    #[allow(dead_code)]
+    fn instruction_fusion(&self, instructions: Vec<Instruction>) -> Vec<Instruction> {
+        let mut result = Vec::with_capacity(instructions.len());
+        let mut i = 0;
+
+        while i < instructions.len() {
+            // Pattern: Equal + JumpIfFalse → JumpIfNotEqual
+            // (JumpIfFalse after Equal means jump if NOT equal)
+            if i + 1 < instructions.len()
+                && matches!(instructions[i], Instruction::Equal)
+                && matches!(instructions[i + 1], Instruction::JumpIfFalse(_))
+            {
+                if let Instruction::JumpIfFalse(target) = instructions[i + 1] {
+                    result.push(Instruction::JumpIfNotEqual(target));
+                    i += 2;
+                    continue;
+                }
+            }
+
+            // Pattern: NotEqual + JumpIfFalse → JumpIfEqual
+            // (JumpIfFalse after NotEqual means jump if equal)
+            if i + 1 < instructions.len()
+                && matches!(instructions[i], Instruction::NotEqual)
+                && matches!(instructions[i + 1], Instruction::JumpIfFalse(_))
+            {
+                if let Instruction::JumpIfFalse(target) = instructions[i + 1] {
+                    result.push(Instruction::JumpIfEqual(target));
+                    i += 2;
+                    continue;
+                }
+            }
+
+            // Pattern: Load(a) + Load(b) + Add → AddLocals(a, b)
+            if i + 2 < instructions.len()
+                && matches!(instructions[i], Instruction::Load(_))
+                && matches!(instructions[i + 1], Instruction::Load(_))
+                && matches!(instructions[i + 2], Instruction::Add)
+            {
+                if let (Instruction::Load(a), Instruction::Load(b)) = (&instructions[i], &instructions[i + 1]) {
+                    result.push(Instruction::AddLocals(*a, *b));
+                    i += 3;
+                    continue;
+                }
+            }
+
+            // No fusion, keep instruction
+            result.push(instructions[i].clone());
+            i += 1;
+        }
+
+        result
     }
 }
 
@@ -543,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Dead code elimination temporarily disabled (too aggressive with closures)
+    #[ignore = "DCE disabled - too aggressive"]
     fn test_dead_code_constant_pop() {
         let optimizer = PeepholeOptimizer::new();
         let instructions = vec![Instruction::LoadSmallInt(42), Instruction::Pop, Instruction::LoadSmallInt(1)];
@@ -706,5 +807,35 @@ mod tests {
 
         let optimized = optimizer.optimize(instructions);
         assert_eq!(optimized, vec![Instruction::LoadSmallInt(0)]);
+    }
+
+    #[test]
+    #[ignore = "Instruction fusion disabled - has bugs with jump target updates"]
+    fn test_instruction_fusion_jump_if_not_equal() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::Equal, Instruction::JumpIfFalse(10)];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::JumpIfNotEqual(10)]);
+    }
+
+    #[test]
+    #[ignore = "Instruction fusion disabled - has bugs with jump target updates"]
+    fn test_instruction_fusion_jump_if_equal() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::NotEqual, Instruction::JumpIfFalse(10)];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::JumpIfEqual(10)]);
+    }
+
+    #[test]
+    #[ignore = "Instruction fusion disabled - has bugs with jump target updates"]
+    fn test_instruction_fusion_add_locals() {
+        let optimizer = PeepholeOptimizer::new();
+        let instructions = vec![Instruction::Load(0), Instruction::Load(1), Instruction::Add];
+
+        let optimized = optimizer.optimize(instructions);
+        assert_eq!(optimized, vec![Instruction::AddLocals(0, 1)]);
     }
 }

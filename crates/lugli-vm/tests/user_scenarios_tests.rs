@@ -1,11 +1,15 @@
 /// User-focused scenario tests that validate real-world usage patterns
 /// These tests identify gaps and validate practical programming scenarios
 use lugli_common::Value;
-use lugli_vm::compile_and_run;
+use lugli_vm::Vm;
 
 fn run_code(source: &str) -> Result<Value, String> {
     let (program, span_map) = lugli_parser::parse(source).map_err(|e| e.to_string())?;
-    compile_and_run(&program, span_map).map_err(|e| e.to_string())
+    {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .map_err(|e| e.to_string())
 }
 
 fn run_and_get_number(source: &str) -> Result<f64, String> {

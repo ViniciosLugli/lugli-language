@@ -1,11 +1,12 @@
 use lugli_parser::Parser;
-use lugli_vm::{compile, run};
+use lugli_vm::Vm;
 
 fn run_code(code: &str) -> String {
     let mut parser = Parser::new(code).unwrap();
     let (ast, span_map) = parser.parse().unwrap();
-    let bytecode = compile(&ast, span_map).unwrap();
-    let result = run(&bytecode).unwrap();
+    let mut vm = Vm::new();
+    let bytecode = vm.compile(&ast, span_map).unwrap();
+    let result = vm.run(&bytecode).unwrap();
     let pool = bytecode.string_pool.borrow();
     result.display_with_pool(&pool)
 }

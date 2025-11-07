@@ -1,10 +1,14 @@
 /// Tests for advanced expression features: Block, If, and Nested List Comprehensions
 use lugli_common::Value;
-use lugli_vm::compile_and_run;
+use lugli_vm::Vm;
 
 fn run_and_get_number(source: &str) -> Result<f64, String> {
     let (program, span_map) = lugli_parser::parse(source).map_err(|e| e.to_string())?;
-    let result = compile_and_run(&program, span_map).map_err(|e| e.to_string())?;
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .map_err(|e| e.to_string())?;
     match result {
         Value::Number(n) => Ok(n),
         other => Err(format!("Expected number, got {:?}", other)),
@@ -13,7 +17,11 @@ fn run_and_get_number(source: &str) -> Result<f64, String> {
 
 fn run_code(source: &str) -> Result<Value, String> {
     let (program, span_map) = lugli_parser::parse(source).map_err(|e| e.to_string())?;
-    compile_and_run(&program, span_map).map_err(|e| e.to_string())
+    {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .map_err(|e| e.to_string())
 }
 
 mod block_expressions {

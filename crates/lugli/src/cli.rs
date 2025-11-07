@@ -1,5 +1,5 @@
 use colored::Colorize;
-use lugli_vm::{ErrorFormatter, VmError};
+use lugli_vm::{ErrorFormatter, Vm, VmError};
 use std::fs;
 use thiserror::Error;
 
@@ -28,7 +28,9 @@ pub fn run_file(file_path: &str) -> Result<(), CliError> {
         CliError::Runtime(formatter.format(&lugli_error))
     })?;
 
-    match lugli_vm::compile_and_run_with_source(&program, span_map, file_path, &source) {
+    let mut vm = Vm::builder().with_source(file_path.to_string(), source).build();
+
+    match vm.compile_and_run(&program, span_map) {
         Ok(_) => Ok(()),
         Err(e) => Err(CliError::Runtime(format_vm_error(e))),
     }
@@ -103,7 +105,8 @@ pub fn disassemble_file(file_path: &str) -> Result<(), CliError> {
 
     let (program, span_map) = lugli_parser::parse(&source).map_err(|e| CliError::Runtime(e.to_string()))?;
 
-    match lugli_vm::compile(&program, span_map) {
+    let vm = Vm::new();
+    match vm.compile(&program, span_map) {
         Ok(bytecode) => {
             println!("{}", lugli_vm::debug::disassemble(&bytecode, file_path));
             Ok(())

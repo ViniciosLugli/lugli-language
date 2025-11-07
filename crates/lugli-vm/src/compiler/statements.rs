@@ -2,6 +2,7 @@ use super::Compiler;
 use crate::Instruction;
 use lugli_ast::{Pattern, Stmt};
 use lugli_common::{LugliError, Value};
+use std::rc::Rc;
 
 impl Compiler {
     pub(super) fn compile_simple_stmt(&mut self, stmt: &Stmt) -> Result<bool, LugliError> {
@@ -232,11 +233,7 @@ impl Compiler {
 
                 // Patch ReserveLocals with actual local count
                 let total_local_count = self.local_count;
-                let locals_to_reserve = if total_local_count > param_count {
-                    total_local_count - param_count
-                } else {
-                    0
-                };
+                let locals_to_reserve = total_local_count.saturating_sub(param_count);
                 self.bytecode.instructions[reserve_locals_ip] = Instruction::ReserveLocals(locals_to_reserve);
 
                 self.patch_jump(jump_over_body)?;
@@ -250,8 +247,8 @@ impl Compiler {
 
                 // Create the function value (use param_names instead of params)
                 let function_value = Value::Function {
-                    name: name.clone(),
-                    params: param_names,
+                    name: Rc::from(name.as_str()),
+                    params: Rc::new(param_names),
                     body_start,
                     bytecode_id: 0, // Main bytecode
                 };

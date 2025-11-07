@@ -1,11 +1,12 @@
 use lugli_common::Value;
 use lugli_parser::Parser;
-use lugli_vm::compile_and_run;
+use lugli_vm::Vm;
 
 fn run_and_get_value(source: &str) -> Value {
     let mut parser = Parser::new(source).unwrap();
     let (ast, span_map) = parser.parse().unwrap();
-    compile_and_run(&ast, span_map).unwrap()
+    let mut vm = Vm::new();
+    vm.compile_and_run(&ast, span_map).unwrap()
 }
 
 #[test]

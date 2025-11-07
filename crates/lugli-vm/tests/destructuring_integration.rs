@@ -3,7 +3,8 @@ use lugli_common::Value;
 
 fn run_code(source: &str) -> Result<Value, String> {
     let (program, span_map) = lugli_parser::parse(source).map_err(|e| e.to_string())?;
-    lugli_vm::compile_and_run(&program, span_map).map_err(|e| e.to_string())
+    let mut vm = lugli_vm::Vm::new();
+    vm.compile_and_run(&program, span_map).map_err(|e| e.to_string())
 }
 
 fn run_and_get_number(source: &str) -> Result<f64, String> {

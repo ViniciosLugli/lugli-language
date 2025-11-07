@@ -1,43 +1,43 @@
-use crate::{Bytecode, Instruction};
-use lugli_common::{LugliError, Value};
 use super::Machine;
+use crate::Bytecode;
+use lugli_common::{LugliError, Value};
 
 // Stack operation instruction handlers
 impl Machine {
     pub(super) fn exec_constant(&mut self, bytecode: &Bytecode, index: usize) -> Result<(), LugliError> {
         let value = self.get_constant(bytecode, index)?.clone_for_stack();
-        self.stack.push(value);
+        self.push(value);
         Ok(())
     }
 
     pub(super) fn exec_load_small_int(&mut self, n: i8) -> Result<(), LugliError> {
-        self.stack.push(Value::Number(n as f64));
+        self.push(Value::Number(n as f64));
         Ok(())
     }
 
     pub(super) fn exec_load_int(&mut self, n: i16) -> Result<(), LugliError> {
-        self.stack.push(Value::Number(n as f64));
+        self.push(Value::Number(n as f64));
         Ok(())
     }
 
     pub(super) fn exec_load_true(&mut self) -> Result<(), LugliError> {
-        self.stack.push(Value::Bool(true));
+        self.push(Value::Bool(true));
         Ok(())
     }
 
     pub(super) fn exec_load_false(&mut self) -> Result<(), LugliError> {
-        self.stack.push(Value::Bool(false));
+        self.push(Value::Bool(false));
         Ok(())
     }
 
     pub(super) fn exec_load_null(&mut self) -> Result<(), LugliError> {
-        self.stack.push(Value::Null);
+        self.push(Value::Null);
         Ok(())
     }
 
     pub(super) fn exec_reserve_locals(&mut self, count: usize) -> Result<(), LugliError> {
         for _ in 0..count {
-            self.stack.push(Value::Null);
+            self.push(Value::Null);
         }
         Ok(())
     }
@@ -49,7 +49,7 @@ impl Machine {
 
     pub(super) fn exec_dup(&mut self) -> Result<(), LugliError> {
         let val = self.peek()?.clone_for_stack();
-        self.stack.push(val);
+        self.push(val);
         Ok(())
     }
 

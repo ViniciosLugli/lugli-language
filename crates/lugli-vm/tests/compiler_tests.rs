@@ -15,7 +15,7 @@ use helpers::assert_value_eq;
 use lugli_ast::{Expr, LiteralValue, NodeId, Pattern, Program, SpanMap, Stmt};
 use lugli_common::{Span, Value};
 use lugli_lexer::TokenKind;
-use lugli_vm::compile_and_run;
+use lugli_vm::Vm;
 
 // Helper function for creating spans
 fn dummy_span() -> Span {
@@ -53,7 +53,11 @@ fn test_compiler_literal_expressions() {
     };
 
     let span_map = make_span_map(2);
-    let result = compile_and_run(&program, span_map).unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(42.0));
 }
 
@@ -88,7 +92,11 @@ fn test_compiler_binary_expressions() {
     };
 
     let span_map = make_span_map(6);
-    let result = compile_and_run(&program, span_map).unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(50.0));
 }
 
@@ -120,7 +128,11 @@ fn test_compiler_variable_declaration_and_access() {
     };
 
     let span_map = make_span_map(4);
-    let result = compile_and_run(&program, span_map).unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(42.0));
 }
 
@@ -159,8 +171,9 @@ fn test_compiler_dictionary_creation() {
     };
 
     let span_map = make_span_map(6);
-    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
-    let result = lugli_vm::run(&bytecode).unwrap();
+    let mut vm = Vm::new();
+    let bytecode = vm.compile(&program, span_map).unwrap();
+    let result = vm.run(&bytecode).unwrap();
 
     if let Value::Dict(dict) = result {
         let mut pool = bytecode.string_pool.borrow_mut();
@@ -204,7 +217,11 @@ fn test_compiler_list_creation() {
     };
 
     let span_map = make_span_map(5);
-    let result = compile_and_run(&program, span_map).unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
 
     if let Value::List(list) = result {
         let list_ref = list.borrow();
@@ -258,8 +275,9 @@ fn test_compiler_property_access() {
     };
 
     let span_map = make_span_map(7);
-    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
-    let result = lugli_vm::run(&bytecode).unwrap();
+    let mut vm = Vm::new();
+    let bytecode = vm.compile(&program, span_map).unwrap();
+    let result = vm.run(&bytecode).unwrap();
     let mut pool = bytecode.string_pool.borrow_mut();
     let alice_id = pool.intern("Alice");
     assert_value_eq(&result, &Value::String(alice_id));
@@ -309,7 +327,11 @@ fn test_compiler_global_variable_assignment() {
     };
 
     let span_map = make_span_map(8);
-    let result = compile_and_run(&program, span_map).unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(20.0));
 }
 
@@ -370,8 +392,9 @@ fn test_compiler_property_assignment() {
     };
 
     let span_map = make_span_map(11);
-    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
-    let result = lugli_vm::run(&bytecode);
+    let mut vm = Vm::new();
+    let bytecode = vm.compile(&program, span_map).unwrap();
+    let result = vm.run(&bytecode);
 
     if let Err(e) = &result {
         println!("{}", lugli_vm::debug::disassemble(&bytecode, "test_compiler_property_assignment"));
@@ -397,8 +420,9 @@ fn test_compiler_return_statement() {
     };
 
     let span_map = make_span_map(2);
-    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
-    let result = lugli_vm::run(&bytecode).unwrap();
+    let mut vm = Vm::new();
+    let bytecode = vm.compile(&program, span_map).unwrap();
+    let result = vm.run(&bytecode).unwrap();
     let mut pool = bytecode.string_pool.borrow_mut();
     let hello_id = pool.intern("Hello, World!");
     assert_value_eq(&result, &Value::String(hello_id));
@@ -450,8 +474,9 @@ fn test_compiler_complex_nested_structure() {
     };
 
     let span_map = make_span_map(9);
-    let bytecode = lugli_vm::compile(&program, span_map).unwrap();
-    let result = lugli_vm::run(&bytecode).unwrap();
+    let mut vm = Vm::new();
+    let bytecode = vm.compile(&program, span_map).unwrap();
+    let result = vm.run(&bytecode).unwrap();
 
     if let Value::Dict(main_dict) = result {
         let mut pool = bytecode.string_pool.borrow_mut();
@@ -491,7 +516,10 @@ fn test_compiler_error_undefined_variable() {
     };
 
     let span_map = make_span_map(2);
-    let result = compile_and_run(&program, span_map);
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    };
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("undefined_var"));
 }
@@ -543,6 +571,10 @@ fn test_compiler_multiple_variable_declarations() {
     };
 
     let span_map = make_span_map(8);
-    let result = compile_and_run(&program, span_map).unwrap();
+    let result = {
+        let mut vm = Vm::new();
+        vm.compile_and_run(&program, span_map)
+    }
+    .unwrap();
     assert_value_eq(&result, &Value::Number(30.0));
 }
