@@ -241,8 +241,18 @@ impl Machine {
         None
     }
 
+    const MAX_FORMAT_DEPTH: usize = 50;
+
     pub fn format_value(&self, value: &Value) -> String {
+        self.format_value_with_depth(value, 0)
+    }
+
+    fn format_value_with_depth(&self, value: &Value, depth: usize) -> String {
         use lugli_common::Value;
+
+        if depth > Self::MAX_FORMAT_DEPTH {
+            return "[max depth exceeded]".to_string();
+        }
 
         match value {
             Value::String(id) => {
@@ -265,7 +275,7 @@ impl Machine {
             }
             Value::List(l) => match l.try_borrow() {
                 Ok(list_ref) => {
-                    let items: Vec<String> = list_ref.iter().map(|v| self.format_value(v)).collect();
+                    let items: Vec<String> = list_ref.iter().map(|v| self.format_value_with_depth(v, depth + 1)).collect();
                     format!("[{}]", items.join(", "))
                 }
                 Err(_) => "[<borrowed list>]".to_string(),
@@ -294,7 +304,7 @@ impl Machine {
                                 }
                             }
                         };
-                        items.push(format!("\"{}\": {}", key_str, self.format_value(v)));
+                        items.push(format!("\"{}\": {}", key_str, self.format_value_with_depth(v, depth + 1)));
                     }
                     format!("{{ {} }}", items.join(", "))
                 }
