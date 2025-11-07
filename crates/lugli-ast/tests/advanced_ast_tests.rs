@@ -1,15 +1,13 @@
 #![allow(clippy::clone_on_copy)]
 
 use lugli_ast::{
-    CallData, ComprehensionClause, Expr, FStringPart, IfData, ListComprehensionData, LiteralValue,
-    MatchArm, NodeId, Pattern, Program, Stmt, StructDeclData, StructField, Visitor,
+    CallData, ComprehensionClause, Expr, FStringPart, IfData, ListComprehensionData, LiteralValue, MatchArm, NodeId, Pattern, Program, Stmt,
+    StructDeclData, StructField, Visitor,
 };
 use lugli_common::Span;
 use lugli_lexer::TokenKind;
 
-fn make_id(n: usize) -> NodeId {
-    NodeId::new(n)
-}
+fn make_id(n: usize) -> NodeId { NodeId::new(n) }
 
 #[test]
 fn test_pattern_matching_ast_construction() {
@@ -56,8 +54,16 @@ fn test_pattern_matching_ast_construction() {
     };
 
     // Verify structure
-    if let Expr::Match { value, arms, .. } = &match_expr {
-        if let Expr::Identifier { name, .. } = value.as_ref() {
+    if let Expr::Match {
+        value,
+        arms,
+        ..
+    } = &match_expr
+    {
+        if let Expr::Identifier {
+            name, ..
+        } = value.as_ref()
+        {
             assert_eq!(name, "status");
         } else {
             panic!("Expected identifier in match value");
@@ -110,7 +116,10 @@ fn test_match_expression_with_guards() {
     };
 
     // Verify guard exists
-    if let Expr::Match { arms, .. } = &match_expr {
+    if let Expr::Match {
+        arms, ..
+    } = &match_expr
+    {
         assert!(arms[0].guard.is_some());
         if let Some(guard) = &arms[0].guard {
             assert!(matches!(guard.as_ref(), Expr::Binary { .. }));
@@ -168,13 +177,13 @@ fn test_list_comprehension_ast() {
     };
 
     // Verify structure
-    if let Expr::ListComprehension { data, .. } = &comprehension {
+    if let Expr::ListComprehension {
+        data, ..
+    } = &comprehension
+    {
         assert!(matches!(data.element, Expr::Binary { .. }));
         assert_eq!(data.clauses.len(), 1);
-        assert_eq!(
-            data.clauses[0].pattern,
-            Pattern::Identifier("x".to_string())
-        );
+        assert_eq!(data.clauses[0].pattern, Pattern::Identifier("x".to_string()));
         assert!(data.clauses[0].condition.is_some());
     } else {
         panic!("Expected ListComprehension");
@@ -209,7 +218,10 @@ fn test_fstring_ast_construction() {
     };
 
     // Verify structure
-    if let Expr::FString { parts, .. } = &fstring {
+    if let Expr::FString {
+        parts, ..
+    } = &fstring
+    {
         assert_eq!(parts.len(), 5);
         assert!(matches!(parts[0], FStringPart::Text(_)));
         assert!(matches!(parts[1], FStringPart::Expression(_)));
@@ -272,7 +284,10 @@ fn test_struct_declaration_ast() {
     };
 
     // Verify structure
-    if let Stmt::StructDecl { data, .. } = &struct_decl {
+    if let Stmt::StructDecl {
+        data, ..
+    } = &struct_decl
+    {
         assert_eq!(data.name, "Point");
         assert_eq!(data.fields.len(), 3);
         assert_eq!(data.methods.len(), 1);
@@ -321,7 +336,9 @@ fn test_complex_property_access_chain() {
         }
     }
 
-    let mut counter = GetCounter { count: 0 };
+    let mut counter = GetCounter {
+        count: 0,
+    };
     counter.visit_expr(&chain);
 
     assert_eq!(counter.count, 2); // Two Get expressions in chain
@@ -346,7 +363,9 @@ fn test_loop_statements_ast() {
                     id: next_id(),
                     name: "condition".to_string(),
                 },
-                then_branch: vec![Stmt::Break { id: next_id() }],
+                then_branch: vec![Stmt::Break {
+                    id: next_id(),
+                }],
                 elif_branches: vec![],
                 else_branch: None,
             }),
@@ -360,7 +379,9 @@ fn test_loop_statements_ast() {
             id: next_id(),
             name: "condition".to_string(),
         },
-        body: vec![Stmt::Continue { id: next_id() }],
+        body: vec![Stmt::Continue {
+            id: next_id(),
+        }],
     };
 
     // for item in collection { print(item) }
@@ -397,7 +418,10 @@ fn test_loop_statements_ast() {
 
 #[test]
 fn test_nested_control_flow() {
-    let span = Span { start: 0, end: 100 };
+    let span = Span {
+        start: 0,
+        end: 100,
+    };
     let mut id_counter = 0;
     let mut next_id = || {
         let id = id_counter;
@@ -460,10 +484,19 @@ fn test_nested_control_flow() {
 
     // Verify structure
     assert_eq!(program.statements.len(), 1);
-    if let Stmt::For { body, .. } = &program.statements[0] {
+    if let Stmt::For {
+        body, ..
+    } = &program.statements[0]
+    {
         assert_eq!(body.len(), 1);
-        if let Stmt::Expression { expr, .. } = &body[0] {
-            if let Expr::Match { arms, .. } = expr {
+        if let Stmt::Expression {
+            expr, ..
+        } = &body[0]
+        {
+            if let Expr::Match {
+                arms, ..
+            } = expr
+            {
                 assert_eq!(arms.len(), 2);
             } else {
                 panic!("Expected Match expression");
@@ -535,7 +568,10 @@ fn test_complex_comprehension_with_multiple_clauses() {
     };
 
     // Verify structure
-    if let Expr::ListComprehension { data, .. } = &comprehension {
+    if let Expr::ListComprehension {
+        data, ..
+    } = &comprehension
+    {
         assert!(matches!(data.element, Expr::List { .. }));
         assert_eq!(data.clauses.len(), 2);
         assert!(data.clauses[0].condition.is_none());

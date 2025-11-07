@@ -2,8 +2,7 @@ use crate::{Bytecode, Instruction};
 use hashbrown::HashMap;
 use lugli_ast::{SpanMap, Stmt};
 use lugli_common::{LugliError, StringPool, Value};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 mod control_flow;
 mod expressions;

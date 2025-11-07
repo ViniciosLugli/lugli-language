@@ -351,8 +351,11 @@ fn test_import_nonexistent_module() {
 
     match result {
         Err(e) => {
-            assert!(e.contains("not found") || e.contains("No such file") || e.contains("Failed to read"),
-                "Should error on missing module, got: {}", e);
+            assert!(
+                e.contains("not found") || e.contains("No such file") || e.contains("Failed to read"),
+                "Should error on missing module, got: {}",
+                e
+            );
         }
         Ok(_) => panic!("Should have failed to import nonexistent module!"),
     }
@@ -381,8 +384,7 @@ fn add(a, b) {
 
     match result {
         Err(e) => {
-            assert!(e.contains("Undefined variable") || e.contains("subtract"),
-                "Should error on missing export, got: {}", e);
+            assert!(e.contains("Undefined variable") || e.contains("subtract"), "Should error on missing export, got: {}", e);
         }
         Ok(_) => panic!("Should have failed to import nonexistent functions!"),
     }

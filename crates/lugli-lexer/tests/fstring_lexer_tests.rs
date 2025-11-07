@@ -5,7 +5,7 @@
 // - Escaped braces ({{ and }})
 // - Complex expressions with conditionals and blocks
 
-use lugli_lexer::{tokenize_with_pool, TokenKind};
+use lugli_lexer::{TokenKind, tokenize_with_pool};
 
 #[test]
 fn test_basic_fstring_lexing() {
@@ -81,7 +81,7 @@ fn test_fstring_with_escaped_braces() {
 #[test]
 fn test_fstring_single_quotes() {
     let source = r#"f'Hello {name}!'"#;
-    let (tokens, pool) = tokenize_with_pool(source).unwrap();
+    let (tokens, _pool) = tokenize_with_pool(source).unwrap();
 
     assert_eq!(tokens.len(), 1);
     assert!(matches!(tokens[0].kind, TokenKind::FString(_)));
@@ -90,7 +90,7 @@ fn test_fstring_single_quotes() {
 #[test]
 fn test_fstring_with_method_calls() {
     let source = r#"f"Upper: {text.upper()}""#;
-    let (tokens, pool) = tokenize_with_pool(source).unwrap();
+    let (tokens, _pool) = tokenize_with_pool(source).unwrap();
 
     assert_eq!(tokens.len(), 1);
     assert!(matches!(tokens[0].kind, TokenKind::FString(_)));
@@ -100,7 +100,7 @@ fn test_fstring_with_method_calls() {
 fn test_fstring_with_dict_literal_in_interpolation() {
     // Dict literal inside interpolation (not escaped braces)
     let source = r#"f"Data: {dict_var}""#;
-    let (tokens, pool) = tokenize_with_pool(source).unwrap();
+    let (tokens, _pool) = tokenize_with_pool(source).unwrap();
 
     assert_eq!(tokens.len(), 1);
     assert!(matches!(tokens[0].kind, TokenKind::FString(_)));
@@ -109,7 +109,7 @@ fn test_fstring_with_dict_literal_in_interpolation() {
 #[test]
 fn test_fstring_with_list_comprehension() {
     let source = r#"f"Items: {[x for x in items]}""#;
-    let (tokens, pool) = tokenize_with_pool(source).unwrap();
+    let (tokens, _pool) = tokenize_with_pool(source).unwrap();
 
     assert_eq!(tokens.len(), 1);
     assert!(matches!(tokens[0].kind, TokenKind::FString(_)));
@@ -128,7 +128,7 @@ fn test_multiple_fstrings_in_source() {
 #[test]
 fn test_fstring_empty_interpolation() {
     let source = r#"f"Empty: {}""#;
-    let (tokens, pool) = tokenize_with_pool(source).unwrap();
+    let (tokens, _pool) = tokenize_with_pool(source).unwrap();
 
     assert_eq!(tokens.len(), 1);
     assert!(matches!(tokens[0].kind, TokenKind::FString(_)));
@@ -137,7 +137,7 @@ fn test_fstring_empty_interpolation() {
 #[test]
 fn test_fstring_alternating_quotes() {
     let source = r#"f"Outer {f'Inner {x}'} done""#;
-    let (tokens, pool) = tokenize_with_pool(source).unwrap();
+    let (tokens, _pool) = tokenize_with_pool(source).unwrap();
 
     assert_eq!(tokens.len(), 1);
     assert!(matches!(tokens[0].kind, TokenKind::FString(_)));

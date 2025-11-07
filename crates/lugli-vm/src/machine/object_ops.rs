@@ -1,8 +1,8 @@
-use crate::Bytecode;
-use lugli_common::{LugliError, Value};
-use hashbrown::HashMap;
-use std::{cell::RefCell, rc::Rc};
 use super::Machine;
+use crate::Bytecode;
+use hashbrown::HashMap;
+use lugli_common::{LugliError, Value};
+use std::{cell::RefCell, rc::Rc};
 
 // Object property and collection instruction handlers
 impl Machine {
@@ -16,7 +16,9 @@ impl Machine {
                     let value = dict.get(name_id).cloned().unwrap_or(Value::Null);
                     self.stack.push(value);
                 }
-                Value::Module { exports, .. } => {
+                Value::Module {
+                    exports, ..
+                } => {
                     let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
                     if let Some(value) = exports.get(&name) {
                         self.stack.push(value.clone());
@@ -26,11 +28,7 @@ impl Machine {
                 }
                 _ => {
                     let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                    return Err(LugliError::runtime(format!(
-                        "Cannot access property '{}' on a value of type {}",
-                        name,
-                        object.type_name()
-                    )));
+                    return Err(LugliError::runtime(format!("Cannot access property '{}' on a value of type {}", name, object.type_name())));
                 }
             }
             Ok(())
@@ -47,11 +45,11 @@ impl Machine {
         if let Value::String(name_id) = prop_name {
             if let Value::Dict(dict_ref) = &object {
                 // Detect potential circular reference (direct)
-                if let Value::Dict(value_dict_ref) = &value {
-                    if Rc::ptr_eq(dict_ref, value_dict_ref) {
-                        eprintln!("⚠️  WARNING: Assigning dictionary to itself creates a circular reference");
-                        eprintln!("    This will cause memory leaks. Consider restructuring your data.");
-                    }
+                if let Value::Dict(value_dict_ref) = &value
+                    && Rc::ptr_eq(dict_ref, value_dict_ref)
+                {
+                    eprintln!("⚠️  WARNING: Assigning dictionary to itself creates a circular reference");
+                    eprintln!("    This will cause memory leaks. Consider restructuring your data.");
                 }
 
                 dict_ref
@@ -72,11 +70,7 @@ impl Machine {
                 Ok(())
             } else {
                 let name = bytecode.string_pool.borrow().resolve(*name_id).to_string();
-                Err(LugliError::runtime(format!(
-                    "Cannot set property '{}' on a value of type {}",
-                    name,
-                    object.type_name()
-                )))
+                Err(LugliError::runtime(format!("Cannot set property '{}' on a value of type {}", name, object.type_name())))
             }
         } else {
             Err(LugliError::runtime("Property name must be a string"))
@@ -153,10 +147,7 @@ impl Machine {
         } = function_value
         {
             // Get current stack frame to calculate absolute positions
-            let frame = self
-                .call_stack
-                .last()
-                .ok_or_else(|| LugliError::runtime("Call stack is empty during closure creation"))?;
+            let frame = self.call_stack.last().ok_or_else(|| LugliError::runtime("Call stack is empty during closure creation"))?;
 
             // Capture values from the stack using open upvalues pattern
             let mut upvalues: Vec<Rc<RefCell<Value>>> = Vec::new();
@@ -171,7 +162,9 @@ impl Machine {
                     let value = self.stack.get(absolute_index).cloned().ok_or_else(|| {
                         LugliError::runtime(format!(
                             "Invalid upvalue capture: local {} (absolute {}) out of bounds (stack size: {})",
-                            local_index, absolute_index, self.stack.len()
+                            local_index,
+                            absolute_index,
+                            self.stack.len()
                         ))
                     })?;
                     let shared = Rc::new(RefCell::new(value));
@@ -223,9 +216,7 @@ impl Machine {
                 let actual_idx_opt = if idx_i64 < 0 {
                     let positive_offset = len + idx_i64;
                     if positive_offset < 0 { None } else { Some(positive_offset as usize) }
-                } else {
-                    if idx_i64 >= len { None } else { Some(idx_i64 as usize) }
-                };
+                } else if idx_i64 >= len { None } else { Some(idx_i64 as usize) };
 
                 if let Some(actual_idx) = actual_idx_opt {
                     self.stack.push(list_ref[actual_idx].clone());
@@ -239,11 +230,7 @@ impl Machine {
                 self.stack.push(value);
             }
             (Value::Dict(dict), Value::Number(num)) => {
-                let key_str = if num.fract() == 0.0 && num.abs() < 1e15 {
-                    format!("{:.0}", num)
-                } else {
-                    num.to_string()
-                };
+                let key_str = if num.fract() == 0.0 && num.abs() < 1e15 { format!("{:.0}", num) } else { num.to_string() };
                 let key_id = bytecode.string_pool.borrow_mut().intern(&key_str);
                 let dict_ref = dict.borrow();
                 let value = dict_ref.get(&key_id).cloned().unwrap_or(Value::Null);
@@ -306,8 +293,7 @@ impl Machine {
                     return Err(LugliError::runtime(format!("Index {} out of valid range", idx)));
                 }
 
-                let mut list_ref = list.try_borrow_mut()
-                    .map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?;
+                let mut list_ref = list.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify list while it's being used"))?;
                 let len = list_ref.len() as i64;
                 let idx_i64 = *idx as i64;
 
@@ -331,21 +317,13 @@ impl Machine {
                 self.stack.push(value);
             }
             (Value::Dict(dict), Value::String(key)) => {
-                dict.try_borrow_mut()
-                    .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
-                    .insert(*key, value.clone());
+                dict.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?.insert(*key, value.clone());
                 self.stack.push(value);
             }
             (Value::Dict(dict), Value::Number(num)) => {
-                let key_str = if num.fract() == 0.0 && num.abs() < 1e15 {
-                    format!("{:.0}", num)
-                } else {
-                    num.to_string()
-                };
+                let key_str = if num.fract() == 0.0 && num.abs() < 1e15 { format!("{:.0}", num) } else { num.to_string() };
                 let key_id = bytecode.string_pool.borrow_mut().intern(&key_str);
-                dict.try_borrow_mut()
-                    .map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?
-                    .insert(key_id, value.clone());
+                dict.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify dict while it's being used"))?.insert(key_id, value.clone());
                 self.stack.push(value);
             }
             _ => {

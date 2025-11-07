@@ -204,11 +204,7 @@ impl GarbageCollector {
 
         for (i, root) in roots.iter().enumerate() {
             if root.contains_cycle() {
-                cycles.push(format!(
-                    "Cycle detected in root value #{}: type={}",
-                    i,
-                    root.type_name()
-                ));
+                cycles.push(format!("Cycle detected in root value #{}: type={}", i, root.type_name()));
             }
         }
 

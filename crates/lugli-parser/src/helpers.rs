@@ -326,16 +326,15 @@ impl<'a> Parser<'a> {
             }
 
             // Check for f-string prefix (f" or f') when NOT inside a string
-            if delimiter_stack.is_empty() && ch == 'f' {
-                if let Some(&quote) = chars.peek() {
-                    if quote == '"' || quote == '\'' {
-                        expr_str.push(ch); // push 'f'
-                        if let Some(quote_ch) = chars.next() {
-                            expr_str.push(quote_ch); // push quote
-                            delimiter_stack.push((quote, StringType::FString));
-                            continue;
-                        }
-                    }
+            if delimiter_stack.is_empty() && ch == 'f'
+                && let Some(&quote) = chars.peek()
+                && (quote == '"' || quote == '\'')
+            {
+                expr_str.push(ch); // push 'f'
+                if let Some(quote_ch) = chars.next() {
+                    expr_str.push(quote_ch); // push quote
+                    delimiter_stack.push((quote, StringType::FString));
+                    continue;
                 }
             }
 
@@ -371,8 +370,7 @@ impl<'a> Parser<'a> {
                     true // Not in any string
                 } else {
                     // Check if we're directly in an f-string (not nested in regular string inside it)
-                    delimiter_stack.last() == Some(&('"', StringType::FString))
-                        || delimiter_stack.last() == Some(&('\'', StringType::FString))
+                    delimiter_stack.last() == Some(&('"', StringType::FString)) || delimiter_stack.last() == Some(&('\'', StringType::FString))
                 };
 
                 if should_count {
@@ -384,8 +382,7 @@ impl<'a> Parser<'a> {
                 let should_count = if delimiter_stack.is_empty() {
                     true
                 } else {
-                    delimiter_stack.last() == Some(&('"', StringType::FString))
-                        || delimiter_stack.last() == Some(&('\'', StringType::FString))
+                    delimiter_stack.last() == Some(&('"', StringType::FString)) || delimiter_stack.last() == Some(&('\'', StringType::FString))
                 };
 
                 if should_count {
@@ -494,21 +491,13 @@ impl<'a> Parser<'a> {
             self.parse_dict_pattern()
         } else {
             let name = self.consume_identifier("Expected identifier in pattern")?;
-            if name == "_" {
-                Ok(Pattern::Wildcard)
-            } else {
-                Ok(Pattern::Identifier(name))
-            }
+            if name == "_" { Ok(Pattern::Wildcard) } else { Ok(Pattern::Identifier(name)) }
         }
     }
 
     fn parse_list_pattern(&mut self) -> Result<Pattern, ParseError> {
         self.consume(&TokenKind::LeftBracket, "Expected '['")?;
-        let patterns = self.parse_delimited(
-            &TokenKind::RightBracket,
-            &TokenKind::Comma,
-            |parser| parser.parse_pattern()
-        )?;
+        let patterns = self.parse_delimited(&TokenKind::RightBracket, &TokenKind::Comma, |parser| parser.parse_pattern())?;
         self.consume(&TokenKind::RightBracket, "Expected ']' after list pattern")?;
         Ok(Pattern::List(patterns))
     }
@@ -521,11 +510,7 @@ impl<'a> Parser<'a> {
             loop {
                 let key = self.consume_identifier("Expected field name in dict pattern")?;
 
-                let pattern = if self.match_any(&[TokenKind::Colon]) {
-                    self.parse_pattern()?
-                } else {
-                    Pattern::Identifier(key.clone())
-                };
+                let pattern = if self.match_any(&[TokenKind::Colon]) { self.parse_pattern()? } else { Pattern::Identifier(key.clone()) };
 
                 fields.push((key, pattern));
 
@@ -601,20 +586,28 @@ impl<'a> Parser<'a> {
     /// Convert an expression (List or Dict) to a pattern for destructuring assignment
     pub(crate) fn expr_to_pattern(&self, expr: &lugli_ast::Expr) -> Result<Pattern, ParseError> {
         match expr {
-            lugli_ast::Expr::List { elements, .. } => {
+            lugli_ast::Expr::List {
+                elements, ..
+            } => {
                 let mut patterns = Vec::new();
                 for elem in elements {
                     patterns.push(self.expr_to_pattern(elem)?);
                 }
                 Ok(Pattern::List(patterns))
             }
-            lugli_ast::Expr::Dict { pairs, .. } => {
+            lugli_ast::Expr::Dict {
+                pairs, ..
+            } => {
                 let mut fields = Vec::new();
                 for (key_expr, value_expr) in pairs {
                     // Key must be a string literal or identifier
                     let key = match key_expr {
-                        lugli_ast::Expr::Literal { value: lugli_ast::LiteralValue::String(s), .. } => s.clone(),
-                        lugli_ast::Expr::Identifier { name, .. } => name.clone(),
+                        lugli_ast::Expr::Literal {
+                            value: lugli_ast::LiteralValue::String(s), ..
+                        } => s.clone(),
+                        lugli_ast::Expr::Identifier {
+                            name, ..
+                        } => name.clone(),
                         _ => {
                             let span = self.get_expr_span(key_expr.id());
                             return Err(ParseError::Custom {
@@ -628,7 +621,9 @@ impl<'a> Parser<'a> {
                 }
                 Ok(Pattern::Dict(fields))
             }
-            lugli_ast::Expr::Identifier { name, .. } => {
+            lugli_ast::Expr::Identifier {
+                name, ..
+            } => {
                 if name == "_" {
                     Ok(Pattern::Wildcard)
                 } else {

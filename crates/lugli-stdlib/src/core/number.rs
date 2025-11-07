@@ -22,11 +22,7 @@ pub fn number_floor(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lug
 pub fn number_sqrt(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity(args, 1, "sqrt")?;
     let n = expect_number(&args[0], "sqrt", 1)?;
-    if n < 0.0 {
-        Err(LugliError::runtime("sqrt expects a non-negative number"))
-    } else {
-        Ok(Value::Number(n.sqrt()))
-    }
+    if n < 0.0 { Err(LugliError::runtime("sqrt expects a non-negative number")) } else { Ok(Value::Number(n.sqrt())) }
 }
 
 pub fn number_sin(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
@@ -50,11 +46,7 @@ pub fn number_tan(args: &[Value], _pool: &mut StringPool) -> Result<Value, Lugli
 pub fn number_log(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity(args, 1, "log")?;
     let n = expect_number(&args[0], "log", 1)?;
-    if n <= 0.0 {
-        Err(LugliError::runtime("log expects a positive number"))
-    } else {
-        Ok(Value::Number(n.ln()))
-    }
+    if n <= 0.0 { Err(LugliError::runtime("log expects a positive number")) } else { Ok(Value::Number(n.ln())) }
 }
 
 pub fn number_exp(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {

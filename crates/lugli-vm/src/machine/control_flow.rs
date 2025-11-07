@@ -1,5 +1,5 @@
-use lugli_common::{LugliError, Value};
 use super::Machine;
+use lugli_common::{LugliError, Value};
 
 // Control flow instruction handlers
 impl Machine {

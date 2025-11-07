@@ -34,23 +34,16 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    pub(crate) fn or(&mut self) -> Result<Expr, ParseError> {
-        self.parse_binary_left_associative(&[TokenKind::Or], Self::and)
-    }
+    pub(crate) fn or(&mut self) -> Result<Expr, ParseError> { self.parse_binary_left_associative(&[TokenKind::Or], Self::and) }
 
-    pub(crate) fn and(&mut self) -> Result<Expr, ParseError> {
-        self.parse_binary_left_associative(&[TokenKind::And], Self::equality)
-    }
+    pub(crate) fn and(&mut self) -> Result<Expr, ParseError> { self.parse_binary_left_associative(&[TokenKind::And], Self::equality) }
 
     pub(crate) fn equality(&mut self) -> Result<Expr, ParseError> {
         self.parse_binary_left_associative(&[TokenKind::BangEqual, TokenKind::EqualEqual], Self::comparison)
     }
 
     pub(crate) fn comparison(&mut self) -> Result<Expr, ParseError> {
-        self.parse_binary_left_associative(
-            &[TokenKind::Greater, TokenKind::GreaterEqual, TokenKind::Less, TokenKind::LessEqual],
-            Self::term,
-        )
+        self.parse_binary_left_associative(&[TokenKind::Greater, TokenKind::GreaterEqual, TokenKind::Less, TokenKind::LessEqual], Self::term)
     }
 
     pub(crate) fn term(&mut self) -> Result<Expr, ParseError> {
@@ -58,10 +51,7 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn factor(&mut self) -> Result<Expr, ParseError> {
-        self.parse_binary_left_associative(
-            &[TokenKind::Slash, TokenKind::Star, TokenKind::Percent, TokenKind::IntegerDivision],
-            Self::power,
-        )
+        self.parse_binary_left_associative(&[TokenKind::Slash, TokenKind::Star, TokenKind::Percent, TokenKind::IntegerDivision], Self::power)
     }
 
     pub(crate) fn power(&mut self) -> Result<Expr, ParseError> {

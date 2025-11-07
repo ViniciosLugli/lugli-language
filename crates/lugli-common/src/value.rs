@@ -368,18 +368,22 @@ impl Value {
                 visited.remove(&ptr);
                 false
             }
-            Value::Closure { upvalues, .. } => {
+            Value::Closure {
+                upvalues, ..
+            } => {
                 // Check upvalues for cycles
                 for upvalue in upvalues {
-                    if let Ok(uv_ref) = upvalue.try_borrow() {
-                        if uv_ref.contains_cycle_impl(visited) {
-                            return true;
-                        }
+                    if let Ok(uv_ref) = upvalue.try_borrow()
+                        && uv_ref.contains_cycle_impl(visited)
+                    {
+                        return true;
                     }
                 }
                 false
             }
-            Value::StructInstance { fields, .. } => {
+            Value::StructInstance {
+                fields, ..
+            } => {
                 // Use stable hash of fields HashMap pointer
                 let ptr = (fields as *const HashMap<StringId, Value>) as usize;
                 if visited.contains(&ptr) {

@@ -1,5 +1,4 @@
-use crate::validation::*;
-use crate::NativeFunction;
+use crate::{NativeFunction, validation::*};
 use lugli_common::{LugliError, StringPool, Value};
 use std::{cell::RefCell, rc::Rc};
 
@@ -334,13 +333,9 @@ fn minmax_fn(args: &[Value], pool: &mut StringPool, op: Comparison) -> Result<Va
     }
 }
 
-fn min_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    minmax_fn(args, pool, Comparison::Min)
-}
+fn min_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> { minmax_fn(args, pool, Comparison::Min) }
 
-fn max_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> {
-    minmax_fn(args, pool, Comparison::Max)
-}
+fn max_fn(args: &[Value], pool: &mut StringPool) -> Result<Value, LugliError> { minmax_fn(args, pool, Comparison::Max) }
 
 fn abs_fn(args: &[Value], _pool: &mut StringPool) -> Result<Value, LugliError> {
     check_arity(args, 1, "abs")?;

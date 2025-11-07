@@ -1,6 +1,6 @@
+use super::Machine;
 use crate::Bytecode;
 use lugli_common::{LugliError, Value};
-use super::Machine;
 
 // Variable operation instruction handlers
 impl Machine {
@@ -13,7 +13,9 @@ impl Machine {
             .ok_or_else(|| {
                 LugliError::runtime(format!(
                     "Stack underflow: attempted to load local {} at index {} (stack size: {})",
-                    index, target_index, self.stack.len()
+                    index,
+                    target_index,
+                    self.stack.len()
                 ))
             })?
             .clone();
@@ -43,10 +45,7 @@ impl Machine {
                 .get(index)
                 .ok_or_else(|| LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len())))?;
 
-            let value = upvalue_ref
-                .try_borrow()
-                .map_err(|_| LugliError::runtime("Cannot access upvalue while it's being modified"))?
-                .clone();
+            let value = upvalue_ref.try_borrow().map_err(|_| LugliError::runtime("Cannot access upvalue while it's being modified"))?.clone();
 
             self.stack.push(value);
             Ok(())
@@ -64,9 +63,7 @@ impl Machine {
                 .get(index)
                 .ok_or_else(|| LugliError::runtime(format!("Upvalue index {} out of bounds (have {} upvalues)", index, upvalues.len())))?;
 
-            *upvalue_ref
-                .try_borrow_mut()
-                .map_err(|_| LugliError::runtime("Cannot modify upvalue while it's being used"))? = value;
+            *upvalue_ref.try_borrow_mut().map_err(|_| LugliError::runtime("Cannot modify upvalue while it's being used"))? = value;
             Ok(())
         } else {
             Err(LugliError::runtime("StoreUpvalue used in non-closure context"))

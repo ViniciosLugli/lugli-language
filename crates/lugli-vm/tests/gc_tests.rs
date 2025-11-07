@@ -27,7 +27,7 @@ print("Circular references created")
 
     // Check GC stats
     let stats = machine.gc_stats();
-    assert_eq!(stats.is_running, false); // GC should not be running after execution
+    assert!(!stats.is_running); // GC should not be running after execution
 }
 
 #[test]
@@ -56,7 +56,7 @@ print(f"Completed {count} iterations")
 
     // GC should have run at least once
     let stats = machine.gc_stats();
-    assert_eq!(stats.is_running, false);
+    assert!(!stats.is_running);
 }
 
 #[test]
