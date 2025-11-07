@@ -2,6 +2,7 @@ use super::Compiler;
 use crate::Instruction;
 use lugli_ast::{Expr, FStringPart, LiteralValue};
 use lugli_common::{LugliError, Value};
+use std::rc::Rc;
 
 impl Compiler {
     pub(super) fn compile_expr(&mut self, expr: &Expr) -> Result<(), LugliError> {
@@ -445,8 +446,8 @@ impl Compiler {
                 if captures.is_empty() {
                     // No captures - regular function
                     let function_value = Value::Function {
-                        name: "<lambda>".to_string(),
-                        params: params.clone(),
+                        name: Rc::from("<lambda>"),
+                        params: Rc::new(params.clone()),
                         body_start,
                         bytecode_id: 0, // Main bytecode
                     };
@@ -456,8 +457,8 @@ impl Compiler {
                     // Has captures - emit MakeClosure instruction
                     // First create the base function template
                     let function_value = Value::Function {
-                        name: "<lambda>".to_string(),
-                        params: params.clone(),
+                        name: Rc::from("<lambda>"),
+                        params: Rc::new(params.clone()),
                         body_start,
                         bytecode_id: 0, // Main bytecode
                     };

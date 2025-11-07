@@ -763,7 +763,7 @@ impl Machine {
                         }
                         | Value::Closure {
                             name, ..
-                        } => name.clone(),
+                        } => name.to_string(),
                         _ => "<unknown>".to_string(),
                     };
                     eprintln!("[CALL] {} with {} arguments", func_name, arg_count);

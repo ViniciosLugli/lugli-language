@@ -52,14 +52,14 @@ pub enum Value {
     /// Dictionary with potential for circular references (see type docs)
     Dict(Rc<RefCell<HashMap<StringId, Value>>>),
     Function {
-        name: String,
-        params: Vec<String>,
+        name: Rc<str>,
+        params: Rc<Vec<String>>,
         body_start: usize,
         bytecode_id: usize,
     },
     Closure {
-        name: String,
-        params: Vec<String>,
+        name: Rc<str>,
+        params: Rc<Vec<String>>,
         body_start: usize,
         bytecode_id: usize,
         upvalues: Vec<Rc<RefCell<Value>>>,
