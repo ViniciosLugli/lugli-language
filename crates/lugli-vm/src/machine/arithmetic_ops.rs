@@ -1,6 +1,6 @@
+use super::Machine;
 use crate::Bytecode;
 use lugli_common::{LugliError, Value};
-use super::Machine;
 
 // Arithmetic and logical operation instruction handlers
 impl Machine {
@@ -18,29 +18,17 @@ impl Machine {
         Ok(())
     }
 
-    pub(super) fn exec_subtract(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::subtract)
-    }
+    pub(super) fn exec_subtract(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::subtract) }
 
-    pub(super) fn exec_multiply(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::multiply)
-    }
+    pub(super) fn exec_multiply(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::multiply) }
 
-    pub(super) fn exec_divide(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::divide)
-    }
+    pub(super) fn exec_divide(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::divide) }
 
-    pub(super) fn exec_integer_divide(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::integer_divide)
-    }
+    pub(super) fn exec_integer_divide(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::integer_divide) }
 
-    pub(super) fn exec_modulo(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::modulo)
-    }
+    pub(super) fn exec_modulo(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::modulo) }
 
-    pub(super) fn exec_power(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::power)
-    }
+    pub(super) fn exec_power(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::power) }
 
     pub(super) fn exec_add_int(&mut self, n: i8) -> Result<(), LugliError> {
         let left = self.pop()?;
@@ -112,19 +100,11 @@ impl Machine {
         Ok(())
     }
 
-    pub(super) fn exec_greater(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::greater)
-    }
+    pub(super) fn exec_greater(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::greater) }
 
-    pub(super) fn exec_greater_equal(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::greater_equal)
-    }
+    pub(super) fn exec_greater_equal(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::greater_equal) }
 
-    pub(super) fn exec_less(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::less)
-    }
+    pub(super) fn exec_less(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::less) }
 
-    pub(super) fn exec_less_equal(&mut self) -> Result<(), LugliError> {
-        self.execute_binary_op(Value::less_equal)
-    }
+    pub(super) fn exec_less_equal(&mut self) -> Result<(), LugliError> { self.execute_binary_op(Value::less_equal) }
 }

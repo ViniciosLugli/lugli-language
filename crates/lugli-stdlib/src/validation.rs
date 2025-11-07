@@ -1,5 +1,5 @@
-use lugli_common::{LugliError, StringId, StringPool, Value};
 use hashbrown::HashMap;
+use lugli_common::{LugliError, StringId, StringPool, Value};
 use std::{cell::RefCell, rc::Rc};
 
 /// Validates that args has exactly `expected` number of arguments
@@ -138,10 +138,7 @@ pub fn validate_list_index_for_set(index: &Value, list_len: usize) -> Result<usi
                 positive_offset as usize
             } else {
                 if idx_i64 >= len {
-                    return Err(LugliError::runtime(format!(
-                        "Index {} out of range for list assignment (length {})",
-                        idx_i64, len
-                    )));
+                    return Err(LugliError::runtime(format!("Index {} out of range for list assignment (length {})", idx_i64, len)));
                 }
                 idx_i64 as usize
             };
@@ -193,7 +190,7 @@ mod tests {
     #[test]
     fn test_expect_bool() {
         let b = Value::Bool(true);
-        assert_eq!(expect_bool(&b, "test", 1).unwrap(), true);
+        assert!(expect_bool(&b, "test", 1).unwrap());
 
         let not_bool = Value::Number(1.0);
         assert!(expect_bool(&not_bool, "test", 1).is_err());

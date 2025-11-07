@@ -8,11 +8,7 @@ fn parse(source: &str) -> Result<(lugli_ast::Program, lugli_ast::SpanMap), lugli
 
 #[test]
 fn test_list_destructuring_simple() {
-    let test_cases = vec![
-        "let [x, y] = [1, 2]",
-        "let [a, b, c] = items",
-        "mut [first, second] = pair",
-    ];
+    let test_cases = vec!["let [x, y] = [1, 2]", "let [a, b, c] = items", "mut [first, second] = pair"];
 
     for source in test_cases {
         let result = parse(source);
@@ -20,7 +16,9 @@ fn test_list_destructuring_simple() {
 
         let (program, _) = result.unwrap();
         match &program.statements[0] {
-            Stmt::VarDecl { pattern: Pattern::List(patterns), .. } => {
+            Stmt::VarDecl {
+                pattern: Pattern::List(patterns), ..
+            } => {
                 assert!(patterns.len() >= 2, "Expected at least 2 patterns in: {}", source);
             }
             _ => panic!("Expected VarDecl with List pattern for: {}", source),
@@ -30,11 +28,7 @@ fn test_list_destructuring_simple() {
 
 #[test]
 fn test_multiple_assignment_shorthand() {
-    let test_cases = vec![
-        ("let x, y = 10, 20", 2),
-        ("let a, b, c = 1, 2, 3", 3),
-        ("mut x, y, z, w = 1, 2, 3, 4", 4),
-    ];
+    let test_cases = vec![("let x, y = 10, 20", 2), ("let a, b, c = 1, 2, 3", 3), ("mut x, y, z, w = 1, 2, 3, 4", 4)];
 
     for (source, expected_count) in test_cases {
         let result = parse(source);
@@ -44,7 +38,9 @@ fn test_multiple_assignment_shorthand() {
         match &program.statements[0] {
             Stmt::VarDecl {
                 pattern: Pattern::List(patterns),
-                initializer: Some(Expr::List { elements, .. }),
+                initializer: Some(Expr::List {
+                    elements, ..
+                }),
                 ..
             } => {
                 assert_eq!(patterns.len(), expected_count, "Wrong pattern count in: {}", source);
@@ -57,11 +53,7 @@ fn test_multiple_assignment_shorthand() {
 
 #[test]
 fn test_dict_destructuring_simple() {
-    let test_cases = vec![
-        "let {name, age} = person",
-        "let {x, y} = point",
-        "mut {key, value} = pair",
-    ];
+    let test_cases = vec!["let {name, age} = person", "let {x, y} = point", "mut {key, value} = pair"];
 
     for source in test_cases {
         let result = parse(source);
@@ -69,7 +61,9 @@ fn test_dict_destructuring_simple() {
 
         let (program, _) = result.unwrap();
         match &program.statements[0] {
-            Stmt::VarDecl { pattern: Pattern::Dict(fields), .. } => {
+            Stmt::VarDecl {
+                pattern: Pattern::Dict(fields), ..
+            } => {
                 assert!(fields.len() >= 2, "Expected at least 2 fields in: {}", source);
             }
             _ => panic!("Expected VarDecl with Dict pattern for: {}", source),
@@ -85,7 +79,9 @@ fn test_dict_destructuring_with_renaming() {
 
     let (program, _) = result.unwrap();
     match &program.statements[0] {
-        Stmt::VarDecl { pattern: Pattern::Dict(fields), .. } => {
+        Stmt::VarDecl {
+            pattern: Pattern::Dict(fields), ..
+        } => {
             assert_eq!(fields.len(), 2);
             assert_eq!(fields[0].0, "x");
             assert_eq!(fields[1].0, "y");
@@ -108,7 +104,9 @@ fn test_dict_destructuring_shorthand() {
 
     let (program, _) = result.unwrap();
     match &program.statements[0] {
-        Stmt::VarDecl { pattern: Pattern::Dict(fields), .. } => {
+        Stmt::VarDecl {
+            pattern: Pattern::Dict(fields), ..
+        } => {
             // Shorthand {name} means {name: name}
             assert_eq!(fields[0].0, "name");
             match &fields[0].1 {
@@ -128,7 +126,9 @@ fn test_nested_destructuring() {
 
     let (program, _) = result.unwrap();
     match &program.statements[0] {
-        Stmt::VarDecl { pattern: Pattern::List(patterns), .. } => {
+        Stmt::VarDecl {
+            pattern: Pattern::List(patterns), ..
+        } => {
             assert_eq!(patterns.len(), 2);
 
             // Second element should be a nested list pattern
@@ -145,11 +145,7 @@ fn test_nested_destructuring() {
 
 #[test]
 fn test_for_loop_list_destructuring() {
-    let test_cases = vec![
-        "for [k, v] in pairs { }",
-        "for [index, item] in enumerate(list) { }",
-        "for [x, y, z] in coords { }",
-    ];
+    let test_cases = vec!["for [k, v] in pairs { }", "for [index, item] in enumerate(list) { }", "for [x, y, z] in coords { }"];
 
     for source in test_cases {
         let result = parse(source);
@@ -157,7 +153,9 @@ fn test_for_loop_list_destructuring() {
 
         let (program, _) = result.unwrap();
         match &program.statements[0] {
-            Stmt::For { pattern: Pattern::List(patterns), .. } => {
+            Stmt::For {
+                pattern: Pattern::List(patterns), ..
+            } => {
                 assert!(patterns.len() >= 2, "Expected at least 2 patterns in: {}", source);
             }
             _ => panic!("Expected For with List pattern for: {}", source),
@@ -173,7 +171,9 @@ fn test_for_loop_dict_destructuring() {
 
     let (program, _) = result.unwrap();
     match &program.statements[0] {
-        Stmt::For { pattern: Pattern::Dict(fields), .. } => {
+        Stmt::For {
+            pattern: Pattern::Dict(fields), ..
+        } => {
             assert_eq!(fields.len(), 2);
         }
         _ => panic!("Expected For with Dict pattern"),
@@ -205,7 +205,9 @@ fn test_wildcard_in_destructuring() {
 
     let (program, _) = result.unwrap();
     match &program.statements[0] {
-        Stmt::VarDecl { pattern: Pattern::List(patterns), .. } => {
+        Stmt::VarDecl {
+            pattern: Pattern::List(patterns), ..
+        } => {
             assert_eq!(patterns.len(), 3);
             match &patterns[1] {
                 Pattern::Wildcard => {} // Success
@@ -224,7 +226,9 @@ fn test_mixed_destructuring() {
 
     let (program, _) = result.unwrap();
     match &program.statements[0] {
-        Stmt::VarDecl { pattern: Pattern::List(patterns), .. } => {
+        Stmt::VarDecl {
+            pattern: Pattern::List(patterns), ..
+        } => {
             assert_eq!(patterns.len(), 3);
 
             // Middle element should be dict pattern
@@ -249,11 +253,7 @@ fn test_destructuring_error_const_without_init() {
 #[test]
 fn test_single_variable_still_works() {
     // Ensure backward compatibility
-    let test_cases = vec![
-        "let x = 5",
-        "mut y = 10",
-        "const Z = 15",
-    ];
+    let test_cases = vec!["let x = 5", "mut y = 10", "const Z = 15"];
 
     for source in test_cases {
         let result = parse(source);
@@ -261,7 +261,9 @@ fn test_single_variable_still_works() {
 
         let (program, _) = result.unwrap();
         match &program.statements[0] {
-            Stmt::VarDecl { pattern: Pattern::Identifier(_), .. } => {} // Success
+            Stmt::VarDecl {
+                pattern: Pattern::Identifier(_), ..
+            } => {} // Success
             _ => panic!("Expected VarDecl with Identifier pattern for: {}", source),
         }
     }

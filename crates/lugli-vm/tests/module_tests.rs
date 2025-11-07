@@ -249,10 +249,7 @@ fn test_nested_module_imports() {
     fs::write(test_dir.join("c.lg"), "let value = 42").unwrap();
 
     // Create b.lg that imports c
-    let b_content = format!(
-        "import {}.c\nfn get_value() {{ return c.value }}",
-        test_dir.display()
-    );
+    let b_content = format!("import {}.c\nfn get_value() {{ return c.value }}", test_dir.display());
     fs::write(test_dir.join("b.lg"), &b_content).unwrap();
 
     // Create a.lg that imports b
@@ -260,10 +257,7 @@ fn test_nested_module_imports() {
     fs::write(test_dir.join("a.lg"), &a_content).unwrap();
 
     // Import a, which imports b, which imports c
-    let code = format!(
-        "import {}.a\na.b.get_value()",
-        test_dir.display()
-    );
+    let code = format!("import {}.a\na.b.get_value()", test_dir.display());
     let result = run_code(&code);
 
     fs::remove_dir_all(&test_dir).unwrap();
@@ -279,10 +273,7 @@ fn test_nested_module_imports() {
 fn test_from_import_nonexistent_item() {
     let test_dir = setup_test_module("nonexistent_item");
 
-    let code = format!(
-        r#"from {}.math import nonexistent_function"#,
-        test_dir.display()
-    );
+    let code = format!(r#"from {}.math import nonexistent_function"#, test_dir.display());
 
     let result = run_code(&code);
     cleanup_test_module("nonexistent_item");
@@ -302,10 +293,7 @@ fn test_module_with_syntax_error() {
     fs::create_dir_all(&test_dir).unwrap();
 
     // Create a module with syntax error
-    fs::write(
-        test_dir.join("broken.lg"),
-        "let x = \n this is invalid syntax"
-    ).unwrap();
+    fs::write(test_dir.join("broken.lg"), "let x = \n this is invalid syntax").unwrap();
 
     let code = format!("import {}.broken", test_dir.display());
     let result = run_code(&code);
@@ -321,10 +309,7 @@ fn test_module_with_runtime_error() {
     fs::create_dir_all(&test_dir).unwrap();
 
     // Create a module that will cause runtime error
-    fs::write(
-        test_dir.join("divzero.lg"),
-        "let x = 1 / 0"
-    ).unwrap();
+    fs::write(test_dir.join("divzero.lg"), "let x = 1 / 0").unwrap();
 
     let code = format!("import {}.divzero", test_dir.display());
     let result = run_code(&code);
@@ -333,11 +318,7 @@ fn test_module_with_runtime_error() {
 
     assert!(result.is_err(), "Should error on module with runtime error");
     let err_msg = result.unwrap_err();
-    assert!(
-        err_msg.contains("division") || err_msg.contains("zero"),
-        "Error should mention division by zero, got: {}",
-        err_msg
-    );
+    assert!(err_msg.contains("division") || err_msg.contains("zero"), "Error should mention division by zero, got: {}", err_msg);
 }
 
 #[test]
@@ -345,10 +326,7 @@ fn test_import_preserves_module_scope() {
     let test_dir = setup_test_module("scope_test");
 
     // Module defines private variable
-    fs::write(
-        test_dir.join("scoped.lg"),
-        "let private_var = 100\nfn get_private() { return private_var }"
-    ).unwrap();
+    fs::write(test_dir.join("scoped.lg"), "let private_var = 100\nfn get_private() { return private_var }").unwrap();
 
     let code = format!(
         r#"

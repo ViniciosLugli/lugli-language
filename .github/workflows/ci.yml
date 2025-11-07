@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ production ]
+    branches: [ main, production, claude/* ]
   pull_request:
-    branches: [ production ]
+    branches: [ main, production ]
   workflow_dispatch:
 
 env:

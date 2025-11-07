@@ -200,7 +200,7 @@ fn msg2() {
     return f"Module 2 says goodbye"
 }
 "#;
-    let test_dir2 = PathBuf::from(format!("test_modules_string_multi_mod2"));
+    let test_dir2 = PathBuf::from("test_modules_string_multi_mod2");
     fs::create_dir_all(&test_dir2).unwrap();
     let helper2_path = test_dir2.join("helper2.lg");
     fs::write(&helper2_path, helper2_content).unwrap();

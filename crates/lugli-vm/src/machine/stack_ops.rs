@@ -1,6 +1,6 @@
-use crate::{Bytecode, Instruction};
-use lugli_common::{LugliError, Value};
 use super::Machine;
+use crate::Bytecode;
+use lugli_common::{LugliError, Value};
 
 // Stack operation instruction handlers
 impl Machine {

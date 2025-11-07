@@ -1,6 +1,6 @@
+use super::Machine;
 use crate::Bytecode;
 use lugli_common::{LugliError, Value};
-use super::Machine;
 
 // Utility and module operation instruction handlers
 impl Machine {
@@ -44,11 +44,22 @@ impl Machine {
                     .collect();
                 format!("{{{}}}", pairs.join(", "))
             }
-            Value::Function { name, .. } | Value::Closure { name, .. } => format!("<function {}>", name),
-            Value::NativeFunction { name, .. } => format!("<native function {}>", name),
-            Value::StructInstance { name, .. } => format!("<{} instance>", name),
+            Value::Function {
+                name, ..
+            }
+            | Value::Closure {
+                name, ..
+            } => format!("<function {}>", name),
+            Value::NativeFunction {
+                name, ..
+            } => format!("<native function {}>", name),
+            Value::StructInstance {
+                name, ..
+            } => format!("<{} instance>", name),
             Value::DateTime(dt) => dt.to_string(),
-            Value::Module { path, .. } => format!("<module {}>", path),
+            Value::Module {
+                path, ..
+            } => format!("<module {}>", path),
         };
         drop(pool);
         let id = bytecode.string_pool.borrow_mut().intern(&string_value);

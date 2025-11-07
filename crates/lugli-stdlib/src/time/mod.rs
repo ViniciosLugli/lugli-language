@@ -1,5 +1,4 @@
-use crate::validation::check_arity;
-use crate::NativeFunction;
+use crate::{NativeFunction, validation::check_arity};
 use chrono::Utc;
 use lugli_common::{LugliError, StringPool, Value};
 

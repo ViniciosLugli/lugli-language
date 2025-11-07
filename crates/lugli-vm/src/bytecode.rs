@@ -1,6 +1,5 @@
 use lugli_common::{Span, StringPool, Value};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Instruction {

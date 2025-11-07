@@ -1,14 +1,18 @@
+use lugli_ast::{Expr, LiteralValue, Stmt};
 use lugli_parser::Parser;
-use lugli_ast::{Stmt, Expr, LiteralValue};
 
 fn extract_string_literal(source: &str) -> Option<String> {
     let mut parser = Parser::new(source).ok()?;
     let (ast, _span_map) = parser.parse().ok()?;
 
-    if let Some(Stmt::VarDecl { initializer: Some(expr), .. }) = ast.statements.first() {
-        if let Expr::Literal { value: LiteralValue::String(s), .. } = expr {
-            return Some(s.clone());
-        }
+    if let Some(Stmt::VarDecl {
+        initializer: Some(expr), ..
+    }) = ast.statements.first()
+        && let Expr::Literal {
+            value: LiteralValue::String(s), ..
+        } = expr
+    {
+        return Some(s.clone());
     }
     None
 }

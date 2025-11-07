@@ -32,13 +32,10 @@ impl StringPool {
 
         // Pre-intern most common identifiers and keywords
         let common = [
-            "self", "true", "false", "null", "len", "push", "pop", "get", "set",
-            "name", "value", "result", "data", "error", "message", "type", "item",
-            "index", "key", "size", "count", "list", "dict", "string", "number",
-            "add", "remove", "contains", "clear", "empty", "start", "end", "text",
-            "i", "j", "k", "x", "y", "z", "a", "b", "c", "n", "m", "tmp", "temp",
-            "main", "fn", "struct", "if", "else", "for", "while", "return", "match",
-            "print", "input", "str", "int", "float", "bool", "upper", "lower", "split",
+            "self", "true", "false", "null", "len", "push", "pop", "get", "set", "name", "value", "result", "data", "error", "message", "type",
+            "item", "index", "key", "size", "count", "list", "dict", "string", "number", "add", "remove", "contains", "clear", "empty", "start",
+            "end", "text", "i", "j", "k", "x", "y", "z", "a", "b", "c", "n", "m", "tmp", "temp", "main", "fn", "struct", "if", "else", "for",
+            "while", "return", "match", "print", "input", "str", "int", "float", "bool", "upper", "lower", "split",
         ];
 
         for s in &common {

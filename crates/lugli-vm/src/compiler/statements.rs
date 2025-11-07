@@ -232,11 +232,7 @@ impl Compiler {
 
                 // Patch ReserveLocals with actual local count
                 let total_local_count = self.local_count;
-                let locals_to_reserve = if total_local_count > param_count {
-                    total_local_count - param_count
-                } else {
-                    0
-                };
+                let locals_to_reserve = total_local_count.saturating_sub(param_count);
                 self.bytecode.instructions[reserve_locals_ip] = Instruction::ReserveLocals(locals_to_reserve);
 
                 self.patch_jump(jump_over_body)?;

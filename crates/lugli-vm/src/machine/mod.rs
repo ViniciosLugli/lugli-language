@@ -8,12 +8,12 @@ use lugli_stdlib::get_global_functions;
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
 
 // Instruction handler modules
-mod stack_ops;
 mod arithmetic_ops;
-mod variable_ops;
-mod object_ops;
 mod control_flow;
+mod object_ops;
+mod stack_ops;
 mod utility_ops;
+mod variable_ops;
 
 const MAX_STACK_SIZE: usize = 10_000;
 const MAX_CALL_DEPTH: usize = 1000;
@@ -459,10 +459,10 @@ impl Machine {
 
                 // Save and restore module globals for cross-bytecode execution
                 let saved_globals = self.globals.clone();
-                if bytecode_id != &0 {
-                    if let Some(module_globals) = self.module_globals.get(bytecode_id) {
-                        self.globals = (**module_globals).clone();
-                    }
+                if bytecode_id != &0
+                    && let Some(module_globals) = self.module_globals.get(bytecode_id)
+                {
+                    self.globals = (**module_globals).clone();
                 }
 
                 // Jump to function body
@@ -632,11 +632,7 @@ impl Machine {
 
         self.module_cache.unmark_loading(&resolved_path);
 
-        let module = crate::module::Module::with_globals(
-            resolved_path.clone(),
-            module_bytecode,
-            module_exports.clone(),
-        );
+        let module = crate::module::Module::with_globals(resolved_path.clone(), module_bytecode, module_exports.clone());
 
         self.module_cache.insert(resolved_path, module);
 
@@ -939,7 +935,9 @@ impl Machine {
                 if self.stack.len() < arg_count + 1 {
                     return Err(LugliError::runtime(format!(
                         "Stack underflow in CallMethod: need {} elements (1 object + {} args), have {}",
-                        arg_count + 1, arg_count, self.stack.len()
+                        arg_count + 1,
+                        arg_count,
+                        self.stack.len()
                     )));
                 }
                 let object_index = self.stack.len() - arg_count - 1;
@@ -952,7 +950,8 @@ impl Machine {
                     if let Some(Value::String(struct_type_id)) = dict_ref.get(&struct_type_key) {
                         // Clone the struct type name before dropping the borrow
                         let struct_type_id = *struct_type_id;
-                        let struct_type = self.resolve_string_id(struct_type_id)
+                        let struct_type = self
+                            .resolve_string_id(struct_type_id)
                             .ok_or_else(|| LugliError::runtime(format!("Invalid struct type id: {}", struct_type_id.as_u32())))?;
 
                         // Check if the property is a function field
@@ -1035,8 +1034,7 @@ impl Machine {
                         let struct_method_name = format!("{}_{}", struct_type, method_name);
 
                         // Look up the method in globals first, then check all loaded modules
-                        let func = self.globals.get(&struct_method_name).cloned()
-                            .or_else(|| self.module_cache.find_in_exports(&struct_method_name));
+                        let func = self.globals.get(&struct_method_name).cloned().or_else(|| self.module_cache.find_in_exports(&struct_method_name));
 
                         if let Some(func) = func {
                             match func {
@@ -1220,12 +1218,14 @@ impl Machine {
 
             // Utility and module operations
             Instruction::ToString => self.exec_to_string(bytecode)?,
-            Instruction::ImportModule { module_idx, bind_name } => {
-                self.exec_import_module(bytecode, *module_idx, bind_name)?
-            }
-            Instruction::ImportFrom { module_idx, names } => {
-                self.exec_import_from(bytecode, *module_idx, names)?
-            }
+            Instruction::ImportModule {
+                module_idx,
+                bind_name,
+            } => self.exec_import_module(bytecode, *module_idx, bind_name)?,
+            Instruction::ImportFrom {
+                module_idx,
+                names,
+            } => self.exec_import_from(bytecode, *module_idx, names)?,
         };
 
         // Timing measurement
